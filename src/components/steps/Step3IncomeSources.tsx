@@ -278,11 +278,13 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
 
 // ─── Assets section ───────────────────────────────────────────────────────────
 
-function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
+function AssetsSection({ assets, set, mode, p1Label, p2Label, jointGia }: {
   assets: PersonAssets;
   set: (key: keyof PersonAssets, u: Record<string, unknown>) => void;
   mode: 'single' | 'couple';
   p1Label: string; p2Label: string;
+  /** When set, person 1's joint GIA is shown read-only instead of a separate input. */
+  jointGia?: PersonAssets['generalInvestments'];
 }) {
   const { cashSavings, isaInvestments, generalInvestments, property } = assets;
   const giaGain  = generalInvestments.enabled ? Math.max(0, generalInvestments.totalValue - generalInvestments.baseCost) : 0;
@@ -314,6 +316,37 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
         </div>
       </SourceCard>
 
+      {/* Joint GIA — read-only mirror when owned jointly on person 1 */}
+      {jointGia ? (
+        <div className="rounded-2xl border-2 border-orange-200 bg-white overflow-hidden">
+          <div className="flex items-start justify-between p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl mt-0.5">📊</span>
+              <div>
+                <p className="font-bold text-sm text-slate-800">General Investments (GIA)</p>
+                <p className="text-xs text-slate-400 mt-0.5">Joint asset — managed under {p1Label}&apos;s assets</p>
+              </div>
+            </div>
+            <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full">Joint</span>
+          </div>
+          <div className="border-t border-orange-100 px-4 pb-3 space-y-0">
+            <FieldRow label="Current market value">
+              <span className="text-sm font-bold text-slate-700">£{jointGia.totalValue.toLocaleString('en-GB')}</span>
+            </FieldRow>
+            <FieldRow label="Purchase price / base cost">
+              <span className="text-sm font-bold text-slate-700">£{jointGia.baseCost.toLocaleString('en-GB')}</span>
+            </FieldRow>
+            <FieldRow label="Annual growth rate">
+              <span className="text-sm font-bold text-slate-700">{jointGia.growthRate}%</span>
+            </FieldRow>
+            {jointGia.totalValue > jointGia.baseCost && (
+              <div className="py-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3">
+                Unrealised gain: <strong>£{(jointGia.totalValue - jointGia.baseCost).toLocaleString('en-GB')}</strong> · Gains split equally between both persons&apos; CGT allowances.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <SourceCard icon="📊" title="General Investments (GIA)"
         desc="Shares, funds or bonds held outside an ISA"
         enabled={generalInvestments.enabled} onToggle={(v) => set('generalInvestments', { enabled: v })}
@@ -339,6 +372,7 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
           </div>
         )}
       </SourceCard>
+      )}
 
       <SourceCard icon="🏘️" title="Rental Property"
         desc="Capture property value for CGT planning and rental income for projections"
@@ -450,7 +484,15 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
       {activeTab === 'income' ? (
         <IncomeSection currentAge={person.currentAge} fiAge={fiAge} src={person.incomeSources} assets={person.assets} set={setIncome} />
       ) : (
-        <AssetsSection assets={person.assets} set={setAsset} mode={mode} p1Label={p1Label} p2Label={p2Label} />
+        <AssetsSection
+          assets={person.assets} set={setAsset} mode={mode}
+          p1Label={p1Label} p2Label={p2Label}
+          jointGia={
+            !isPerson1 && person1.assets.generalInvestments.enabled && person1.assets.generalInvestments.owner === 'joint'
+              ? person1.assets.generalInvestments
+              : undefined
+          }
+        />
       )}
 
       {/* Assumptions */}

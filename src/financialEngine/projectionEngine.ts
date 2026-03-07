@@ -100,8 +100,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   let p1Dc    = person1.incomeSources.dcPension.enabled   ? person1.incomeSources.dcPension.totalValue   : 0;
 
   let p2Isa   = (mode === 'couple' && person2.assets.isaInvestments.enabled)     ? person2.assets.isaInvestments.totalValue     : 0;
-  let p2GiaV  = (mode === 'couple' && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.totalValue : 0;
-  let p2GiaBC = (mode === 'couple' && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.baseCost   : 0;
+  // Joint GIA is canonical on person1 — do not initialise p2 separately to avoid double-counting.
+  const p1GiaJoint = mode === 'couple' && person1.assets.generalInvestments.owner === 'joint';
+  let p2GiaV  = (mode === 'couple' && !p1GiaJoint && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.totalValue : 0;
+  let p2GiaBC = (mode === 'couple' && !p1GiaJoint && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.baseCost   : 0;
   let p2Cash  = (mode === 'couple' && person2.assets.cashSavings.enabled)        ? person2.assets.cashSavings.totalValue        : 0;
   let p2Dc    = (mode === 'couple' && person2.incomeSources.dcPension.enabled)   ? person2.incomeSources.dcPension.totalValue   : 0;
 
@@ -118,8 +120,9 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   let p2PclsTaken = false;
 
   // ── Joint GIA flag — GIA split by person for CGT ──────────────────────────
+  // Joint GIA lives on person1 only; p2GiaV is always 0 in that case.
   const p1GiaIsJoint = person1.assets.generalInvestments.owner === 'joint';
-  const p2GiaIsJoint = mode === 'couple' && person2.assets.generalInvestments.owner === 'joint';
+  const p2GiaIsJoint = !p1GiaJoint && mode === 'couple' && person2.assets.generalInvestments.owner === 'joint';
 
   const maxYears   = lifeExpectancy - person1.currentAge;
   const projections: YearlyProjection[] = [];
