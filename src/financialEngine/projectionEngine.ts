@@ -12,9 +12,11 @@
  *
  * PCLS model:
  *   In the year the DC pension is first drawn (drawdownAge), a Pension
- *   Commencement Lump Sum (pclsPercentage% of pot) is taken completely
- *   tax-free. The remaining pot is then drawn via the UFPLS model
- *   (UFPLS_TAX_FREE_FRACTION of each subsequent withdrawal is tax-free).
+ *   Commencement Lump Sum of 25% of the pot (HMRC maximum, fixed) is taken
+ *   completely tax-free. PCLS is not user-configurable — it has no bearing on
+ *   tax bands because it is entirely exempt from income tax. The remaining pot
+ *   is then drawn via the UFPLS model (UFPLS_TAX_FREE_FRACTION of each
+ *   subsequent withdrawal is tax-free).
  *
  * Joint GIA:
  *   When a GIA has owner = 'joint', capital gains are split equally
@@ -156,15 +158,13 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
     const dc1 = person1.incomeSources.dcPension;
     if (!p1PclsTaken && p1Dc > 0 && dc1.enabled && p1Age >= dc1.drawdownAge) {
-      const pct = Math.min(PENSION_RULES.PCLS_MAX_FRACTION, (dc1.pclsPercentage ?? 25) / 100);
-      p1PclsAmount = p1Dc * pct;
+      p1PclsAmount = p1Dc * PENSION_RULES.PCLS_MAX_FRACTION;
       p1Dc -= p1PclsAmount;
       p1PclsTaken = true;
     }
     const dc2 = person2.incomeSources.dcPension;
     if (mode === 'couple' && !p2PclsTaken && p2Dc > 0 && dc2.enabled && p2Age !== null && p2Age >= dc2.drawdownAge) {
-      const pct = Math.min(PENSION_RULES.PCLS_MAX_FRACTION, (dc2.pclsPercentage ?? 25) / 100);
-      p2PclsAmount = p2Dc * pct;
+      p2PclsAmount = p2Dc * PENSION_RULES.PCLS_MAX_FRACTION;
       p2Dc -= p2PclsAmount;
       p2PclsTaken = true;
     }

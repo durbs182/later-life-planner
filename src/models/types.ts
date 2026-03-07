@@ -53,13 +53,6 @@ export interface DCPensionSource {
   totalValue: number;
   drawdownAge: number;
   growthRate: number;     // Annual % — user-adjustable, default from config
-  /**
-   * Pension Commencement Lump Sum as a % of pot (0–25).
-   * Taken tax-free as a one-off at crystallisation (drawdownAge).
-   * Remaining pot is drawn via UFPLS thereafter.
-   * Default: 25 (maximum allowed).
-   */
-  pclsPercentage: number;
 }
 
 export interface DBPensionSource {

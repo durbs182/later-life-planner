@@ -195,7 +195,7 @@ describe('PCLS', () => {
         incomeSources: {
           ...base.person1.incomeSources,
           statePension: { enabled: false, weeklyAmount: 0, startAge: 67 },
-          dcPension: { enabled: true, totalValue: 100_000, drawdownAge: 65, growthRate: 0, pclsPercentage: 25 },
+          dcPension: { enabled: true, totalValue: 100_000, drawdownAge: 65, growthRate: 0 },
         },
       },
     };
@@ -267,7 +267,7 @@ describe('getAssetDepletionAge', () => {
         incomeSources: {
           ...base.person1.incomeSources,
           statePension: { enabled: false, weeklyAmount: 0, startAge: 67 },
-          dcPension:    { enabled: false, totalValue: 0, drawdownAge: 65, growthRate: 4, pclsPercentage: 25 },
+          dcPension:    { enabled: false, totalValue: 0, drawdownAge: 65, growthRate: 4 },
         },
       },
     };

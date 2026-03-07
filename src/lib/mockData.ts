@@ -120,7 +120,6 @@ export function buildDefaultIncome(currentAge: number): PersonIncomeSources {
     dcPension:    {
       enabled: false, totalValue: 0, drawdownAge: 65,
       growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH,
-      pclsPercentage: PENSION_RULES.PCLS_MAX_FRACTION * 100, // default 25%
     },
     partTimeWork: { enabled: false, annualIncome: 0, stopAge: 65 },
     otherIncome:  { enabled: false, annualAmount: 0, description: '', startAge: currentAge, stopAge: 0 },
@@ -185,7 +184,7 @@ export function createMockDemoState(): PlannerState {
         statePension: { enabled: true,  weeklyAmount: 221.20, startAge: 67 },
         dbPension:    { enabled: false, annualIncome: 0, startAge: 65 },
         annuity:      { enabled: false, annualIncome: 0, startAge: 65 },
-        dcPension:    { enabled: true,  totalValue: 320000, drawdownAge: 65, growthRate: 4, pclsPercentage: 25 },
+        dcPension:    { enabled: true,  totalValue: 320000, drawdownAge: 65, growthRate: 4 },
         partTimeWork: { enabled: true,  annualIncome: 22000, stopAge: 65 },
         otherIncome:  { enabled: false, annualAmount: 0, description: '', startAge: 57, stopAge: 0 },
       },
@@ -204,7 +203,7 @@ export function createMockDemoState(): PlannerState {
         statePension: { enabled: true,  weeklyAmount: 195.00, startAge: 67 },
         dbPension:    { enabled: true,  annualIncome: 8000,  startAge: 65 },
         annuity:      { enabled: false, annualIncome: 0,     startAge: 65 },
-        dcPension:    { enabled: true,  totalValue: 150000,  drawdownAge: 65, growthRate: 4, pclsPercentage: 25 },
+        dcPension:    { enabled: true,  totalValue: 150000,  drawdownAge: 65, growthRate: 4 },
         partTimeWork: { enabled: true,  annualIncome: 18000, stopAge: 63 },
         otherIncome:  { enabled: false, annualAmount: 0,     description: '', startAge: 55, stopAge: 0 },
       },

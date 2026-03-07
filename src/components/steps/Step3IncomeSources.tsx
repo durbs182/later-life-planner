@@ -233,19 +233,8 @@ function IncomeSection({ currentAge, src, assets, set }: {
           <FieldRow label="Annual growth rate">
             <PctInput value={src.dcPension.growthRate} onChange={(v) => set('dcPension', { growthRate: v })} />
           </FieldRow>
-          <FieldRow label="PCLS %" hint="Tax-free lump sum at crystallisation (0–25%)">
-            <div className="flex items-center gap-2">
-              <input type="range" min={0} max={25} step={1}
-                value={src.dcPension.pclsPercentage ?? 25}
-                onChange={(e) => set('dcPension', { pclsPercentage: parseInt(e.target.value) })}
-                className="w-24"
-                style={{ background: `linear-gradient(to right, #f97316 ${((src.dcPension.pclsPercentage ?? 25) / 25) * 100}%, #e2e8f0 ${((src.dcPension.pclsPercentage ?? 25) / 25) * 100}%)` }}
-              />
-              <span className="font-black text-orange-600 w-8 text-sm">{src.dcPension.pclsPercentage ?? 25}%</span>
-            </div>
-          </FieldRow>
           <div className="py-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3">
-            PCLS taken tax-free at crystallisation. Remaining pot drawn via UFPLS (25% of each withdrawal tax-free).
+            25% PCLS taken tax-free at crystallisation (HMRC maximum, fixed). Remaining pot drawn via UFPLS (25% of each withdrawal tax-free).
           </div>
         </SourceCard>
 

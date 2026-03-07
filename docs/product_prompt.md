@@ -101,7 +101,7 @@ Support single users or couples. Capture all income streams individually per per
 - Guaranteed income: State Pension, Defined Benefit Pension, Annuities
 - Property income (owner: A/B/Joint)
 - Investment assets:
-  - Pension (DC): owner, current value, PCLS %, growth
+  - Pension (DC): owner, current value, growth. PCLS is fixed at 25% (HMRC maximum) — NOT user-configurable. PCLS is entirely tax-free and has no bearing on income tax bands, so offering a variable % would be misleading.
   - ISA: owner, value, growth
   - GIA: owner (A/B/Joint), current value, base cost, growth. If joint, allow drawdown individually to optimise CGT per person
   - Cash savings: owner, balance
