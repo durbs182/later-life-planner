@@ -37,12 +37,15 @@ export function dobFromAge(age: number): string {
 
 // ─── Life stages ─────────────────────────────────────────────────────────────
 
-export function buildDefaultLifeStages(currentAge: number): LifeStage[] {
+export function buildDefaultLifeStages(
+  currentAge: number,
+  lifeExpectancy: number = DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY,
+): LifeStage[] {
   const activeEnd = Math.min(64, Math.max(currentAge + 1, 60));
   return [
-    { id: 'active',  label: 'Active Years',      startAge: currentAge,    endAge: activeEnd, color: '#f97316' },
-    { id: 'gradual', label: 'Gradual Transition', startAge: activeEnd + 1, endAge: 75,        color: '#10b981' },
-    { id: 'later',   label: 'Later Years',         startAge: 76,            endAge: 95,        color: '#8b5cf6' },
+    { id: 'active',  label: 'Active Years',      startAge: currentAge,    endAge: activeEnd,      color: '#f97316' },
+    { id: 'gradual', label: 'Gradual Transition', startAge: activeEnd + 1, endAge: 75,             color: '#10b981' },
+    { id: 'later',   label: 'Later Years',        startAge: 76,            endAge: lifeExpectancy, color: '#8b5cf6' },
   ];
 }
 
@@ -157,7 +160,7 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
     },
     lifeVision: '',
     aspirations: [],
-    lifeStages: buildDefaultLifeStages(primaryAge),
+    lifeStages: buildDefaultLifeStages(primaryAge, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
     spendingCategories: buildDefaultCategories(),
     assumptions: {
       investmentGrowth: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH,

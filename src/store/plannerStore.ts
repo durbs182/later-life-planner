@@ -50,15 +50,15 @@ export const usePlannerStore = create<PlannerState & Actions>()(
 
       setP1Name: (name) => set((s) => ({ person1: { ...s.person1, name } })),
 
-      // DOB setter — recomputes age and rebuilds life stages
+      // DOB setter — recomputes age and rebuilds life stages (preserving endAge from lifeExpectancy)
       setP1Dob: (dateOfBirth) =>
         set((s) => {
           const age = ageFromDOB(dateOfBirth, s.person1.currentAge);
           return {
             person1: { ...s.person1, dateOfBirth, currentAge: age },
-            lifeStages: buildDefaultLifeStages(age).map((ns) => {
+            lifeStages: buildDefaultLifeStages(age, s.assumptions.lifeExpectancy).map((ns) => {
               const ex = s.lifeStages.find((ls) => ls.id === ns.id);
-              return ex ? { ...ex, startAge: ns.startAge } : ns;
+              return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
             }),
           };
         }),
@@ -67,9 +67,9 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setP1Age: (age) =>
         set((s) => ({
           person1: { ...s.person1, currentAge: age },
-          lifeStages: buildDefaultLifeStages(age).map((ns) => {
+          lifeStages: buildDefaultLifeStages(age, s.assumptions.lifeExpectancy).map((ns) => {
             const ex = s.lifeStages.find((ls) => ls.id === ns.id);
-            return ex ? { ...ex, startAge: ns.startAge } : ns;
+            return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
           }),
         })),
 
@@ -131,7 +131,17 @@ export const usePlannerStore = create<PlannerState & Actions>()(
           ),
         })),
       updateAssumptions: (updates) =>
-        set((s) => ({ assumptions: { ...s.assumptions, ...updates } })),
+        set((s) => {
+          const newAssumptions = { ...s.assumptions, ...updates };
+          // Keep the last life stage's endAge in sync with the planning horizon
+          if (updates.lifeExpectancy !== undefined) {
+            const lifeStages = s.lifeStages.map((ls, i, arr) =>
+              i === arr.length - 1 ? { ...ls, endAge: updates.lifeExpectancy as number } : ls
+            );
+            return { assumptions: newAssumptions, lifeStages };
+          }
+          return { assumptions: newAssumptions };
+        }),
 
       applyRlssTemplate: (standard) =>
         set((s) => ({
