@@ -131,8 +131,9 @@ function PriorityGroup({ number, title, subtitle, badge, badgeClass, children }:
 
 // ─── Income section ───────────────────────────────────────────────────────────
 
-function IncomeSection({ currentAge, src, assets, set }: {
+function IncomeSection({ currentAge, fiAge, src, assets, set }: {
   currentAge: number;
+  fiAge: number;
   src: PersonIncomeSources;
   assets: PersonAssets;
   set: (key: keyof PersonIncomeSources, u: Record<string, unknown>) => void;
@@ -228,11 +229,11 @@ function IncomeSection({ currentAge, src, assets, set }: {
           <FieldRow label="Current pot value">
             <CurrencyInput value={src.dcPension.totalValue} onChange={(v) => set('dcPension', { totalValue: v })} max={2000000} step={1000} />
           </FieldRow>
-          <FieldRow label="Drawdown start age">
-            <AgeInput value={src.dcPension.drawdownAge} onChange={(v) => set('dcPension', { drawdownAge: v })} min={55} max={80} />
-          </FieldRow>
           <FieldRow label="Annual growth rate">
             <PctInput value={src.dcPension.growthRate} onChange={(v) => set('dcPension', { growthRate: v })} />
+          </FieldRow>
+          <FieldRow label="Drawdown starts">
+            <span className="text-sm font-bold text-orange-600">Age {fiAge} <span className="font-normal text-slate-400">(your financial independence age)</span></span>
           </FieldRow>
           <div className="py-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3">
             25% PCLS taken tax-free at crystallisation (HMRC maximum, fixed). Remaining pot drawn via UFPLS (25% of each withdrawal tax-free).
@@ -381,7 +382,7 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
 
 export default function Step3IncomeSources({ onNext, onBack }: Props) {
   const {
-    mode,
+    mode, fiAge,
     person1, setP1Income, setP1Asset,
     person2, setP2Income, setP2Asset,
     assumptions, updateAssumptions,
@@ -447,7 +448,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
 
       {/* Content */}
       {activeTab === 'income' ? (
-        <IncomeSection currentAge={person.currentAge} src={person.incomeSources} assets={person.assets} set={setIncome} />
+        <IncomeSection currentAge={person.currentAge} fiAge={fiAge} src={person.incomeSources} assets={person.assets} set={setIncome} />
       ) : (
         <AssetsSection assets={person.assets} set={setAsset} mode={mode} p1Label={p1Label} p2Label={p2Label} />
       )}

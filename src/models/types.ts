@@ -51,7 +51,6 @@ export interface StatePensionSource {
 export interface DCPensionSource {
   enabled: boolean;
   totalValue: number;
-  drawdownAge: number;
   growthRate: number;     // Annual % — user-adjustable, default from config
 }
 

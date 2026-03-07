@@ -89,7 +89,7 @@ function getStageForAge(stages: LifeStage[], age: number): LifeStage {
 // ─── Main projection loop ─────────────────────────────────────────────────────
 
 export function calculateProjections(state: PlannerState): YearlyProjection[] {
-  const { person1, person2, lifeStages, spendingCategories, assumptions, mode } = state;
+  const { person1, person2, lifeStages, spendingCategories, assumptions, mode, fiAge } = state;
   const { lifeExpectancy, inflation, investmentGrowth } = assumptions;
 
   // ── Initialise asset balances ──────────────────────────────────────────────
@@ -161,13 +161,13 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     let p2PclsAmount = 0;
 
     const dc1 = person1.incomeSources.dcPension;
-    if (!p1PclsTaken && p1Dc > 0 && dc1.enabled && p1Age >= dc1.drawdownAge) {
+    if (!p1PclsTaken && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
       p1PclsAmount = p1Dc * PENSION_RULES.PCLS_MAX_FRACTION;
       p1Dc -= p1PclsAmount;
       p1PclsTaken = true;
     }
     const dc2 = person2.incomeSources.dcPension;
-    if (mode === 'couple' && !p2PclsTaken && p2Dc > 0 && dc2.enabled && p2Age !== null && p2Age >= dc2.drawdownAge) {
+    if (mode === 'couple' && !p2PclsTaken && p2Dc > 0 && dc2.enabled && p2Age !== null && p2Age >= fiAge) {
       p2PclsAmount = p2Dc * PENSION_RULES.PCLS_MAX_FRACTION;
       p2Dc -= p2PclsAmount;
       p2PclsTaken = true;
@@ -212,12 +212,12 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
         const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
       }
       // P1 DC Pension (UFPLS after PCLS)
-      if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= dc1.drawdownAge) {
+      if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
         const d = Math.min(p1Dc, remaining); p1DcD = d; p1Dc -= d; remaining -= d;
       }
       // P2 DC Pension
       if (remaining > 0 && mode === 'couple' && p2Age !== null) {
-        if (p2Dc > 0 && dc2.enabled && p2Age >= dc2.drawdownAge) {
+        if (p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
           const d = Math.min(p2Dc, remaining); p2DcD = d; p2Dc -= d; remaining -= d;
         }
       }
