@@ -12,7 +12,7 @@ export default function Toggle({ checked, onChange, label }: ToggleProps) {
       <div
         onClick={() => onChange(!checked)}
         className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${
-          checked ? 'bg-blue-600' : 'bg-slate-300'
+          checked ? 'bg-orange-500' : 'bg-slate-300'
         }`}
       >
         <span

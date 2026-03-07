@@ -2,277 +2,239 @@
 
 import { useState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
-import Card from '@/components/ui/Card';
-import SliderInput from '@/components/ui/SliderInput';
 import { getStageTotals, getStageTotalSpending, formatCurrency } from '@/lib/calculations';
 import { RLSS_STANDARDS } from '@/lib/mockData';
-import type { SpendingTier, RlssStandard } from '@/lib/types';
+import type { SpendingTier, RlssStandard } from '@/models/types';
 import clsx from 'clsx';
 
-interface Props {
-  onNext: () => void;
-  onBack: () => void;
-}
+interface Props { onNext: () => void; onBack: () => void }
 
-const TIER_META: Record<SpendingTier, { label: string; description: string; color: string; bg: string }> = {
-  essential: {
-    label: 'Essential',
-    description: 'The basics you need to live comfortably',
-    color: 'text-blue-700',
-    bg: 'bg-blue-50 border-blue-100',
-  },
-  moderate: {
-    label: 'Enjoyment',
-    description: 'Things that make life enjoyable',
-    color: 'text-emerald-700',
-    bg: 'bg-emerald-50 border-emerald-100',
-  },
-  aspirational: {
-    label: 'Aspirational',
-    description: 'Your lifestyle ambitions and experiences',
-    color: 'text-purple-700',
-    bg: 'bg-purple-50 border-purple-100',
-  },
-  variable: {
-    label: 'Life-Stage / Variable',
-    description: 'Costs that may arise at specific life stages',
-    color: 'text-amber-700',
-    bg: 'bg-amber-50 border-amber-100',
-  },
+const TIER_CFG: Record<SpendingTier, { label: string; desc: string; color: string; bg: string; border: string }> = {
+  essential:    { label: 'Essential',         desc: 'The basics you need',           color: 'text-sky-700',    bg: 'bg-sky-50',    border: 'border-sky-200' },
+  moderate:     { label: 'Enjoyment',          desc: 'Things that make life enjoyable',color: 'text-emerald-700',bg: 'bg-emerald-50',border: 'border-emerald-200' },
+  aspirational: { label: 'Aspirational',       desc: 'Lifestyle ambitions',           color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200' },
+  variable:     { label: 'Life-Stage / Variable', desc: 'Stage-specific costs',       color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
 };
 
-const TIERS: SpendingTier[] = ['essential', 'moderate', 'aspirational', 'variable'];
-
-const STANDARD_STYLES: Record<RlssStandard, { border: string; bg: string; badge: string; check: string; ring: string }> = {
-  minimum:     { border: 'border-slate-300',  bg: 'bg-slate-50',   badge: 'bg-slate-100 text-slate-600',    check: 'text-slate-600',  ring: 'ring-slate-300'  },
-  moderate:    { border: 'border-blue-400',   bg: 'bg-blue-50',    badge: 'bg-blue-100 text-blue-700',      check: 'text-blue-600',   ring: 'ring-blue-400'   },
-  comfortable: { border: 'border-emerald-400',bg: 'bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700',check: 'text-emerald-600',ring: 'ring-emerald-400'},
+const STANDARD_CFG: Record<RlssStandard, { bg: string; ring: string; text: string; badge: string }> = {
+  minimum:     { bg: 'bg-slate-50',   ring: 'ring-slate-400',   text: 'text-slate-700',   badge: 'bg-slate-100 text-slate-700' },
+  moderate:    { bg: 'bg-sky-50',     ring: 'ring-sky-400',     text: 'text-sky-700',     badge: 'bg-sky-100 text-sky-700' },
+  comfortable: { bg: 'bg-emerald-50', ring: 'ring-emerald-400', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
 };
 
-function RlssTemplateSelector() {
-  const { mode, rlssStandard, applyRlssTemplate } = usePlannerStore();
-  const standards = RLSS_STANDARDS[mode];
-  const keys: RlssStandard[] = ['minimum', 'moderate', 'comfortable'];
-
-  return (
-    <Card className="border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-white">
-      <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
-        <div>
-          <h3 className="section-heading">UK Retirement Living Standards</h3>
-          <p className="text-sm text-slate-500">
-            Choose a benchmark to pre-fill your spending — then customise below.
-            Based on PLSA research for a <strong>{mode === 'couple' ? 'two-person' : 'one-person'}</strong> household.
-          </p>
-        </div>
-        {rlssStandard && (
-          <span className={clsx('text-xs font-semibold px-3 py-1 rounded-full', STANDARD_STYLES[rlssStandard].badge)}>
-            Using: {standards[rlssStandard].label}
-          </span>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-        {keys.map((key) => {
-          const std     = standards[key];
-          const style   = STANDARD_STYLES[key];
-          const active  = rlssStandard === key;
-          return (
-            <button
-              key={key}
-              onClick={() => applyRlssTemplate(key)}
-              className={clsx(
-                'relative text-left p-4 rounded-xl border-2 transition-all focus:outline-none',
-                active
-                  ? `${style.border} ${style.bg} ring-2 ${style.ring} ring-offset-1`
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50',
-              )}
-            >
-              {active && (
-                <span className={clsx('absolute top-3 right-3 text-lg', style.check)}>✓</span>
-              )}
-              <p className="font-bold text-slate-800 text-base mb-0.5">{std.label}</p>
-              <p className="text-2xl font-extrabold text-slate-900 mb-1">
-                {formatCurrency(std.annual)}
-                <span className="text-sm font-normal text-slate-400">/yr</span>
-              </p>
-              <p className="text-xs text-slate-500 leading-snug">{std.description}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      <p className="mt-3 text-xs text-slate-400">
-        Figures in today&apos;s £. Applying a template scales all spending categories proportionally — you can adjust any category below.
-      </p>
-    </Card>
-  );
-}
-
-// Shows where current spend sits relative to the RLSS benchmarks
-function SpendBenchmark({ total, mode }: { total: number; mode: 'single' | 'couple' }) {
-  const standards = RLSS_STANDARDS[mode];
-  const min = standards.minimum.annual;
-  const mod = standards.moderate.annual;
-  const com = standards.comfortable.annual;
-  const max = Math.max(com * 1.3, total * 1.05);
-
-  const pct = (v: number) => `${Math.min(100, (v / max) * 100).toFixed(1)}%`;
-
-  let label = 'Below Minimum';
-  let labelColor = 'text-slate-500';
-  if (total >= com) { label = 'Comfortable+'; labelColor = 'text-emerald-600'; }
-  else if (total >= mod) { label = 'Moderate–Comfortable'; labelColor = 'text-blue-600'; }
-  else if (total >= min) { label = 'Minimum–Moderate'; labelColor = 'text-amber-600'; }
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-slate-600">
-          Your spend vs UK standards
-        </span>
-        <span className={clsx('text-sm font-bold', labelColor)}>{label}</span>
-      </div>
-      <div className="relative h-3 rounded-full bg-slate-100 overflow-hidden">
-        {/* Benchmark zones */}
-        <div className="absolute inset-y-0 left-0 rounded-l-full bg-slate-200" style={{ width: pct(min) }} />
-        <div className="absolute inset-y-0 bg-blue-100" style={{ left: pct(min), width: `calc(${pct(mod)} - ${pct(min)})` }} />
-        <div className="absolute inset-y-0 bg-emerald-100" style={{ left: pct(mod), width: `calc(${pct(com)} - ${pct(mod)})` }} />
-        {/* Your spend marker */}
-        <div
-          className="absolute inset-y-0 w-1 bg-slate-800 rounded-full"
-          style={{ left: pct(total) }}
-        />
-      </div>
-      <div className="flex justify-between mt-1.5 text-xs text-slate-400">
-        <span>Min {formatCurrency(min, true)}</span>
-        <span>Mod {formatCurrency(mod, true)}</span>
-        <span>Com {formatCurrency(com, true)}</span>
-      </div>
-    </div>
-  );
-}
+const STAGE_COLORS = { active: '#f97316', gradual: '#10b981', later: '#8b5cf6' };
 
 export default function Step2SpendingGoals({ onNext, onBack }: Props) {
   const state = usePlannerStore();
-  const { mode, lifeStages, spendingCategories, updateSpendingAmount } = state;
+  const { mode, lifeStages, spendingCategories, updateSpendingAmount, rlssStandard, applyRlssTemplate } = state;
 
   const [activeStageId, setActiveStageId] = useState(lifeStages[0]?.id ?? 'active');
+  const [openTiers, setOpenTiers] = useState<Record<string, boolean>>({ essential: true, moderate: true, aspirational: false, variable: false });
 
   const activeStage = lifeStages.find(s => s.id === activeStageId) ?? lifeStages[0];
   const totalSpend  = getStageTotalSpending(state, activeStageId);
   const tierTotals  = getStageTotals(state, activeStageId);
+  const standards   = RLSS_STANDARDS[mode];
+
+  // Benchmark label
+  const min = standards.minimum.annual;
+  const mod = standards.moderate.annual;
+  const com = standards.comfortable.annual;
+  let benchmarkLabel = 'Below Minimum';
+  let benchmarkColor = 'text-slate-500';
+  if (totalSpend >= com)  { benchmarkLabel = 'Comfortable+';          benchmarkColor = 'text-emerald-600'; }
+  else if (totalSpend >= mod) { benchmarkLabel = 'Moderate–Comfortable'; benchmarkColor = 'text-sky-600'; }
+  else if (totalSpend >= min) { benchmarkLabel = 'Minimum–Moderate';     benchmarkColor = 'text-amber-600'; }
+
+  const toggleTier = (tier: string) => setOpenTiers(p => ({ ...p, [tier]: !p[tier] }));
 
   return (
-    <div className="space-y-6 pb-24">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-1">Your spending goals</h2>
-        <p className="text-slate-500 text-base">
-          Start with a UK standard as a guide, then tailor every category to match your life.
+    <div className="space-y-5 pb-24">
+
+      {/* Hero */}
+      <div className="text-center pt-4 pb-2">
+        <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3">
+          💰 Step 2 of 4 — Spending Goals
+        </div>
+        <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 tracking-tight">
+          What will your life{' '}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">cost?</span>
+        </h2>
+        <p className="text-slate-500">Start with a UK benchmark, then make it yours.</p>
+      </div>
+
+      {/* RLSS Lifestyle cards */}
+      <div className="game-card bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
+        <h3 className="section-heading">Choose your lifestyle starting point</h3>
+        <p className="text-xs text-slate-500 mb-4">
+          UK Retirement Living Standards (PLSA 2024) · <strong>{mode === 'couple' ? 'Two-person' : 'One-person'}</strong> household
+        </p>
+
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          {(['minimum', 'moderate', 'comfortable'] as RlssStandard[]).map((key) => {
+            const std   = standards[key];
+            const cfg   = STANDARD_CFG[key];
+            const active = rlssStandard === key;
+            return (
+              <button
+                key={key}
+                onClick={() => applyRlssTemplate(key)}
+                className={clsx(
+                  'relative text-left p-4 rounded-2xl border-2 transition-all focus:outline-none',
+                  active
+                    ? `${cfg.bg} ring-2 ${cfg.ring} ring-offset-1 border-transparent`
+                    : 'bg-white border-slate-200 hover:border-slate-300'
+                )}
+              >
+                {active && <span className="absolute top-2.5 right-2.5 text-base">✓</span>}
+                <div className="text-2xl mb-2">{std.emoji}</div>
+                <p className={clsx('font-black text-sm mb-1', active ? cfg.text : 'text-slate-700')}>{std.label}</p>
+                <p className="text-2xl font-black text-slate-900 leading-none">
+                  {formatCurrency(std.annual, true)}
+                  <span className="text-xs font-normal text-slate-400">/yr</span>
+                </p>
+                <p className="text-xs text-slate-500 mt-1.5 leading-snug">{std.description}</p>
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="text-xs text-slate-400">
+          Selecting a template scales all categories proportionally. Customise below.
         </p>
       </div>
 
-      {/* RLSS Template Selector */}
-      <RlssTemplateSelector />
-
       {/* Stage tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2">
         {lifeStages.map(stage => (
           <button
             key={stage.id}
             onClick={() => setActiveStageId(stage.id)}
             className={clsx(
-              'flex-shrink-0 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all border',
-              activeStageId === stage.id
-                ? 'text-white border-transparent shadow-sm'
-                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              'flex-1 py-2.5 px-3 rounded-2xl font-semibold text-sm transition-all border-2',
+              activeStageId === stage.id ? 'text-white border-transparent shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
             )}
             style={activeStageId === stage.id ? { backgroundColor: stage.color, borderColor: stage.color } : {}}
           >
             {stage.label}
-            <span className="ml-2 text-xs opacity-80">Age {stage.startAge}–{stage.endAge}</span>
+            <span className="ml-1.5 text-xs opacity-75">{stage.startAge}–{stage.endAge}</span>
           </button>
         ))}
       </div>
 
-      {/* Total spending summary + benchmark */}
+      {/* Total + benchmark */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="col-span-2 sm:col-span-1 bg-slate-800 text-white rounded-2xl p-4">
-          <p className="text-sm text-slate-300 mb-1">Total annual</p>
-          <p className="text-2xl font-bold">{formatCurrency(totalSpend)}</p>
-          <p className="text-xs text-slate-400 mt-1">per year in today&apos;s £</p>
+          <p className="text-xs text-slate-400 mb-1">Total annual</p>
+          <p className="text-3xl font-black">{formatCurrency(totalSpend, true)}</p>
+          <p className={clsx('text-xs font-semibold mt-1', benchmarkColor)}>{benchmarkLabel}</p>
         </div>
         {tierTotals.map(({ tier, total }) => {
-          const meta = TIER_META[tier as SpendingTier];
+          const cfg = TIER_CFG[tier as SpendingTier];
           return (
-            <div key={tier} className={`rounded-2xl p-4 border ${meta.bg}`}>
-              <p className={`text-xs font-semibold mb-1 ${meta.color}`}>{meta.label}</p>
-              <p className="text-xl font-bold text-slate-800">{formatCurrency(total)}</p>
+            <div key={tier} className={`rounded-2xl p-4 border ${cfg.bg} ${cfg.border}`}>
+              <p className={`text-xs font-bold mb-1 ${cfg.color}`}>{cfg.label}</p>
+              <p className="text-xl font-black text-slate-800">{formatCurrency(total, true)}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Benchmark comparison bar */}
-      <SpendBenchmark total={totalSpend} mode={mode} />
+      {/* RLSS benchmark bar */}
+      <div className="game-card-sm">
+        <div className="flex justify-between mb-2">
+          <span className="text-xs font-semibold text-slate-500">vs UK standards</span>
+          <span className={clsx('text-xs font-bold', benchmarkColor)}>{benchmarkLabel}</span>
+        </div>
+        <div className="relative h-3 rounded-full bg-slate-100 overflow-hidden">
+          <div className="absolute inset-y-0 left-0 bg-slate-200 rounded-l-full" style={{ width: `${Math.min(100, (min / (com * 1.3)) * 100)}%` }} />
+          <div className="absolute inset-y-0 bg-sky-100" style={{ left: `${(min / (com * 1.3)) * 100}%`, width: `${((mod - min) / (com * 1.3)) * 100}%` }} />
+          <div className="absolute inset-y-0 bg-emerald-100" style={{ left: `${(mod / (com * 1.3)) * 100}%`, width: `${((com - mod) / (com * 1.3)) * 100}%` }} />
+          <div className="absolute inset-y-0 w-1 bg-slate-800 rounded-full -translate-x-1/2"
+            style={{ left: `${Math.min(98, (totalSpend / (com * 1.3)) * 100)}%` }} />
+        </div>
+        <div className="flex justify-between mt-1">
+          <span className="text-xs text-slate-400">Min {formatCurrency(min, true)}</span>
+          <span className="text-xs text-slate-400">Mod {formatCurrency(mod, true)}</span>
+          <span className="text-xs text-slate-400">Com {formatCurrency(com, true)}</span>
+        </div>
+      </div>
 
-      {/* Copy from stage button */}
+      {/* Copy from stage */}
       {lifeStages.indexOf(activeStage) > 0 && (
         <div className="text-right">
           <button
             onClick={() => {
-              const prevStage = lifeStages[lifeStages.indexOf(activeStage) - 1];
+              const prev = lifeStages[lifeStages.indexOf(activeStage) - 1];
               spendingCategories.forEach(cat => {
-                const prevAmount = cat.amounts[prevStage.id] ?? 0;
-                updateSpendingAmount(cat.id, activeStageId, prevAmount);
+                updateSpendingAmount(cat.id, activeStageId, cat.amounts[prev.id] ?? 0);
               });
             }}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            className="text-sm text-orange-600 hover:text-orange-700 font-semibold"
           >
-            Copy amounts from &quot;{lifeStages[lifeStages.indexOf(activeStage) - 1]?.label}&quot;
+            ↩ Copy from &quot;{lifeStages[lifeStages.indexOf(activeStage) - 1]?.label}&quot;
           </button>
         </div>
       )}
 
-      {/* Categories by tier */}
-      {TIERS.map(tier => {
+      {/* Category sliders by tier */}
+      {(['essential', 'moderate', 'aspirational', 'variable'] as SpendingTier[]).map(tier => {
+        const cfg  = TIER_CFG[tier];
         const cats = spendingCategories.filter(c => c.tier === tier);
-        const meta = TIER_META[tier];
+        const tot  = tierTotals.find(t => t.tier === tier)?.total ?? 0;
+        const open = openTiers[tier];
         return (
-          <Card key={tier} className={`border ${meta.bg}`}>
-            <div className="flex items-center justify-between mb-4">
+          <div key={tier} className={`rounded-2xl border ${cfg.bg} ${cfg.border} overflow-hidden`}>
+            <button
+              onClick={() => toggleTier(tier)}
+              className="w-full flex items-center justify-between p-4 text-left"
+            >
               <div>
-                <h3 className={`text-lg font-bold ${meta.color}`}>{meta.label}</h3>
-                <p className="text-sm text-slate-500">{meta.description}</p>
+                <span className={`font-black text-base ${cfg.color}`}>{cfg.label}</span>
+                <span className="text-xs text-slate-500 ml-2">{cfg.desc}</span>
               </div>
-              <span className={`text-lg font-bold ${meta.color}`}>
-                {formatCurrency(tierTotals.find(t => t.tier === tier)?.total ?? 0)}
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {cats.map(cat => (
-                <SliderInput
-                  key={cat.id}
-                  label={cat.name}
-                  icon={cat.icon}
-                  description={cat.description}
-                  value={cat.amounts[activeStageId] ?? 0}
-                  onChange={(v) => updateSpendingAmount(cat.id, activeStageId, v)}
-                  min={0}
-                  max={cat.maxValue}
-                  step={100}
-                />
-              ))}
-            </div>
-          </Card>
+              <div className="flex items-center gap-3">
+                <span className={`font-black text-lg ${cfg.color}`}>{formatCurrency(tot, true)}</span>
+                <span className="text-slate-400 text-sm">{open ? '▲' : '▼'}</span>
+              </div>
+            </button>
+
+            {open && (
+              <div className="border-t border-slate-200/60 px-4 pb-2">
+                {cats.map(cat => {
+                  const val = cat.amounts[activeStageId] ?? 0;
+                  const pct = (val / cat.maxValue) * 100;
+                  return (
+                    <div key={cat.id} className="py-3 border-b border-slate-100/80 last:border-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{cat.icon}</span>
+                          <div>
+                            <p className="font-semibold text-sm text-slate-800">{cat.name}</p>
+                            <p className="text-xs text-slate-400">{cat.description}</p>
+                          </div>
+                        </div>
+                        <span className={clsx('font-black text-base', cfg.color)}>{formatCurrency(val, true)}</span>
+                      </div>
+                      <input
+                        type="range" min={0} max={cat.maxValue} step={100} value={val}
+                        onChange={(e) => updateSpendingAmount(cat.id, activeStageId, parseInt(e.target.value))}
+                        className="w-full"
+                        style={{ background: `linear-gradient(to right, ${STAGE_COLORS[activeStageId as keyof typeof STAGE_COLORS] ?? '#f97316'} ${pct}%, #e2e8f0 ${pct}%)` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         );
       })}
 
       <div className="flex justify-between pt-4">
-        <button onClick={onBack} className="btn-secondary">
-          Back
-        </button>
-        <button onClick={onNext} className="btn-primary px-10">
-          Add income sources →
+        <button onClick={onBack} className="btn-secondary">← Back</button>
+        <button onClick={onNext} className="btn-primary px-10 text-base">
+          Add income & assets →
         </button>
       </div>
     </div>

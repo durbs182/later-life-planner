@@ -8,263 +8,245 @@ import {
   getAssetDepletionAge, formatCurrency, getTotalUnrealisedGain,
 } from '@/lib/calculations';
 import { RLSS_STANDARDS } from '@/lib/mockData';
-import Card from '@/components/ui/Card';
-import SliderInput from '@/components/ui/SliderInput';
 import type { YearlyProjection } from '@/lib/types';
+import clsx from 'clsx';
 
 const LifetimeChart = dynamic(() => import('@/components/charts/LifetimeChart'), { ssr: false });
 const AssetChart    = dynamic(() => import('@/components/charts/AssetChart'),    { ssr: false });
 
 interface Props { onBack: () => void }
 
-function KpiCard({ label, value, sub, color = 'slate' }: {
-  label: string; value: string; sub?: string;
-  color?: 'slate' | 'emerald' | 'rose' | 'blue' | 'amber';
+const STAGE_COLORS = { active: '#f97316', gradual: '#10b981', later: '#8b5cf6' } as const;
+
+// ─── Lifestyle level indicator ─────────────────────────────────────────────────
+
+function LifestyleLevel({ mode, annualIncome, rlssStandard }: {
+  mode: 'single' | 'couple'; annualIncome: number; rlssStandard: string | null;
 }) {
-  const bg = { slate: 'bg-slate-800 text-white', emerald: 'bg-emerald-600 text-white',
-               rose: 'bg-rose-600 text-white', blue: 'bg-blue-600 text-white', amber: 'bg-amber-500 text-white' };
+  const standards = RLSS_STANDARDS[mode];
+  const min = standards.minimum.annual;
+  const mod = standards.moderate.annual;
+  const com = standards.comfortable.annual;
+
+  let level = 0;
+  let levelLabel = 'Below Minimum';
+  let levelColor = 'text-slate-500';
+  let levelBg    = 'bg-slate-100';
+  if (annualIncome >= com)  { level = 3; levelLabel = 'Comfortable'; levelColor = 'text-emerald-700'; levelBg = 'bg-emerald-100'; }
+  else if (annualIncome >= mod) { level = 2; levelLabel = 'Moderate';    levelColor = 'text-sky-700';     levelBg = 'bg-sky-100'; }
+  else if (annualIncome >= min) { level = 1; levelLabel = 'Minimum';     levelColor = 'text-amber-700';   levelBg = 'bg-amber-100'; }
+
+  const pct = Math.min(100, (annualIncome / (com * 1.2)) * 100);
+
   return (
-    <div className={`rounded-2xl p-5 ${bg[color]}`}>
-      <p className="text-sm opacity-75 mb-1">{label}</p>
-      <p className="text-2xl font-bold leading-tight">{value}</p>
-      {sub && <p className="text-xs opacity-70 mt-1">{sub}</p>}
+    <div className="game-card bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="section-heading mb-0">Lifestyle level — Year 1</h3>
+        <span className={clsx('text-sm font-black px-3 py-1 rounded-full', levelBg, levelColor)}>
+          {level === 0 ? '—' : ['', standards.minimum.emoji, standards.moderate.emoji, standards.comfortable.emoji][level]}{' '}
+          {levelLabel}
+        </span>
+      </div>
+      <div className="relative h-4 rounded-full bg-slate-100 overflow-hidden mb-2">
+        <div className="absolute inset-y-0 left-0 bg-slate-200 rounded-l-full"
+          style={{ width: `${(min / (com * 1.2)) * 100}%` }} />
+        <div className="absolute inset-y-0 bg-sky-100"
+          style={{ left: `${(min / (com * 1.2)) * 100}%`, width: `${((mod - min) / (com * 1.2)) * 100}%` }} />
+        <div className="absolute inset-y-0 bg-emerald-100"
+          style={{ left: `${(mod / (com * 1.2)) * 100}%`, width: `${((com - mod) / (com * 1.2)) * 100}%` }} />
+        <div className="absolute inset-y-0 w-1.5 bg-slate-800 rounded-full -translate-x-1/2 transition-all"
+          style={{ left: `${Math.min(97, pct)}%` }} />
+      </div>
+      <div className="flex justify-between text-xs text-slate-400">
+        <span>Min {formatCurrency(min, true)}</span>
+        <span>Mod {formatCurrency(mod, true)}</span>
+        <span>Com {formatCurrency(com, true)}</span>
+      </div>
     </div>
   );
 }
 
-// ─── Tax strategy ─────────────────────────────────────────────────────────────
+// ─── Life stage timeline ───────────────────────────────────────────────────────
 
-function TaxStrategy({ projections }: { projections: YearlyProjection[] }) {
-  const now   = projections[0];
-  const age70 = projections.find(p => p.p1Age === 70);
+function StageTimeline({ projections, lifeStages, p1Age }: {
+  projections: YearlyProjection[];
+  lifeStages: { id: string; label: string; startAge: number; endAge: number; color: string }[];
+  p1Age: number;
+}) {
+  const maxAge = projections[projections.length - 1]?.p1Age ?? 95;
+  const totalYears = maxAge - p1Age + 1;
+
   return (
-    <Card>
-      <h3 className="section-heading">Tax-Efficient Income Strategy</h3>
-      <p className="section-subheading">
+    <div className="game-card-sm">
+      <p className="text-xs font-bold text-slate-500 mb-2">Life stage timeline</p>
+      <div className="flex rounded-xl overflow-hidden h-8">
+        {lifeStages.map(stage => {
+          const span = stage.endAge - stage.startAge + 1;
+          const pct  = (span / totalYears) * 100;
+          return (
+            <div key={stage.id} className="flex items-center justify-center text-white text-xs font-bold overflow-hidden"
+              style={{ width: `${pct}%`, backgroundColor: stage.color }}
+            >
+              <span className="truncate px-1">{stage.startAge} — {stage.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Stat card ─────────────────────────────────────────────────────────────────
+
+function StatCard({ icon, label, value, sub, accent = 'slate' }: {
+  icon: string; label: string; value: string; sub?: string;
+  accent?: 'slate' | 'emerald' | 'rose' | 'sky' | 'amber' | 'orange';
+}) {
+  const accents: Record<string, string> = {
+    slate:   'bg-slate-800 text-white',
+    emerald: 'bg-emerald-500 text-white',
+    rose:    'bg-rose-500 text-white',
+    sky:     'bg-sky-500 text-white',
+    amber:   'bg-amber-500 text-white',
+    orange:  'bg-orange-500 text-white',
+  };
+  return (
+    <div className={clsx('rounded-2xl p-4', accents[accent])}>
+      <div className="text-2xl mb-2">{icon}</div>
+      <p className="text-xs opacity-70 mb-1">{label}</p>
+      <p className="text-2xl font-black leading-tight">{value}</p>
+      {sub && <p className="text-xs opacity-60 mt-1">{sub}</p>}
+    </div>
+  );
+}
+
+// ─── Tax overview ──────────────────────────────────────────────────────────────
+
+function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
+  const now          = projections[0];
+  const lifetimeTax  = projections.reduce((s, p) => s + p.totalTaxPaid, 0);
+  const lifetimeCGT  = projections.reduce((s, p) => s + p.totalCgtPaid, 0);
+
+  return (
+    <div className="game-card">
+      <h3 className="section-heading">Tax-efficient income strategy</h3>
+      <p className="text-xs text-slate-500 mb-4">
         Prioritised withdrawal order: personal allowance → CGT allowance → PCLS → ISA → taxable pension.
       </p>
-      <div className="space-y-3 mb-6">
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <div className="rounded-2xl p-3 bg-sky-50 border border-sky-100">
+          <p className="text-xs text-sky-600 font-bold mb-1">Income tax (yr 1)</p>
+          <p className="text-xl font-black text-sky-800">{formatCurrency(now?.incomeTaxPaid ?? 0, true)}</p>
+          <p className="text-xs text-sky-500 mt-0.5">
+            {now && now.totalIncome > 0 ? `${((now.incomeTaxPaid / now.totalIncome) * 100).toFixed(1)}% effective` : '—'}
+          </p>
+        </div>
+        <div className="rounded-2xl p-3 bg-amber-50 border border-amber-100">
+          <p className="text-xs text-amber-600 font-bold mb-1">CGT (yr 1)</p>
+          <p className="text-xl font-black text-amber-800">{formatCurrency(now?.totalCgtPaid ?? 0, true)}</p>
+          <p className="text-xs text-amber-500 mt-0.5">on GIA gains</p>
+        </div>
+        <div className="rounded-2xl p-3 bg-rose-50 border border-rose-100">
+          <p className="text-xs text-rose-600 font-bold mb-1">Lifetime income tax</p>
+          <p className="text-xl font-black text-rose-800">{formatCurrency(lifetimeTax - lifetimeCGT, true)}</p>
+          <p className="text-xs text-rose-500 mt-0.5">all years</p>
+        </div>
+        <div className="rounded-2xl p-3 bg-amber-50 border border-amber-100">
+          <p className="text-xs text-amber-600 font-bold mb-1">Lifetime CGT</p>
+          <p className="text-xl font-black text-amber-800">{formatCurrency(lifetimeCGT, true)}</p>
+          <p className="text-xs text-amber-500 mt-0.5">all years</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
         {[
-          { n: 1, icon: '🏛️', label: 'Personal allowance — guaranteed income first', bg: 'bg-blue-50 border-blue-200',    desc: 'State Pension, DB pensions and annuities fill your personal allowance (£12,570) first. This income is tax-free up to that threshold. Modelled per person.' },
-          { n: 2, icon: '📊', label: 'CGT allowance — GIA disposals',               bg: 'bg-amber-50 border-amber-200',   desc: 'Use the £3,000 CGT annual exempt amount each year. Gains above this are taxed at 10% (basic rate) or 20% (higher rate). Base cost tracked proportionally.' },
-          { n: 3, icon: '🏦', label: 'PCLS — pension tax-free cash',                bg: 'bg-purple-50 border-purple-200', desc: 'At pension crystallisation, take up to 25% as a tax-free Pension Commencement Lump Sum (PCLS). Remaining 75% is drawn as taxable income (UFPLS model used here).' },
-          { n: 4, icon: '✅', label: 'ISA withdrawals',                              bg: 'bg-emerald-50 border-emerald-200',desc: 'Completely tax-free. No income tax, no CGT, no impact on personal allowance. Drawn before taxable pension income to preserve tax-free growth.' },
-          { n: 5, icon: '💼', label: 'Taxable pension income',                       bg: 'bg-slate-50 border-slate-200',   desc: '75% of DC drawdown (beyond PCLS) is taxed as income. Maximise use of each person\'s remaining personal allowance before drawing above the threshold.' },
-        ].map(({ n, icon, label, bg, desc }) => (
-          <div key={n} className={`flex gap-4 p-4 rounded-xl border ${bg}`}>
-            <div className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center font-bold text-sm flex-shrink-0">{n}</div>
+          { n: 1, icon: '🏛️', label: 'Personal allowance first', desc: 'State Pension, DB and annuities fill £12,570 personal allowance — tax-free up to threshold.', color: 'bg-sky-50 border-sky-100' },
+          { n: 2, icon: '📊', label: 'CGT allowance — GIA', desc: 'Use £3,000 annual exempt amount. Gains above taxed at 10% (basic) / 20% (higher).', color: 'bg-amber-50 border-amber-100' },
+          { n: 3, icon: '🏦', label: 'PCLS — pension tax-free cash', desc: 'Take up to 25% of DC pot as tax-free lump sum at crystallisation.', color: 'bg-violet-50 border-violet-100' },
+          { n: 4, icon: '✅', label: 'ISA withdrawals', desc: 'Completely tax-free. No income tax, no CGT, no personal allowance impact.', color: 'bg-emerald-50 border-emerald-100' },
+          { n: 5, icon: '💼', label: 'Taxable pension income', desc: '75% of DC drawdown beyond PCLS taxed as income. Maximise use of remaining personal allowance.', color: 'bg-slate-50 border-slate-100' },
+        ].map(({ n, icon, label, desc, color }) => (
+          <div key={n} className={clsx('flex gap-3 p-3 rounded-2xl border', color)}>
+            <div className="w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center font-black text-xs flex-shrink-0 text-slate-700">
+              {n}
+            </div>
             <div>
-              <div className="flex items-center gap-2 font-semibold text-slate-800 mb-0.5"><span>{icon}</span>{label}</div>
-              <p className="text-sm text-slate-500">{desc}</p>
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                <span>{icon}</span>{label}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">{desc}</p>
             </div>
           </div>
         ))}
       </div>
-
-      {now && (
-        <div className="grid sm:grid-cols-3 gap-4">
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-            <p className="text-sm text-slate-500 mb-1">Income tax this year</p>
-            <p className="text-xl font-bold text-slate-800">{formatCurrency(now.incomeTaxPaid)}</p>
-            <p className="text-xs text-slate-400 mt-1">effective rate {now.totalIncome > 0 ? ((now.incomeTaxPaid / now.totalIncome) * 100).toFixed(1) : 0}%</p>
-          </div>
-          <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-            <p className="text-sm text-amber-700 mb-1">CGT this year</p>
-            <p className="text-xl font-bold text-amber-800">{formatCurrency(now.totalCgtPaid)}</p>
-            <p className="text-xs text-amber-600 mt-1">on £{now.p1CapitalGain + now.p2CapitalGain > 0 ? formatCurrency(now.p1CapitalGain + now.p2CapitalGain) : '0'} gains</p>
-          </div>
-          {age70 && (
-            <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-              <p className="text-sm text-slate-500 mb-1">Total tax at age 70</p>
-              <p className="text-xl font-bold text-slate-800">{formatCurrency(age70.totalTaxPaid)}</p>
-              <p className="text-xs text-slate-400 mt-1">income tax + CGT</p>
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
+    </div>
   );
 }
 
-// ─── CGT summary ──────────────────────────────────────────────────────────────
+// ─── Projection table ──────────────────────────────────────────────────────────
 
-function CGTSummary({ projections, p1Name, p2Name }: {
-  projections: YearlyProjection[]; p1Name: string; p2Name: string;
-}) {
-  const lifetimeCGT = projections.reduce((s, p) => s + p.totalCgtPaid, 0);
-  const lifetimeCG  = projections.reduce((s, p) => s + p.p1CapitalGain + p.p2CapitalGain, 0);
-  const peakCGT     = Math.max(...projections.map(p => p.totalCgtPaid));
-
-  // Years with significant CGT
-  const cgtYears = projections.filter(p => p.totalCgtPaid > 100);
-
+function ProjectionTable({ projections }: { projections: YearlyProjection[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? projections : projections.filter((_, i) => i % 5 === 0);
   return (
-    <Card>
-      <h3 className="section-heading">Capital Gains Tax (CGT)</h3>
-      <p className="section-subheading">
-        CGT arises when you draw from your General Investment Accounts (GIA). Your base cost is tracked so
-        only actual gains are taxed.
-      </p>
-
-      <div className="grid sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-          <p className="text-sm text-amber-700 mb-1">Total lifetime CGT</p>
-          <p className="text-xl font-bold text-amber-800">{formatCurrency(lifetimeCGT)}</p>
-          <p className="text-xs text-amber-600 mt-1">on {formatCurrency(lifetimeCG)} total gains</p>
-        </div>
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-          <p className="text-sm text-slate-500 mb-1">Peak annual CGT</p>
-          <p className="text-xl font-bold text-slate-800">{formatCurrency(peakCGT)}</p>
-          <p className="text-xs text-slate-400 mt-1">highest year</p>
-        </div>
-        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-          <p className="text-sm text-slate-500 mb-1">Years with CGT due</p>
-          <p className="text-xl font-bold text-slate-800">{cgtYears.length}</p>
-          <p className="text-xs text-slate-400 mt-1">above £3,000 exempt amount</p>
-        </div>
-      </div>
-
-      <div className="text-sm text-slate-600 bg-blue-50 rounded-xl p-4 border border-blue-100 space-y-1">
-        <p className="font-semibold text-blue-800">How CGT is modelled here:</p>
-        <ul className="list-disc list-inside space-y-1 text-blue-700 text-xs mt-1">
-          <li>Each GIA drawdown partially realises the embedded gain (proportional disposal method).</li>
-          <li>Annual CGT exempt amount: £3,000 per person (2024/25).</li>
-          <li>Rate: 10% if basic-rate taxpayer, 20% if higher-rate — assessed per person.</li>
-          <li>Base cost is reduced proportionally on each withdrawal, not first-in-first-out.</li>
-          <li>Property CGT is <strong>not</strong> currently modelled (base cost captured for Phase 2).</li>
-        </ul>
-      </div>
-
-      {cgtYears.length > 0 && (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left pb-2 pr-3 text-slate-500 font-semibold">Age</th>
-                <th className="text-right pb-2 pr-3 text-blue-600 font-semibold">{p1Name} gain</th>
-                {p2Name !== 'You' && <th className="text-right pb-2 pr-3 text-emerald-600 font-semibold">{p2Name} gain</th>}
-                <th className="text-right pb-2 text-amber-600 font-semibold">CGT paid</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cgtYears.slice(0, 10).map(p => (
-                <tr key={p.p1Age} className="border-b border-slate-50 hover:bg-slate-50">
-                  <td className="py-1.5 pr-3 font-bold">{p.p1Age}</td>
-                  <td className="py-1.5 pr-3 text-right">{formatCurrency(p.p1CapitalGain, true)}</td>
-                  {p2Name !== 'You' && <td className="py-1.5 pr-3 text-right">{formatCurrency(p.p2CapitalGain, true)}</td>}
-                  <td className="py-1.5 text-right font-medium text-amber-600">{formatCurrency(p.totalCgtPaid, true)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-// ─── Household breakdown (couples) ───────────────────────────────────────────
-
-function HouseholdBreakdown({ projections, p1Name, p2Name }: {
-  projections: YearlyProjection[]; p1Name: string; p2Name: string;
-}) {
-  const rows = [0, 5, 10, 15, 20].map(i => projections[i]).filter(Boolean);
-  return (
-    <Card>
-      <h3 className="section-heading">Per-Person Income Contributions</h3>
-      <p className="section-subheading">How each person contributes to household income at key ages.</p>
+    <div className="game-card">
+      <h3 className="section-heading">Year-by-year projection</h3>
+      <p className="text-xs text-slate-500 mb-4">Nominal (inflation-adjusted) figures in future £.</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 text-left">
-              <th className="pb-2 pr-3 text-slate-500 font-semibold">Ages</th>
-              <th className="pb-2 pr-3 text-blue-600 font-semibold text-right">{p1Name}</th>
-              <th className="pb-2 pr-3 text-emerald-600 font-semibold text-right">{p2Name}</th>
-              <th className="pb-2 pr-3 text-slate-500 font-semibold text-right">Assets drawn</th>
-              <th className="pb-2 text-slate-700 font-semibold text-right">Total</th>
+            <tr className="border-b border-slate-100 text-right">
+              {['Age', 'Stage', 'Spending', 'Income', 'Tax', 'Net', 'Assets'].map((h, i) => (
+                <th key={h} className={clsx('pb-2 pr-3 last:pr-0 font-bold text-slate-500', i === 0 && 'text-left')}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {rows.map(p => {
-              const p1Fixed  = p.p1StatePension + p.p1DbPension + p.p1PartTimeWork + p.p1OtherIncome + p.p1PropertyRent + p.p1DcDrawdown;
-              const p2Fixed  = p.p2StatePension + p.p2DbPension + p.p2PartTimeWork + p.p2OtherIncome + p.p2PropertyRent + p.p2DcDrawdown;
-              const assetsDr = p.isaDrawdown + p.giaDrawdown + p.cashDrawdown;
+              const stageColor = STAGE_COLORS[p.lifeStage as keyof typeof STAGE_COLORS] ?? '#94a3b8';
               return (
-                <tr key={p.p1Age} className="border-b border-slate-50 hover:bg-slate-50">
-                  <td className="py-2 pr-3 font-bold text-slate-800">{p.p1Age} / {p.p2Age}</td>
-                  <td className="py-2 pr-3 text-right text-blue-600 font-medium">{formatCurrency(p1Fixed, true)}</td>
-                  <td className="py-2 pr-3 text-right text-emerald-600 font-medium">{formatCurrency(p2Fixed, true)}</td>
-                  <td className="py-2 pr-3 text-right text-slate-500">{formatCurrency(assetsDr, true)}</td>
-                  <td className="py-2 text-right font-bold text-slate-800">{formatCurrency(p.totalIncome, true)}</td>
+                <tr key={p.p1Age} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                  <td className="py-2 pr-3 font-black text-slate-800">
+                    {p.p1Age}{p.p2Age !== null && <span className="text-slate-400 font-normal text-xs">/{p.p2Age}</span>}
+                  </td>
+                  <td className="py-2 pr-3">
+                    <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: stageColor }} />
+                    <span className="text-xs text-slate-400">{p.lifeStage}</span>
+                  </td>
+                  <td className="py-2 pr-3 text-right text-slate-600">{formatCurrency(p.spending, true)}</td>
+                  <td className="py-2 pr-3 text-right font-semibold text-slate-800">{formatCurrency(p.totalIncome, true)}</td>
+                  <td className="py-2 pr-3 text-right text-rose-500">{formatCurrency(p.totalTaxPaid, true)}</td>
+                  <td className="py-2 pr-3 text-right text-emerald-600 font-semibold">{formatCurrency(p.netIncome, true)}</td>
+                  <td className={clsx('py-2 text-right font-bold', p.totalAssets <= 0 ? 'text-rose-600' : 'text-slate-700')}>
+                    {p.totalAssets <= 0 ? '—' : formatCurrency(p.totalAssets, true)}
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-    </Card>
-  );
-}
-
-// ─── Projection table ─────────────────────────────────────────────────────────
-
-function ProjectionTable({ projections }: { projections: YearlyProjection[] }) {
-  const [showAll, setShowAll] = useState(false);
-  const rows = showAll ? projections : projections.filter((_, i) => i % 5 === 0);
-  return (
-    <Card>
-      <h3 className="section-heading">Year-by-Year Projection</h3>
-      <p className="section-subheading">Nominal (inflation-adjusted) figures in future £.</p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 text-left">
-              {['Age', 'Stage', 'Spending', 'Total Income', 'Income Tax', 'CGT', 'Total Tax', 'Net Income', 'Total Assets'].map(h => (
-                <th key={h} className="pb-2 pr-3 last:pr-0 font-semibold text-slate-500 text-right first:text-left first:pr-3">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(p => (
-              <tr key={p.p1Age} className="border-b border-slate-50 hover:bg-slate-50">
-                <td className="py-1.5 pr-3 font-bold text-slate-800">
-                  {p.p1Age}{p.p2Age !== null && <span className="text-slate-400 font-normal">/{p.p2Age}</span>}
-                </td>
-                <td className="py-1.5 pr-3 text-slate-400 text-xs">{p.lifeStage}</td>
-                <td className="py-1.5 pr-3 text-right">{formatCurrency(p.spending, true)}</td>
-                <td className="py-1.5 pr-3 text-right">{formatCurrency(p.totalIncome, true)}</td>
-                <td className="py-1.5 pr-3 text-right text-blue-600">{formatCurrency(p.incomeTaxPaid, true)}</td>
-                <td className="py-1.5 pr-3 text-right text-amber-600">{p.totalCgtPaid > 0 ? formatCurrency(p.totalCgtPaid, true) : '—'}</td>
-                <td className="py-1.5 pr-3 text-right text-rose-600">{formatCurrency(p.totalTaxPaid, true)}</td>
-                <td className="py-1.5 pr-3 text-right">{formatCurrency(p.netIncome, true)}</td>
-                <td className={`py-1.5 text-right font-medium ${p.totalAssets <= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                  {p.totalAssets <= 0 ? '—' : formatCurrency(p.totalAssets, true)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <button onClick={() => setShowAll(!showAll)} className="mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium">
-        {showAll ? 'Show fewer rows' : 'Show all years'}
+      <button onClick={() => setShowAll(!showAll)} className="mt-4 text-sm text-orange-600 hover:text-orange-700 font-semibold">
+        {showAll ? '▲ Show fewer rows' : '▼ Show all years'}
       </button>
-    </Card>
+    </div>
   );
 }
 
-// ─── Main dashboard ───────────────────────────────────────────────────────────
+// ─── Main dashboard ────────────────────────────────────────────────────────────
 
 export default function Step4Dashboard({ onBack }: Props) {
   const state = usePlannerStore();
-  const { mode, person1, person2, updateSpendingAmount, lifeStages, spendingCategories, rlssStandard } = state;
+  const { mode, person1, person2, lifeStages, rlssStandard, updateSpendingAmount, spendingCategories } = state;
 
-  const projections = useMemo(() => calculateProjections(state), [state]);
-  const firstYear   = projections[0];
-  const depletionAge = getAssetDepletionAge(projections);
-  const firstStageId = lifeStages[0]?.id ?? 'active';
-  const annualSpend  = getStageTotalSpending(state, firstStageId);
-  const lastPositive = [...projections].reverse().find(p => p.totalAssets > 0);
-  const surplus      = depletionAge === null;
+  const projections   = useMemo(() => calculateProjections(state), [state]);
+  const firstYear     = projections[0];
+  const depletionAge  = getAssetDepletionAge(projections);
+  const firstStageId  = lifeStages[0]?.id ?? 'active';
+  const annualSpend   = getStageTotalSpending(state, firstStageId);
+  const lastPositive  = [...projections].reverse().find(p => p.totalAssets > 0);
+  const surplus       = depletionAge === null;
   const unrealisedGain = getTotalUnrealisedGain(state);
 
   const [showAdjust, setShowAdjust] = useState(false);
@@ -273,124 +255,132 @@ export default function Step4Dashboard({ onBack }: Props) {
   const p2Name = person2.name || 'Partner 2';
 
   return (
-    <div className="space-y-6 pb-16">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-1">Your lifetime dashboard</h2>
-          <p className="text-slate-500">
-            Age {person1.currentAge}{mode === 'couple' ? ` / ${person2.currentAge}` : ''} → {state.assumptions.lifeExpectancy} · nominal £
-          </p>
-        </div>
-        <button onClick={() => window.print()} className="btn-secondary text-sm no-print">Export / Print</button>
-      </div>
+    <div className="space-y-5 pb-16">
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard
-          label="Household spending"
-          value={formatCurrency(annualSpend)}
-          sub={rlssStandard
-            ? `${RLSS_STANDARDS[mode][rlssStandard].label} standard · today's £`
-            : "today's £ per year"}
-          color="slate"
-        />
-        <KpiCard label="Year 1 income" value={formatCurrency(firstYear?.totalIncome ?? 0)}
-          sub={`${formatCurrency(firstYear?.netIncome ?? 0)} after all tax`} color="blue" />
-        <KpiCard label="Total assets today" value={formatCurrency(firstYear?.totalAssets ?? 0)}
-          sub={unrealisedGain > 0 ? `${formatCurrency(unrealisedGain)} unrealised gain` : 'ISA + GIA + cash + pensions'} color="emerald" />
-        <KpiCard label={surplus ? 'Assets at 95' : 'Assets depleted'}
-          value={surplus ? formatCurrency(lastPositive?.totalAssets ?? 0) : `Age ${depletionAge}`}
-          sub={surplus ? 'on track' : 'review your plan'} color={surplus ? 'emerald' : 'rose'} />
+      {/* Hero */}
+      <div className="text-center pt-4 pb-2">
+        <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3">
+          🎯 Step 4 of 4 — Your Dashboard
+        </div>
+        <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 tracking-tight">
+          Your lifetime{' '}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">plan</span>
+        </h2>
+        <p className="text-slate-500">
+          Age {person1.currentAge}{mode === 'couple' ? ` / ${person2.currentAge}` : ''} → {state.assumptions.lifeExpectancy} · nominal £
+        </p>
       </div>
 
       {/* Gap alert */}
       {!surplus && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex gap-3">
-          <span className="text-lg flex-shrink-0">⚠️</span>
+        <div className="rounded-2xl bg-rose-50 border-2 border-rose-200 p-4 flex gap-3">
+          <span className="text-xl flex-shrink-0">⚠️</span>
           <div>
-            <p className="font-semibold text-rose-800">Potential funding gap</p>
+            <p className="font-black text-rose-800">Funding gap detected</p>
             <p className="text-sm text-rose-600 mt-0.5">
-              At current spending levels, assets could be depleted by age {depletionAge}.
-              Consider increasing income sources, adjusting spending, or extending part-time work.
+              At current spending, assets could be depleted by age <strong>{depletionAge}</strong>.
+              Consider increasing income, adjusting spending, or working a little longer.
             </p>
           </div>
         </div>
       )}
 
-      {/* Lifetime chart */}
-      <Card>
-        <h3 className="section-heading">Income vs Spending — Lifetime View</h3>
-        <p className="text-sm text-slate-500 mb-4">Stacked bars = income sources. Dashed line = desired spending.</p>
+      {/* KPI stat cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard icon="💰" label="Annual spending" value={formatCurrency(annualSpend, true)}
+          sub={rlssStandard ? `${RLSS_STANDARDS[mode][rlssStandard].label} lifestyle` : "today's £"}
+          accent="slate" />
+        <StatCard icon="📥" label="Year 1 income" value={formatCurrency(firstYear?.totalIncome ?? 0, true)}
+          sub={`${formatCurrency(firstYear?.netIncome ?? 0, true)} after tax`}
+          accent="sky" />
+        <StatCard icon="🏦" label="Assets today" value={formatCurrency(firstYear?.totalAssets ?? 0, true)}
+          sub={unrealisedGain > 0 ? `${formatCurrency(unrealisedGain, true)} unrealised gain` : 'across all accounts'}
+          accent="orange" />
+        <StatCard
+          icon={surplus ? '✅' : '⚠️'}
+          label={surplus ? `Assets at ${state.assumptions.lifeExpectancy}` : 'Depleted at age'}
+          value={surplus ? formatCurrency(lastPositive?.totalAssets ?? 0, true) : String(depletionAge)}
+          sub={surplus ? 'plan is on track' : 'review your plan'}
+          accent={surplus ? 'emerald' : 'rose'} />
+      </div>
+
+      {/* Lifestyle level indicator */}
+      <LifestyleLevel mode={mode} annualIncome={firstYear?.totalIncome ?? 0} rlssStandard={rlssStandard} />
+
+      {/* Life stage timeline */}
+      <StageTimeline projections={projections} lifeStages={lifeStages} p1Age={person1.currentAge} />
+
+      {/* Charts */}
+      <div className="game-card">
+        <h3 className="section-heading">Income vs spending — lifetime view</h3>
+        <p className="text-xs text-slate-500 mb-4">Stacked bars = income sources. Dashed line = desired spending.</p>
         <LifetimeChart projections={projections} mode={mode} p1Name={p1Name} p2Name={p2Name} />
-      </Card>
+      </div>
 
-      {/* Asset chart */}
-      <Card>
-        <h3 className="section-heading">Asset Balance Over Time</h3>
-        <p className="text-sm text-slate-500 mb-4">Combined ISA, GIA, cash and pension balances as you draw from them.</p>
+      <div className="game-card">
+        <h3 className="section-heading">Asset balances over time</h3>
+        <p className="text-xs text-slate-500 mb-4">Combined ISA, GIA, cash and pension as you draw from them.</p>
         <AssetChart projections={projections} />
-      </Card>
-
-      {/* Per-person breakdown (couples) */}
-      {mode === 'couple' && (
-        <HouseholdBreakdown projections={projections} p1Name={p1Name} p2Name={p2Name} />
-      )}
-
-      {/* Tax strategy */}
-      <TaxStrategy projections={projections} />
-
-      {/* CGT section */}
-      <CGTSummary projections={projections} p1Name={p1Name} p2Name={p2Name} />
+      </div>
 
       {/* Quick adjust */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
+      <div className="game-card">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h3 className="section-heading">Quick-adjust spending</h3>
-            <p className="text-sm text-slate-500">Tweak key categories and see charts update instantly.</p>
+            <h3 className="section-heading mb-0">Quick-adjust spending</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Tweak key categories and see the charts update live.</p>
           </div>
-          <button onClick={() => setShowAdjust(!showAdjust)} className="text-blue-600 text-sm font-medium hover:text-blue-700">
-            {showAdjust ? 'Hide' : 'Show'}
+          <button onClick={() => setShowAdjust(v => !v)} className="text-sm text-orange-600 hover:text-orange-700 font-bold">
+            {showAdjust ? '▲ Hide' : '▼ Show'}
           </button>
         </div>
         {showAdjust && (
-          <div className="border-t border-slate-100 pt-2">
-            {spendingCategories.slice(0, 8).map(cat => (
-              <SliderInput key={cat.id} label={cat.name} icon={cat.icon}
-                value={cat.amounts[firstStageId] ?? 0}
-                onChange={(v) => updateSpendingAmount(cat.id, firstStageId, v)}
-                min={0} max={cat.maxValue} step={100} />
-            ))}
-            <p className="text-xs text-slate-400 pt-2">Go to Step 2 to adjust all categories and life stages.</p>
+          <div className="border-t border-slate-100 pt-3 space-y-2">
+            {spendingCategories.slice(0, 8).map(cat => {
+              const val = cat.amounts[firstStageId] ?? 0;
+              const pct = (val / cat.maxValue) * 100;
+              return (
+                <div key={cat.id} className="py-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{cat.icon}</span>
+                      <span className="text-sm font-semibold text-slate-700">{cat.name}</span>
+                    </div>
+                    <span className="text-sm font-black text-orange-600">{formatCurrency(val, true)}</span>
+                  </div>
+                  <input type="range" min={0} max={cat.maxValue} step={100} value={val}
+                    onChange={(e) => updateSpendingAmount(cat.id, firstStageId, parseInt(e.target.value))}
+                    className="w-full"
+                    style={{ background: `linear-gradient(to right, #f97316 ${pct}%, #e2e8f0 ${pct}%)` }}
+                  />
+                </div>
+              );
+            })}
+            <p className="text-xs text-slate-400 pt-1">Go to Step 2 to adjust all categories across all life stages.</p>
           </div>
         )}
-      </Card>
+      </div>
+
+      {/* Tax strategy */}
+      <TaxOverview projections={projections} />
 
       {/* Projection table */}
       <ProjectionTable projections={projections} />
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 justify-between pt-2 no-print">
-        <button onClick={onBack} className="btn-secondary">Edit income &amp; assets</button>
-        <div className="flex gap-3">
+        <button onClick={onBack} className="btn-secondary">← Edit income & assets</button>
+        <div className="flex gap-3 flex-wrap">
           <button
             onClick={() => {
               const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a'); a.href = url; a.download = 'lifeplan-scenario.json'; a.click();
+              const url  = URL.createObjectURL(blob);
+              const a    = document.createElement('a'); a.href = url; a.download = 'lifeplan.json'; a.click();
               URL.revokeObjectURL(url);
             }}
             className="btn-secondary text-sm"
-          >Save scenario</button>
-          <button
-            onClick={() => {
-              try {
-                navigator.clipboard.writeText(`${window.location.origin}?plan=${btoa(JSON.stringify(state))}`).then(() => alert('Link copied!'));
-              } catch { alert('Could not generate share link.'); }
-            }}
-            className="btn-secondary text-sm"
-          >Share with adviser</button>
-          <button onClick={() => window.print()} className="btn-primary text-sm">Export PDF</button>
+          >💾 Save scenario</button>
+          <button onClick={() => window.print()} className="btn-primary text-sm">🖨️ Export PDF</button>
         </div>
       </div>
     </div>
