@@ -5,6 +5,7 @@ import { usePlannerStore } from '@/store/plannerStore';
 import Header from '@/components/Header';
 import StepIndicator from '@/components/StepIndicator';
 import SummaryBar from '@/components/SummaryBar';
+import Step1HouseholdSetup from '@/components/steps/Step1HouseholdSetup';
 import Step1LifeVision from '@/components/steps/Step1LifeVision';
 import Step2SpendingGoals from '@/components/steps/Step2SpendingGoals';
 import Step3IncomeSources from '@/components/steps/Step3IncomeSources';
@@ -12,10 +13,11 @@ import Step3IncomeSources from '@/components/steps/Step3IncomeSources';
 const Step4Dashboard = dynamic(() => import('@/components/steps/Step4Dashboard'), { ssr: false });
 
 const STEPS = [
-  { label: 'Life Vision',    description: 'Design your aspirations' },
-  { label: 'Spending Goals', description: 'Set your lifestyle budget' },
-  { label: 'Income & Assets',description: 'Map your financial picture' },
-  { label: 'Your Dashboard', description: 'See your lifetime plan' },
+  { label: 'Household',     description: 'Who are we planning for?' },
+  { label: 'Life Vision',   description: 'Design your aspirations' },
+  { label: 'Spending',      description: 'Set your lifestyle budget' },
+  { label: 'Income & Assets', description: 'Map your financial picture' },
+  { label: 'Dashboard',     description: 'See your lifetime plan' },
 ];
 
 export default function Home() {
@@ -36,15 +38,16 @@ export default function Home() {
 
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
         <div className="fade-in">
-          {currentStep === 0 && <Step1LifeVision onNext={goNext} />}
-          {currentStep === 1 && <Step2SpendingGoals onNext={goNext} onBack={goBack} />}
-          {currentStep === 2 && <Step3IncomeSources onNext={goNext} onBack={goBack} />}
-          {currentStep === 3 && <Step4Dashboard onBack={goBack} />}
+          {currentStep === 0 && <Step1HouseholdSetup onNext={goNext} />}
+          {currentStep === 1 && <Step1LifeVision onNext={goNext} onBack={goBack} />}
+          {currentStep === 2 && <Step2SpendingGoals onNext={goNext} onBack={goBack} />}
+          {currentStep === 3 && <Step3IncomeSources onNext={goNext} onBack={goBack} />}
+          {currentStep === 4 && <Step4Dashboard onBack={goBack} />}
         </div>
       </main>
 
       {/* Live summary bar */}
-      {currentStep < 3 && (
+      {currentStep < 4 && (
         <div className="sticky bottom-0 bg-white/90 backdrop-blur-sm border-t border-orange-100/60 shadow-game no-print">
           <SummaryBar />
         </div>

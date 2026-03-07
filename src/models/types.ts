@@ -2,11 +2,21 @@
 
 export type AspirationTag =
   | 'travel' | 'hobbies' | 'learning' | 'family'
-  | 'volunteering' | 'property' | 'health' | 'fitness';
+  | 'volunteering' | 'property' | 'health' | 'fitness' | 'giving';
 
+/**
+ * Spending tiers map to the product prompt's four category groups:
+ *   essential     → Essential (housing, food, utilities, transport, insurance, healthcare)
+ *   moderate      → Lifestyle (travel, dining, hobbies)
+ *   aspirational  → Family & Giving (family support, charity, gifts)
+ *   variable      → Other (home improvements, major purchases, buffer)
+ */
 export type SpendingTier = 'essential' | 'moderate' | 'aspirational' | 'variable';
 export type PlanningMode = 'single' | 'couple';
 export type RlssStandard = 'minimum' | 'moderate' | 'comfortable';
+
+/** Who owns a shared asset. 'joint' splits CGT gains equally between both persons. */
+export type AssetOwner = 'p1' | 'p2' | 'joint';
 
 // ─── Life stages ──────────────────────────────────────────────────────────────
 
@@ -15,7 +25,7 @@ export interface LifeStage {
   label: string;
   startAge: number;
   endAge: number;
-  color: string;  // Tailwind bg color class used for visual coding
+  color: string;
 }
 
 // ─── Spending ─────────────────────────────────────────────────────────────────
@@ -42,7 +52,14 @@ export interface DCPensionSource {
   enabled: boolean;
   totalValue: number;
   drawdownAge: number;
-  growthRate: number;   // Annual % — user-adjustable, default from config
+  growthRate: number;     // Annual % — user-adjustable, default from config
+  /**
+   * Pension Commencement Lump Sum as a % of pot (0–25).
+   * Taken tax-free as a one-off at crystallisation (drawdownAge).
+   * Remaining pot is drawn via UFPLS thereafter.
+   * Default: 25 (maximum allowed).
+   */
+  pclsPercentage: number;
 }
 
 export interface DBPensionSource {
@@ -98,6 +115,11 @@ export interface GIAAsset {
   totalValue: number;
   baseCost: number;    // Purchase price — required for CGT calculation
   growthRate: number;
+  /**
+   * Asset owner. 'joint' means held by both persons; CGT gains split equally
+   * across both persons' annual exempt amounts for optimal tax efficiency.
+   */
+  owner: AssetOwner;
 }
 
 export interface PropertyAsset {
@@ -106,6 +128,8 @@ export interface PropertyAsset {
   baseCost: number;        // Original purchase price — for CGT planning
   annualRent: number;      // 0 if main home / not rented
   durationYears: number;   // How many years rental income continues
+  /** Owner of the property — determines which person's rental income it counts toward. */
+  owner: AssetOwner;
 }
 
 export interface PersonAssets {
@@ -119,6 +143,12 @@ export interface PersonAssets {
 
 export interface Person {
   name: string;
+  /**
+   * Date of birth in ISO format (YYYY-MM-DD).
+   * Used to compute currentAge precisely.
+   */
+  dateOfBirth: string;
+  /** Computed from dateOfBirth at plan creation / update. Stored for performance. */
   currentAge: number;
   incomeSources: PersonIncomeSources;
   assets: PersonAssets;
@@ -225,4 +255,26 @@ export interface SimulationResult {
   lifetimeTaxPaid: number;
   lifetimeCGT: number;
   sustainableRlssLevel: RlssStandard | null;
+}
+
+// ─── Gamification metrics ────────────────────────────────────────────────────
+
+export interface GamificationMetrics {
+  /**
+   * Income stability score (0–100).
+   * Measures what % of spending is covered by guaranteed income (State Pension,
+   * DB pension, annuity). Higher = more stable.
+   */
+  incomeStabilityScore: number;
+  /**
+   * Spending confidence score (0–100).
+   * Based on how many years the plan remains funded vs. planning horizon.
+   */
+  spendingConfidenceScore: number;
+  /**
+   * Number of aspirations (life goals) that can be "funded" within current projections.
+   * Funded = spending in aspirational/moderate tiers > 0 in all stages.
+   */
+  fundedGoalsCount: number;
+  totalGoalsCount: number;
 }

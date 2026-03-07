@@ -6,23 +6,30 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "ts-node --project tsconfig.test.json -r tsconfig-paths/register tests/financialEngine.test.ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
     "next": "14.2.5",
     "react": "^18",
     "react-dom": "^18",
     "recharts": "^2.12.7",
-    "zustand": "^4.5.4",
-    "clsx": "^2.1.1"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitest/runner": "^4.0.18",
     "autoprefixer": "^10.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

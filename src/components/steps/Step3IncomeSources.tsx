@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
 import Toggle from '@/components/ui/Toggle';
 import CurrencyInput from '@/components/ui/CurrencyInput';
-import type { PersonIncomeSources, PersonAssets } from '@/lib/types';
+import type { PersonIncomeSources, PersonAssets, AssetOwner } from '@/lib/types';
 import clsx from 'clsx';
 
 interface Props { onNext: () => void; onBack: () => void }
@@ -46,6 +46,29 @@ function PctInput({ value, onChange, label = 'Growth' }: { value: number; onChan
           className="w-20 input-base text-center py-1.5 text-sm pr-6" />
         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
       </div>
+    </div>
+  );
+}
+
+function OwnerSelect({ value, onChange, mode }: {
+  value: AssetOwner; onChange: (v: AssetOwner) => void; mode: 'single' | 'couple';
+}) {
+  if (mode === 'single') return null;
+  const opts: { v: AssetOwner; label: string }[] = [
+    { v: 'p1',    label: 'Person 1' },
+    { v: 'p2',    label: 'Person 2' },
+    { v: 'joint', label: 'Joint' },
+  ];
+  return (
+    <div className="flex gap-1.5">
+      {opts.map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)}
+          className={clsx('px-2.5 py-1 rounded-lg text-xs font-bold border transition-all',
+            value === o.v ? 'bg-orange-500 border-orange-500 text-white' : 'bg-white border-slate-200 text-slate-500 hover:border-orange-300'
+          )}>
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -210,8 +233,19 @@ function IncomeSection({ currentAge, src, assets, set }: {
           <FieldRow label="Annual growth rate">
             <PctInput value={src.dcPension.growthRate} onChange={(v) => set('dcPension', { growthRate: v })} />
           </FieldRow>
+          <FieldRow label="PCLS %" hint="Tax-free lump sum at crystallisation (0–25%)">
+            <div className="flex items-center gap-2">
+              <input type="range" min={0} max={25} step={1}
+                value={src.dcPension.pclsPercentage ?? 25}
+                onChange={(e) => set('dcPension', { pclsPercentage: parseInt(e.target.value) })}
+                className="w-24"
+                style={{ background: `linear-gradient(to right, #f97316 ${((src.dcPension.pclsPercentage ?? 25) / 25) * 100}%, #e2e8f0 ${((src.dcPension.pclsPercentage ?? 25) / 25) * 100}%)` }}
+              />
+              <span className="font-black text-orange-600 w-8 text-sm">{src.dcPension.pclsPercentage ?? 25}%</span>
+            </div>
+          </FieldRow>
           <div className="py-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3">
-            25% of each withdrawal is tax-free (UFPLS). 75% taxed as income. First 25% can also be taken as PCLS.
+            PCLS taken tax-free at crystallisation. Remaining pot drawn via UFPLS (25% of each withdrawal tax-free).
           </div>
         </SourceCard>
 
@@ -253,9 +287,10 @@ function IncomeSection({ currentAge, src, assets, set }: {
 
 // ─── Assets section ───────────────────────────────────────────────────────────
 
-function AssetsSection({ assets, set }: {
+function AssetsSection({ assets, set, mode }: {
   assets: PersonAssets;
   set: (key: keyof PersonAssets, u: Record<string, unknown>) => void;
+  mode: 'single' | 'couple';
 }) {
   const { cashSavings, isaInvestments, generalInvestments, property } = assets;
   const giaGain  = generalInvestments.enabled ? Math.max(0, generalInvestments.totalValue - generalInvestments.baseCost) : 0;
@@ -300,9 +335,15 @@ function AssetsSection({ assets, set }: {
         <FieldRow label="Annual growth rate">
           <PctInput value={generalInvestments.growthRate} onChange={(v) => set('generalInvestments', { growthRate: v })} />
         </FieldRow>
+        {mode === 'couple' && (
+          <FieldRow label="Ownership" hint="Joint splits CGT gains between both persons">
+            <OwnerSelect value={generalInvestments.owner ?? 'p1'} onChange={(v) => set('generalInvestments', { owner: v })} mode={mode} />
+          </FieldRow>
+        )}
         {giaGain > 0 && (
           <div className="py-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3">
             Unrealised gain: <strong>£{giaGain.toLocaleString('en-GB')}</strong> · CGT applies on gains above £3,000 annual exempt amount.
+            {generalInvestments.owner === 'joint' && ' Joint ownership splits gains across both persons\' CGT allowances.'}
           </div>
         )}
       </SourceCard>
@@ -320,6 +361,11 @@ function AssetsSection({ assets, set }: {
         <FieldRow label="Annual net rental income" hint="0 if owner-occupied">
           <CurrencyInput value={property.annualRent} onChange={(v) => set('property', { annualRent: v })} max={100000} step={500} />
         </FieldRow>
+        {mode === 'couple' && (
+          <FieldRow label="Ownership">
+            <OwnerSelect value={property.owner ?? 'p1'} onChange={(v) => set('property', { owner: v })} mode={mode} />
+          </FieldRow>
+        )}
         {property.annualRent > 0 && (
           <FieldRow label="Duration (years from now)">
             <div className="flex items-center gap-2">
@@ -367,7 +413,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
       {/* Hero */}
       <div className="text-center pt-4 pb-2">
         <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3">
-          💷 Step 3 of 4 — Income & Assets
+          💷 Step 4 of 5 — Income & Assets
         </div>
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 tracking-tight">
           Where will the{' '}
@@ -412,7 +458,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
       {activeTab === 'income' ? (
         <IncomeSection currentAge={person.currentAge} src={person.incomeSources} assets={person.assets} set={setIncome} />
       ) : (
-        <AssetsSection assets={person.assets} set={setAsset} />
+        <AssetsSection assets={person.assets} set={setAsset} mode={mode} />
       )}
 
       {/* Assumptions */}

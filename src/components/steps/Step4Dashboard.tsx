@@ -6,6 +6,7 @@ import { usePlannerStore } from '@/store/plannerStore';
 import {
   calculateProjections, getStageTotalSpending,
   getAssetDepletionAge, formatCurrency, getTotalUnrealisedGain,
+  calculateGamificationMetrics,
 } from '@/lib/calculations';
 import { RLSS_STANDARDS } from '@/lib/mockData';
 import type { YearlyProjection } from '@/lib/types';
@@ -247,7 +248,8 @@ export default function Step4Dashboard({ onBack }: Props) {
   const annualSpend   = getStageTotalSpending(state, firstStageId);
   const lastPositive  = [...projections].reverse().find(p => p.totalAssets > 0);
   const surplus       = depletionAge === null;
-  const unrealisedGain = getTotalUnrealisedGain(state);
+  const unrealisedGain  = getTotalUnrealisedGain(state);
+  const gamification    = useMemo(() => calculateGamificationMetrics(state), [state]);
 
   const [showAdjust, setShowAdjust] = useState(false);
 
@@ -260,7 +262,7 @@ export default function Step4Dashboard({ onBack }: Props) {
       {/* Hero */}
       <div className="text-center pt-4 pb-2">
         <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3">
-          🎯 Step 4 of 4 — Your Dashboard
+          🎯 Step 5 of 5 — Your Dashboard
         </div>
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 tracking-tight">
           Your lifetime{' '}
@@ -309,6 +311,62 @@ export default function Step4Dashboard({ onBack }: Props) {
 
       {/* Life stage timeline */}
       <StageTimeline projections={projections} lifeStages={lifeStages} p1Age={person1.currentAge} />
+
+      {/* Gamification metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+        {/* Income stability meter */}
+        <div className="game-card-sm text-center">
+          <p className="text-xs font-bold text-slate-500 mb-2">Income stability</p>
+          <div className="relative w-20 h-20 mx-auto mb-2">
+            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#10b981" strokeWidth="3"
+                strokeDasharray={`${gamification.incomeStabilityScore} 100`}
+                strokeLinecap="round" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-black text-emerald-600">{gamification.incomeStabilityScore}%</span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">of spending covered by<br />guaranteed income</p>
+        </div>
+
+        {/* Spending confidence */}
+        <div className="game-card-sm text-center">
+          <p className="text-xs font-bold text-slate-500 mb-2">Spending confidence</p>
+          <div className="relative w-20 h-20 mx-auto mb-2">
+            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none"
+                stroke={gamification.spendingConfidenceScore >= 80 ? '#f97316' : gamification.spendingConfidenceScore >= 50 ? '#f59e0b' : '#f43f5e'}
+                strokeWidth="3"
+                strokeDasharray={`${gamification.spendingConfidenceScore} 100`}
+                strokeLinecap="round" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-lg font-black ${gamification.spendingConfidenceScore >= 80 ? 'text-orange-600' : gamification.spendingConfidenceScore >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>
+                {gamification.spendingConfidenceScore}%
+              </span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500">of plan years<br />fully funded</p>
+        </div>
+
+        {/* Life goal progress */}
+        <div className="game-card-sm">
+          <p className="text-xs font-bold text-slate-500 mb-2 text-center">Life goals funded</p>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-3xl font-black text-violet-600">{gamification.fundedGoalsCount}</span>
+            <span className="text-sm text-slate-400">/ {gamification.totalGoalsCount}</span>
+          </div>
+          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-violet-500 rounded-full transition-all"
+              style={{ width: `${gamification.totalGoalsCount > 0 ? (gamification.fundedGoalsCount / gamification.totalGoalsCount) * 100 : 0}%` }} />
+          </div>
+          <p className="text-xs text-slate-400 mt-2 text-center">lifestyle &amp; family categories with budget set</p>
+        </div>
+      </div>
 
       {/* Charts */}
       <div className="game-card">

@@ -9,11 +9,23 @@
  * - Tax calculations delegated to /financialEngine/taxCalculations
  * - No React imports — this module is pure TypeScript
  * - Exported helpers (formatCurrency, etc.) are used by UI components
+ *
+ * PCLS model:
+ *   In the year the DC pension is first drawn (drawdownAge), a Pension
+ *   Commencement Lump Sum (pclsPercentage% of pot) is taken completely
+ *   tax-free. The remaining pot is then drawn via the UFPLS model
+ *   (UFPLS_TAX_FREE_FRACTION of each subsequent withdrawal is tax-free).
+ *
+ * Joint GIA:
+ *   When a GIA has owner = 'joint', capital gains are split equally
+ *   between both persons for CGT purposes, allowing each person's
+ *   annual CGT exempt amount (£3,000) to be used efficiently.
  */
 
 import type {
   PlannerState, YearlyProjection, LifeStage,
   PersonIncomeSources, PersonAssets, SimulationResult,
+  GamificationMetrics,
 } from '@/models/types';
 import { PENSION_RULES, RLSS } from '@/config/financialConstants';
 import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer } from './taxCalculations';
@@ -40,7 +52,7 @@ function personIncome(
 
   // Annuity — indexed from start age (combined into 'other' for chart simplicity)
   const annuity = src.annuity?.enabled && personAge >= (src.annuity?.startAge ?? 999)
-    ? (src.annuity.annualIncome) * inflFrom(src.annuity.startAge) : 0;
+    ? src.annuity.annualIncome * inflFrom(src.annuity.startAge) : 0;
 
   // Part-time work — not inflation-linked (nominal income)
   const ptw = src.partTimeWork.enabled && personAge < src.partTimeWork.stopAge
@@ -53,6 +65,7 @@ function personIncome(
     ? src.otherIncome.annualAmount : 0;
 
   // Property rental income — runs for durationYears from year 0
+  // For joint property, both persons can have the same property; only count once (handled at call site)
   const rent = assets.property.enabled &&
     assets.property.annualRent > 0 &&
     yearIndex < assets.property.durationYears
@@ -73,7 +86,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   const { person1, person2, lifeStages, spendingCategories, assumptions, mode } = state;
   const { lifeExpectancy, inflation, investmentGrowth } = assumptions;
 
-  // Initialise asset balances
+  // ── Initialise asset balances ──────────────────────────────────────────────
   let p1Isa   = person1.assets.isaInvestments.enabled     ? person1.assets.isaInvestments.totalValue     : 0;
   let p1GiaV  = person1.assets.generalInvestments.enabled ? person1.assets.generalInvestments.totalValue : 0;
   let p1GiaBC = person1.assets.generalInvestments.enabled ? person1.assets.generalInvestments.baseCost   : 0;
@@ -86,13 +99,21 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   let p2Cash  = (mode === 'couple' && person2.assets.cashSavings.enabled)        ? person2.assets.cashSavings.totalValue        : 0;
   let p2Dc    = (mode === 'couple' && person2.incomeSources.dcPension.enabled)   ? person2.incomeSources.dcPension.totalValue   : 0;
 
-  // Per-asset growth rates (fall back to global investmentGrowth)
+  // ── Per-asset growth rates (fall back to global investmentGrowth) ──────────
   const p1IsaG  = (person1.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
   const p1GiaG  = (person1.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
   const p1DcG   = (person1.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
   const p2IsaG  = (person2.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
   const p2GiaG  = (person2.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
   const p2DcG   = (person2.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
+
+  // ── PCLS tracking — taken once at crystallisation ─────────────────────────
+  let p1PclsTaken = false;
+  let p2PclsTaken = false;
+
+  // ── Joint GIA flag — GIA split by person for CGT ──────────────────────────
+  const p1GiaIsJoint = person1.assets.generalInvestments.owner === 'joint';
+  const p2GiaIsJoint = mode === 'couple' && person2.assets.generalInvestments.owner === 'joint';
 
   const maxYears   = lifeExpectancy - person1.currentAge;
   const projections: YearlyProjection[] = [];
@@ -102,20 +123,24 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     const p2Age     = mode === 'couple' ? person2.currentAge + y : null;
     const inflFactor = Math.pow(1 + inflation / 100, y);
 
-    // ── Spending (inflation-adjusted from today's £) ──────────────────────
+    // ── Spending (inflation-adjusted from today's £) ───────────────────────
     const stage    = getStageForAge(lifeStages, p1Age);
     const spending = spendingCategories.reduce((s, c) => s + (c.amounts[stage.id] ?? 0), 0) * inflFactor;
 
     // ── Fixed income ──────────────────────────────────────────────────────
-    const p1 = personIncome(person1.incomeSources, person1.assets, p1Age, y, inflation);
-    const p2 = mode === 'couple' && p2Age !== null
+    const p1Inc = personIncome(person1.incomeSources, person1.assets, p1Age, y, inflation);
+    const p2Inc = mode === 'couple' && p2Age !== null
       ? personIncome(person2.incomeSources, person2.assets, p2Age, y, inflation)
       : { sp: 0, db: 0, ptw: 0, other: 0, rent: 0 };
 
-    const fixedIncome = p1.sp + p1.db + p1.ptw + p1.other + p1.rent
-                      + p2.sp + p2.db + p2.ptw + p2.other + p2.rent;
+    // For joint property: avoid double-counting rent — use only person1's rent figure
+    const jointPropP1 = person1.assets.property.owner === 'joint';
+    const p2RentEffective = jointPropP1 ? 0 : p2Inc.rent; // already counted in p1Inc.rent
 
-    // ── Asset growth (before drawdown — assets grow throughout the year) ──
+    const fixedIncome = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent
+                      + p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
+
+    // ── Asset growth (before drawdown) ────────────────────────────────────
     if (p1Isa  > 0) p1Isa  *= (1 + p1IsaG);
     if (p1GiaV > 0) p1GiaV *= (1 + p1GiaG);
     if (p1Dc   > 0) p1Dc   *= (1 + p1DcG);
@@ -123,17 +148,43 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     if (p2GiaV > 0) p2GiaV *= (1 + p2GiaG);
     if (p2Dc   > 0) p2Dc   *= (1 + p2DcG);
 
-    // ── Drawdown to cover gap (Priority order: P1 ISA → P2 ISA → P1 GIA → P2 GIA → P1 Cash → P2 Cash → P1 DC → P2 DC)
-    let remaining = spending - fixedIncome;
+    // ── PCLS: one-off tax-free lump sum at crystallisation ────────────────
+    // Taken in the first year the DC pension becomes available. Reduces the
+    // pot immediately; treated as income this year (tax-free component).
+    let p1PclsAmount = 0;
+    let p2PclsAmount = 0;
+
+    const dc1 = person1.incomeSources.dcPension;
+    if (!p1PclsTaken && p1Dc > 0 && dc1.enabled && p1Age >= dc1.drawdownAge) {
+      const pct = Math.min(PENSION_RULES.PCLS_MAX_FRACTION, (dc1.pclsPercentage ?? 25) / 100);
+      p1PclsAmount = p1Dc * pct;
+      p1Dc -= p1PclsAmount;
+      p1PclsTaken = true;
+    }
+    const dc2 = person2.incomeSources.dcPension;
+    if (mode === 'couple' && !p2PclsTaken && p2Dc > 0 && dc2.enabled && p2Age !== null && p2Age >= dc2.drawdownAge) {
+      const pct = Math.min(PENSION_RULES.PCLS_MAX_FRACTION, (dc2.pclsPercentage ?? 25) / 100);
+      p2PclsAmount = p2Dc * pct;
+      p2Dc -= p2PclsAmount;
+      p2PclsTaken = true;
+    }
+
+    // ── Drawdown to cover gap ─────────────────────────────────────────────
+    // Priority: P1 ISA → P2 ISA → P1 GIA → P2 GIA → P1 Cash → P2 Cash → P1 DC → P2 DC
+    let remaining = spending - fixedIncome - p1PclsAmount - p2PclsAmount;
 
     let p1IsaD = 0, p1GiaD = 0, p1GiaCG = 0, p1CashD = 0, p1DcD = 0;
     let p2IsaD = 0, p2GiaD = 0, p2GiaCG = 0, p2CashD = 0, p2DcD = 0;
 
     if (remaining > 0) {
       // P1 ISA — completely tax-free
-      if (p1Isa > 0) { const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d; }
+      if (p1Isa > 0) {
+        const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
+      }
       // P2 ISA
-      if (remaining > 0 && p2Isa > 0) { const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d; }
+      if (remaining > 0 && p2Isa > 0) {
+        const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
+      }
       // P1 GIA — proportional CGT
       if (remaining > 0 && p1GiaV > 0) {
         const r = drawFromGIA(p1GiaV, p1GiaBC, remaining);
@@ -149,17 +200,19 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
         remaining -= r.drawn;
       }
       // P1 Cash
-      if (remaining > 0 && p1Cash > 0) { const d = Math.min(p1Cash, remaining); p1CashD = d; p1Cash -= d; remaining -= d; }
+      if (remaining > 0 && p1Cash > 0) {
+        const d = Math.min(p1Cash, remaining); p1CashD = d; p1Cash -= d; remaining -= d;
+      }
       // P2 Cash
-      if (remaining > 0 && p2Cash > 0) { const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d; }
-      // P1 DC Pension
-      const dc1 = person1.incomeSources.dcPension;
+      if (remaining > 0 && p2Cash > 0) {
+        const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
+      }
+      // P1 DC Pension (UFPLS after PCLS)
       if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= dc1.drawdownAge) {
         const d = Math.min(p1Dc, remaining); p1DcD = d; p1Dc -= d; remaining -= d;
       }
       // P2 DC Pension
       if (remaining > 0 && mode === 'couple' && p2Age !== null) {
-        const dc2 = person2.incomeSources.dcPension;
         if (p2Dc > 0 && dc2.enabled && p2Age >= dc2.drawdownAge) {
           const d = Math.min(p2Dc, remaining); p2DcD = d; p2Dc -= d; remaining -= d;
         }
@@ -169,22 +222,35 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       p1Cash += Math.abs(remaining);
     }
 
-    const totalIncome = fixedIncome + p1IsaD + p1GiaD + p1CashD + p1DcD
-                                    + p2IsaD + p2GiaD + p2CashD + p2DcD;
+    const totalIncome = fixedIncome + p1PclsAmount + p2PclsAmount
+                      + p1IsaD + p1GiaD + p1CashD + p1DcD
+                      + p2IsaD + p2GiaD + p2CashD + p2DcD;
 
-    // ── Tax (per person) ──────────────────────────────────────────────────
-    // Taxable income: fixed income + 75% of DC drawdown (UFPLS model)
+    // ── Tax per person ────────────────────────────────────────────────────
+    // PCLS is tax-free, so not included in tax basis.
+    // UFPLS: 75% of ongoing DC drawdown is taxable.
     const taxFree = PENSION_RULES.UFPLS_TAX_FREE_FRACTION;
-    const p1TaxBasis = p1.sp + p1.db + p1.ptw + p1.other + p1.rent + p1DcD * (1 - taxFree);
-    const p2TaxBasis = p2.sp + p2.db + p2.ptw + p2.other + p2.rent + p2DcD * (1 - taxFree);
+
+    // Joint GIA: split capital gain equally between both persons for CGT efficiency
+    const p1GiaCGForTax = p1GiaIsJoint ? p1GiaCG / 2 : p1GiaCG;
+    const p1JointGainShare = p1GiaIsJoint ? p1GiaCG / 2 : 0;  // P2 receives the other half
+    const p2GiaCGForTax = p2GiaIsJoint ? p2GiaCG / 2 : p2GiaCG;
+    const p2JointGainShare = p2GiaIsJoint ? p2GiaCG / 2 : 0;
+
+    const p1TaxBasis = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent
+                     + p1DcD * (1 - taxFree);
+    const p2TaxBasis = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective
+                     + p2DcD * (1 - taxFree);
 
     const p1IncomeTax = calcIncomeTax(p1TaxBasis);
     const p2IncomeTax = calcIncomeTax(p2TaxBasis);
     const incomeTaxPaid = p1IncomeTax + p2IncomeTax;
 
-    // CGT — assessed per person against their own exempt amount
-    const p1CgtPaid = calcCGT(p1GiaCG, isHigherRateTaxpayer(p1TaxBasis));
-    const p2CgtPaid = calcCGT(p2GiaCG, isHigherRateTaxpayer(p2TaxBasis));
+    // CGT per person (joint GIA gain split equally)
+    const p1TotalCG = p1GiaCGForTax + p2JointGainShare; // P1's own gain + half of any P2-side joint gain
+    const p2TotalCG = p2GiaCGForTax + p1JointGainShare; // P2's own gain + half of any P1-side joint gain
+    const p1CgtPaid = calcCGT(p1TotalCG, isHigherRateTaxpayer(p1TaxBasis));
+    const p2CgtPaid = calcCGT(p2TotalCG, isHigherRateTaxpayer(p2TaxBasis));
     const totalCgtPaid  = p1CgtPaid + p2CgtPaid;
     const totalTaxPaid  = incomeTaxPaid + totalCgtPaid;
     const netIncome     = totalIncome - totalTaxPaid;
@@ -197,10 +263,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       lifeStage: stage.label,
       spending,
 
-      p1StatePension: p1.sp, p1DbPension: p1.db, p1PartTimeWork: p1.ptw,
-      p1OtherIncome: p1.other, p1PropertyRent: p1.rent,
-      p2StatePension: p2.sp, p2DbPension: p2.db, p2PartTimeWork: p2.ptw,
-      p2OtherIncome: p2.other, p2PropertyRent: p2.rent,
+      p1StatePension: p1Inc.sp, p1DbPension: p1Inc.db, p1PartTimeWork: p1Inc.ptw,
+      p1OtherIncome: p1Inc.other, p1PropertyRent: p1Inc.rent,
+      p2StatePension: p2Inc.sp, p2DbPension: p2Inc.db, p2PartTimeWork: p2Inc.ptw,
+      p2OtherIncome: p2Inc.other, p2PropertyRent: p2RentEffective,
 
       p1IsaDrawdown: p1IsaD, p1GiaDrawdown: p1GiaD, p1CashDrawdown: p1CashD, p1DcDrawdown: p1DcD,
       p2IsaDrawdown: p2IsaD, p2GiaDrawdown: p2GiaD, p2CashDrawdown: p2CashD, p2DcDrawdown: p2DcD,
@@ -209,7 +275,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       giaDrawdown:  p1GiaD  + p2GiaD,
       cashDrawdown: p1CashD + p2CashD,
       dcDrawdown:   p1DcD   + p2DcD,
-      propertyRent: p1.rent + p2.rent,
+      propertyRent: p1Inc.rent + p2RentEffective,
 
       p1CapitalGain: p1GiaCG, p2CapitalGain: p2GiaCG,
       p1CgtPaid, p2CgtPaid, totalCgtPaid,
@@ -282,6 +348,42 @@ export function getSustainableRlssLevel(
   return null;
 }
 
+/**
+ * Calculate gamification metrics for dashboard display.
+ *
+ * incomeStabilityScore:  % of Year 1 spending covered by guaranteed income (SP + DB + annuity).
+ * spendingConfidenceScore: % of years in the projection where the plan is fully funded.
+ * fundedGoalsCount: number of aspirational/lifestyle spending categories with non-zero amounts.
+ */
+export function calculateGamificationMetrics(state: PlannerState): GamificationMetrics {
+  const projections = calculateProjections(state);
+  const firstYear = projections[0];
+  const firstStageId = state.lifeStages[0]?.id ?? 'active';
+
+  // Income stability: guaranteed income / spending in year 1
+  const guaranteedIncome = (firstYear?.p1StatePension ?? 0) + (firstYear?.p1DbPension ?? 0)
+                         + (firstYear?.p2StatePension ?? 0) + (firstYear?.p2DbPension ?? 0)
+                         + (firstYear?.p1OtherIncome  ?? 0) + (firstYear?.p2OtherIncome  ?? 0);
+  const yearOneSpending  = firstYear?.spending ?? 1;
+  const incomeStabilityScore = Math.min(100, Math.round((guaranteedIncome / yearOneSpending) * 100));
+
+  // Spending confidence: funded years / total years
+  const fundedYears = projections.filter(p => p.totalAssets > 0).length;
+  const spendingConfidenceScore = Math.round((fundedYears / projections.length) * 100);
+
+  // Funded goals: active-stage categories with amount > 0
+  const goalTiers: Array<'moderate' | 'aspirational'> = ['moderate', 'aspirational'];
+  const goalCats = state.spendingCategories.filter(c => goalTiers.includes(c.tier as 'moderate' | 'aspirational'));
+  const fundedGoalsCount = goalCats.filter(c => (c.amounts[firstStageId] ?? 0) > 0).length;
+
+  return {
+    incomeStabilityScore,
+    spendingConfidenceScore,
+    fundedGoalsCount,
+    totalGoalsCount: goalCats.length,
+  };
+}
+
 /** Format a number as £ currency. compact=true gives £12.3k style. */
 export function formatCurrency(value: number, compact = false): string {
   if (compact && Math.abs(value) >= 1000) return '£' + (value / 1000).toFixed(1) + 'k';
@@ -293,9 +395,9 @@ export function runSimulation(state: PlannerState): SimulationResult {
   const projections = calculateProjections(state);
   return {
     projections,
-    depletionAge:        getAssetDepletionAge(projections),
-    lifetimeTaxPaid:     projections.reduce((s, p) => s + p.totalTaxPaid, 0),
-    lifetimeCGT:         projections.reduce((s, p) => s + p.totalCgtPaid, 0),
+    depletionAge:         getAssetDepletionAge(projections),
+    lifetimeTaxPaid:      projections.reduce((s, p) => s + p.totalTaxPaid, 0),
+    lifetimeCGT:          projections.reduce((s, p) => s + p.totalCgtPaid, 0),
     sustainableRlssLevel: getSustainableRlssLevel(projections, state.mode),
   };
 }

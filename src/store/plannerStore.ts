@@ -5,23 +5,25 @@ import { persist } from 'zustand/middleware';
 import type {
   PlannerState, PlanningMode, LifeStage,
   PersonIncomeSources, PersonAssets, Assumptions, AspirationTag, RlssStandard,
-} from '@/lib/types';
+} from '@/models/types';
 import {
   createDefaultState, createMockDemoState, buildDefaultLifeStages,
-  buildCategoriesForRlss,
+  buildCategoriesForRlss, ageFromDOB,
 } from '@/lib/mockData';
 
 type Actions = {
   setCurrentStep: (step: number) => void;
   setMode: (mode: PlanningMode) => void;
 
-  setP1Name: (name: string) => void;
-  setP1Age: (age: number) => void;
+  setP1Name:  (name: string) => void;
+  setP1Dob:   (dob: string)  => void;
+  setP1Age:   (age: number)  => void;
   setP1Income: (key: keyof PersonIncomeSources, updates: Record<string, unknown>) => void;
   setP1Asset:  (key: keyof PersonAssets,        updates: Record<string, unknown>) => void;
 
-  setP2Name: (name: string) => void;
-  setP2Age: (age: number) => void;
+  setP2Name:  (name: string) => void;
+  setP2Dob:   (dob: string)  => void;
+  setP2Age:   (age: number)  => void;
   setP2Income: (key: keyof PersonIncomeSources, updates: Record<string, unknown>) => void;
   setP2Asset:  (key: keyof PersonAssets,        updates: Record<string, unknown>) => void;
 
@@ -47,6 +49,21 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setMode: (mode) => set({ mode }),
 
       setP1Name: (name) => set((s) => ({ person1: { ...s.person1, name } })),
+
+      // DOB setter — recomputes age and rebuilds life stages
+      setP1Dob: (dateOfBirth) =>
+        set((s) => {
+          const age = ageFromDOB(dateOfBirth, s.person1.currentAge);
+          return {
+            person1: { ...s.person1, dateOfBirth, currentAge: age },
+            lifeStages: buildDefaultLifeStages(age).map((ns) => {
+              const ex = s.lifeStages.find((ls) => ls.id === ns.id);
+              return ex ? { ...ex, startAge: ns.startAge } : ns;
+            }),
+          };
+        }),
+
+      // Legacy age setter (used by slider fallback)
       setP1Age: (age) =>
         set((s) => ({
           person1: { ...s.person1, currentAge: age },
@@ -55,6 +72,7 @@ export const usePlannerStore = create<PlannerState & Actions>()(
             return ex ? { ...ex, startAge: ns.startAge } : ns;
           }),
         })),
+
       setP1Income: (key, updates) =>
         set((s) => ({
           person1: {
@@ -71,7 +89,15 @@ export const usePlannerStore = create<PlannerState & Actions>()(
         })),
 
       setP2Name: (name) => set((s) => ({ person2: { ...s.person2, name } })),
+
+      setP2Dob: (dateOfBirth) =>
+        set((s) => {
+          const age = ageFromDOB(dateOfBirth, s.person2.currentAge);
+          return { person2: { ...s.person2, dateOfBirth, currentAge: age } };
+        }),
+
       setP2Age: (age) => set((s) => ({ person2: { ...s.person2, currentAge: age } })),
+
       setP2Income: (key, updates) =>
         set((s) => ({
           person2: {
@@ -118,6 +144,6 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       loadDemo: () => set(createMockDemoState()),
       resetPlan: () => set(createDefaultState(57)),
     }),
-    { name: 'life-planner-v3' }
+    { name: 'life-planner-v4' }
   )
 );

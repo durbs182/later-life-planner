@@ -10,10 +10,10 @@ import clsx from 'clsx';
 interface Props { onNext: () => void; onBack: () => void }
 
 const TIER_CFG: Record<SpendingTier, { label: string; desc: string; color: string; bg: string; border: string }> = {
-  essential:    { label: 'Essential',         desc: 'The basics you need',           color: 'text-sky-700',    bg: 'bg-sky-50',    border: 'border-sky-200' },
-  moderate:     { label: 'Enjoyment',          desc: 'Things that make life enjoyable',color: 'text-emerald-700',bg: 'bg-emerald-50',border: 'border-emerald-200' },
-  aspirational: { label: 'Aspirational',       desc: 'Lifestyle ambitions',           color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200' },
-  variable:     { label: 'Life-Stage / Variable', desc: 'Stage-specific costs',       color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
+  essential:    { label: 'Essential',       desc: 'Housing, food, utilities, transport, insurance, healthcare', color: 'text-sky-700',    bg: 'bg-sky-50',    border: 'border-sky-200' },
+  moderate:     { label: 'Lifestyle',       desc: 'Travel, dining, hobbies',                                   color: 'text-emerald-700',bg: 'bg-emerald-50',border: 'border-emerald-200' },
+  aspirational: { label: 'Family & Giving', desc: 'Family support, charity, gifts',                           color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200' },
+  variable:     { label: 'Other',           desc: 'Home improvements, major purchases, buffer',                color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
 };
 
 const STANDARD_CFG: Record<RlssStandard, { bg: string; ring: string; text: string; badge: string }> = {
@@ -54,7 +54,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
       {/* Hero */}
       <div className="text-center pt-4 pb-2">
         <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold px-4 py-1.5 rounded-full mb-3">
-          💰 Step 2 of 4 — Spending Goals
+          💰 Step 3 of 5 — Spending Goals
         </div>
         <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2 tracking-tight">
           What will your life{' '}
