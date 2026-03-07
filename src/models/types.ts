@@ -107,11 +107,6 @@ export interface GIAAsset {
   totalValue: number;
   baseCost: number;    // Purchase price — required for CGT calculation
   growthRate: number;
-  /**
-   * Asset owner. 'joint' means held by both persons; CGT gains split equally
-   * across both persons' annual exempt amounts for optimal tax efficiency.
-   */
-  owner: AssetOwner;
 }
 
 export interface PropertyAsset {
@@ -174,6 +169,12 @@ export interface PlannerState {
   spendingCategories: SpendingCategory[];
   assumptions: Assumptions;
   rlssStandard: RlssStandard | null;
+  /**
+   * Jointly-held GIA shared between both persons.
+   * Capital gains are split 50/50 across both persons' CGT allowances.
+   * Only relevant in couple mode; ignored in single mode.
+   */
+  jointGia: GIAAsset;
 }
 
 // ─── Projection output ────────────────────────────────────────────────────────
@@ -243,6 +244,8 @@ export interface YearlyProjection {
   p2GiaBaseCost: number;
   p2CashBalance: number;
   p2DcBalance: number;
+  jointGiaValue: number;
+  jointGiaBaseCost: number;
   totalAssets: number;
 }
 

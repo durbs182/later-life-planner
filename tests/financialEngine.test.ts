@@ -210,22 +210,28 @@ describe('PCLS', () => {
 // ─── Joint GIA ────────────────────────────────────────────────────────────────
 
 describe('Joint GIA', () => {
-  it('joint ownership produces equal or lower CGT than single-owner', () => {
+  it('joint GIA produces equal or lower CGT than single-owner individual GIA', () => {
     const base = createDefaultState(60);
-    const sharedAssets = {
-      ...base.person1.assets,
-      isaInvestments:     { enabled: false, totalValue: 0, growthRate: 4 },
-      generalInvestments: { enabled: true, totalValue: 50_000, baseCost: 20_000, growthRate: 0, owner: 'joint' as const },
-    };
 
+    // Joint: asset held in top-level jointGia
     const stateJoint: PlannerState = {
       ...base,
       mode: 'couple',
-      person1: { ...base.person1, assets: sharedAssets },
+      jointGia: { enabled: true, totalValue: 50_000, baseCost: 20_000, growthRate: 0 },
     };
+
+    // P1 only: same asset held as person1 individual GIA
     const stateP1: PlannerState = {
-      ...stateJoint,
-      person1: { ...stateJoint.person1, assets: { ...sharedAssets, generalInvestments: { ...sharedAssets.generalInvestments, owner: 'p1' as const } } },
+      ...base,
+      mode: 'couple',
+      person1: {
+        ...base.person1,
+        assets: {
+          ...base.person1.assets,
+          isaInvestments:     { enabled: false, totalValue: 0, growthRate: 4 },
+          generalInvestments: { enabled: true, totalValue: 50_000, baseCost: 20_000, growthRate: 0 },
+        },
+      },
     };
 
     const cgtJoint = calculateProjections(stateJoint).reduce((s, p) => s + p.totalCgtPaid, 0);
@@ -261,7 +267,7 @@ describe('getAssetDepletionAge', () => {
         assets: {
           cashSavings:        { enabled: true, totalValue: 10_000 },
           isaInvestments:     { enabled: false, totalValue: 0, growthRate: 4 },
-          generalInvestments: { enabled: false, totalValue: 0, baseCost: 0, growthRate: 4, owner: 'p1' },
+          generalInvestments: { enabled: false, totalValue: 0, baseCost: 0, growthRate: 4 },
           property:           { enabled: false, propertyValue: 0, baseCost: 0, annualRent: 0, durationYears: 0, owner: 'p1' },
         },
         incomeSources: {

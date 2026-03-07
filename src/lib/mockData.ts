@@ -139,7 +139,7 @@ export function buildDefaultAssets(): PersonAssets {
   return {
     cashSavings:        { enabled: false, totalValue: 0 },
     isaInvestments:     { enabled: false, totalValue: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
-    generalInvestments: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH, owner: 'p1' },
+    generalInvestments: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
     property:           { enabled: false, propertyValue: 0, baseCost: 0, annualRent: 0, durationYears: 10, owner: 'p1' },
   };
 }
@@ -176,6 +176,7 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
       lifeExpectancy:   DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY,
     },
     rlssStandard: null,
+    jointGia: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
   };
 }
 
@@ -204,7 +205,7 @@ export function createMockDemoState(): PlannerState {
       assets: {
         cashSavings:        { enabled: true,  totalValue: 25000 },
         isaInvestments:     { enabled: true,  totalValue: 85000,  growthRate: 4 },
-        generalInvestments: { enabled: true,  totalValue: 30000,  baseCost: 18000, growthRate: 4, owner: 'p1' },
+        generalInvestments: { enabled: true,  totalValue: 30000,  baseCost: 18000, growthRate: 4 },
         property:           { enabled: true,  propertyValue: 450000, baseCost: 220000, annualRent: 0, durationYears: 0, owner: 'p1' },
       },
     },
@@ -223,11 +224,12 @@ export function createMockDemoState(): PlannerState {
       assets: {
         cashSavings:        { enabled: true,  totalValue: 20000 },
         isaInvestments:     { enabled: true,  totalValue: 40000, growthRate: 4 },
-        generalInvestments: { enabled: true,  totalValue: 15000, baseCost: 10000, growthRate: 4, owner: 'p2' },
+        generalInvestments: { enabled: true,  totalValue: 15000, baseCost: 10000, growthRate: 4 },
         property:           { enabled: false, propertyValue: 0,  baseCost: 0,    annualRent: 0, durationYears: 0, owner: 'p2' },
       },
     },
     lifeVision: 'We want to travel widely while we still have the energy, spend time with our grandchildren, and pursue our passions for photography and sailing. In later years we want comfort, community and peace of mind.',
     aspirations: ['travel', 'family', 'hobbies', 'fitness', 'giving'],
+    jointGia: { enabled: true, totalValue: 50000, baseCost: 35000, growthRate: 4 },
   };
 }

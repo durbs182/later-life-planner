@@ -89,7 +89,7 @@ function getStageForAge(stages: LifeStage[], age: number): LifeStage {
 // ─── Main projection loop ─────────────────────────────────────────────────────
 
 export function calculateProjections(state: PlannerState): YearlyProjection[] {
-  const { person1, person2, lifeStages, spendingCategories, assumptions, mode, fiAge } = state;
+  const { person1, person2, lifeStages, spendingCategories, assumptions, mode, fiAge, jointGia } = state;
   const { lifeExpectancy, inflation, investmentGrowth } = assumptions;
 
   // ── Initialise asset balances ──────────────────────────────────────────────
@@ -100,29 +100,27 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   let p1Dc    = person1.incomeSources.dcPension.enabled   ? person1.incomeSources.dcPension.totalValue   : 0;
 
   let p2Isa   = (mode === 'couple' && person2.assets.isaInvestments.enabled)     ? person2.assets.isaInvestments.totalValue     : 0;
-  // Joint GIA is canonical on person1 — do not initialise p2 separately to avoid double-counting.
-  const p1GiaJoint = mode === 'couple' && person1.assets.generalInvestments.owner === 'joint';
-  let p2GiaV  = (mode === 'couple' && !p1GiaJoint && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.totalValue : 0;
-  let p2GiaBC = (mode === 'couple' && !p1GiaJoint && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.baseCost   : 0;
+  let p2GiaV  = (mode === 'couple' && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.totalValue : 0;
+  let p2GiaBC = (mode === 'couple' && person2.assets.generalInvestments.enabled) ? person2.assets.generalInvestments.baseCost   : 0;
   let p2Cash  = (mode === 'couple' && person2.assets.cashSavings.enabled)        ? person2.assets.cashSavings.totalValue        : 0;
   let p2Dc    = (mode === 'couple' && person2.incomeSources.dcPension.enabled)   ? person2.incomeSources.dcPension.totalValue   : 0;
 
+  // ── Joint GIA (top-level shared asset, couple mode only) ─────────────────
+  let jointGiaV  = (mode === 'couple' && jointGia.enabled) ? jointGia.totalValue : 0;
+  let jointGiaBC = (mode === 'couple' && jointGia.enabled) ? jointGia.baseCost   : 0;
+
   // ── Per-asset growth rates (fall back to global investmentGrowth) ──────────
-  const p1IsaG  = (person1.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
-  const p1GiaG  = (person1.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
-  const p1DcG   = (person1.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
-  const p2IsaG  = (person2.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
-  const p2GiaG  = (person2.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
-  const p2DcG   = (person2.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
+  const p1IsaG     = (person1.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
+  const p1GiaG     = (person1.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
+  const p1DcG      = (person1.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
+  const p2IsaG     = (person2.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
+  const p2GiaG     = (person2.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
+  const p2DcG      = (person2.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
+  const jointGiaG  = (jointGia.growthRate ?? investmentGrowth) / 100;
 
   // ── PCLS tracking — taken once at crystallisation ─────────────────────────
   let p1PclsTaken = false;
   let p2PclsTaken = false;
-
-  // ── Joint GIA flag — GIA split by person for CGT ──────────────────────────
-  // Joint GIA lives on person1 only; p2GiaV is always 0 in that case.
-  const p1GiaIsJoint = person1.assets.generalInvestments.owner === 'joint';
-  const p2GiaIsJoint = !p1GiaJoint && mode === 'couple' && person2.assets.generalInvestments.owner === 'joint';
 
   const maxYears   = lifeExpectancy - person1.currentAge;
   const projections: YearlyProjection[] = [];
@@ -150,12 +148,13 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
                       + p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
 
     // ── Asset growth (before drawdown) ────────────────────────────────────
-    if (p1Isa  > 0) p1Isa  *= (1 + p1IsaG);
-    if (p1GiaV > 0) p1GiaV *= (1 + p1GiaG);
-    if (p1Dc   > 0) p1Dc   *= (1 + p1DcG);
-    if (p2Isa  > 0) p2Isa  *= (1 + p2IsaG);
-    if (p2GiaV > 0) p2GiaV *= (1 + p2GiaG);
-    if (p2Dc   > 0) p2Dc   *= (1 + p2DcG);
+    if (p1Isa     > 0) p1Isa     *= (1 + p1IsaG);
+    if (p1GiaV    > 0) p1GiaV    *= (1 + p1GiaG);
+    if (p1Dc      > 0) p1Dc      *= (1 + p1DcG);
+    if (p2Isa     > 0) p2Isa     *= (1 + p2IsaG);
+    if (p2GiaV    > 0) p2GiaV    *= (1 + p2GiaG);
+    if (p2Dc      > 0) p2Dc      *= (1 + p2DcG);
+    if (jointGiaV > 0) jointGiaV *= (1 + jointGiaG);
 
     // ── PCLS: one-off tax-free lump sum at crystallisation ────────────────
     // Taken in the first year the DC pension becomes available. Reduces the
@@ -182,6 +181,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
     let p1IsaD = 0, p1GiaD = 0, p1GiaCG = 0, p1CashD = 0, p1DcD = 0;
     let p2IsaD = 0, p2GiaD = 0, p2GiaCG = 0, p2CashD = 0, p2DcD = 0;
+    let jointGiaD = 0, jointGiaCG = 0;
 
     if (remaining > 0) {
       // P1 ISA — completely tax-free
@@ -199,11 +199,18 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
         p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
-      // P2 GIA
+      // P2 GIA (individual)
       if (remaining > 0 && p2GiaV > 0) {
         const r = drawFromGIA(p2GiaV, p2GiaBC, remaining);
         p2GiaD = r.drawn; p2GiaCG = r.capitalGain;
         p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
+        remaining -= r.drawn;
+      }
+      // Joint GIA — gains split 50/50 between both persons' CGT allowances
+      if (remaining > 0 && jointGiaV > 0) {
+        const r = drawFromGIA(jointGiaV, jointGiaBC, remaining);
+        jointGiaD = r.drawn; jointGiaCG = r.capitalGain;
+        jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
       // P1 Cash
@@ -231,18 +238,16 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
     const totalIncome = fixedIncome + p1PclsAmount + p2PclsAmount
                       + p1IsaD + p1GiaD + p1CashD + p1DcD
-                      + p2IsaD + p2GiaD + p2CashD + p2DcD;
+                      + p2IsaD + p2GiaD + p2CashD + p2DcD
+                      + jointGiaD;
 
     // ── Tax per person ────────────────────────────────────────────────────
     // PCLS is tax-free, so not included in tax basis.
     // UFPLS: 75% of ongoing DC drawdown is taxable.
     const taxFree = PENSION_RULES.UFPLS_TAX_FREE_FRACTION;
 
-    // Joint GIA: split capital gain equally between both persons for CGT efficiency
-    const p1GiaCGForTax = p1GiaIsJoint ? p1GiaCG / 2 : p1GiaCG;
-    const p1JointGainShare = p1GiaIsJoint ? p1GiaCG / 2 : 0;  // P2 receives the other half
-    const p2GiaCGForTax = p2GiaIsJoint ? p2GiaCG / 2 : p2GiaCG;
-    const p2JointGainShare = p2GiaIsJoint ? p2GiaCG / 2 : 0;
+    // Joint GIA: capital gain split equally between both persons' CGT allowances
+    const jointGainEach = jointGiaCG / 2;
 
     const p1TaxBasis = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent
                      + p1DcD * (1 - taxFree);
@@ -253,9 +258,9 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     const p2IncomeTax = calcIncomeTax(p2TaxBasis);
     const incomeTaxPaid = p1IncomeTax + p2IncomeTax;
 
-    // CGT per person (joint GIA gain split equally)
-    const p1TotalCG = p1GiaCGForTax + p2JointGainShare; // P1's own gain + half of any P2-side joint gain
-    const p2TotalCG = p2GiaCGForTax + p1JointGainShare; // P2's own gain + half of any P1-side joint gain
+    // CGT per person: individual gain + half of joint GIA gain
+    const p1TotalCG = p1GiaCG + jointGainEach;
+    const p2TotalCG = p2GiaCG + jointGainEach;
     const p1CgtPaid = calcCGT(p1TotalCG, isHigherRateTaxpayer(p1TaxBasis));
     const p2CgtPaid = calcCGT(p2TotalCG, isHigherRateTaxpayer(p2TaxBasis));
     const totalCgtPaid  = p1CgtPaid + p2CgtPaid;
@@ -279,7 +284,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       p2IsaDrawdown: p2IsaD, p2GiaDrawdown: p2GiaD, p2CashDrawdown: p2CashD, p2DcDrawdown: p2DcD,
 
       isaDrawdown:  p1IsaD  + p2IsaD,
-      giaDrawdown:  p1GiaD  + p2GiaD,
+      giaDrawdown:  p1GiaD  + p2GiaD + jointGiaD,
       cashDrawdown: p1CashD + p2CashD,
       dcDrawdown:   p1DcD   + p2DcD,
       propertyRent: p1Inc.rent + p2RentEffective,
@@ -295,8 +300,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       p1CashBalance: clamp(p1Cash), p1DcBalance: clamp(p1Dc),
       p2IsaBalance:  clamp(p2Isa),  p2GiaValue: clamp(p2GiaV), p2GiaBaseCost: clamp(p2GiaBC),
       p2CashBalance: clamp(p2Cash), p2DcBalance: clamp(p2Dc),
+      jointGiaValue: clamp(jointGiaV), jointGiaBaseCost: clamp(jointGiaBC),
       totalAssets: clamp(p1Isa) + clamp(p1GiaV) + clamp(p1Cash) + clamp(p1Dc)
-                 + clamp(p2Isa) + clamp(p2GiaV) + clamp(p2Cash) + clamp(p2Dc),
+                 + clamp(p2Isa) + clamp(p2GiaV) + clamp(p2Cash) + clamp(p2Dc)
+                 + clamp(jointGiaV),
     });
   }
 
@@ -330,9 +337,11 @@ export function getAssetDepletionAge(projections: YearlyProjection[]): number | 
 export function getTotalUnrealisedGain(state: PlannerState): number {
   const p1 = state.person1.assets.generalInvestments;
   const p2 = state.mode === 'couple' ? state.person2.assets.generalInvestments : null;
-  const p1Gain = p1.enabled ? Math.max(0, p1.totalValue - p1.baseCost) : 0;
-  const p2Gain = p2?.enabled ? Math.max(0, p2.totalValue - p2.baseCost) : 0;
-  return p1Gain + p2Gain;
+  const joint = state.mode === 'couple' ? state.jointGia : null;
+  const p1Gain    = p1.enabled    ? Math.max(0, p1.totalValue    - p1.baseCost)    : 0;
+  const p2Gain    = p2?.enabled   ? Math.max(0, p2.totalValue    - p2.baseCost)    : 0;
+  const jointGain = joint?.enabled ? Math.max(0, joint.totalValue - joint.baseCost) : 0;
+  return p1Gain + p2Gain + jointGain;
 }
 
 /**

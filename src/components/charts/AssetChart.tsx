@@ -45,7 +45,7 @@ export default function AssetChart({ projections }: Props) {
     .map(p => ({
       age:        p.p1Age,
       isaBalance:  Math.round(p.p1IsaBalance  + p.p2IsaBalance),
-      giaBalance:  Math.round(p.p1GiaValue    + p.p2GiaValue),
+      giaBalance:  Math.round(p.p1GiaValue    + p.p2GiaValue    + p.jointGiaValue),
       cashBalance: Math.round(p.p1CashBalance + p.p2CashBalance),
       dcBalance:   Math.round(p.p1DcBalance   + p.p2DcBalance),
       totalAssets: Math.round(p.totalAssets),

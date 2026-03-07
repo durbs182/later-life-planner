@@ -278,17 +278,18 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
 
 // ─── Assets section ───────────────────────────────────────────────────────────
 
-function AssetsSection({ assets, set, mode, p1Label, p2Label, jointGia }: {
+function AssetsSection({ assets, set, mode, p1Label, p2Label, sharedGia, onSharedGiaChange }: {
   assets: PersonAssets;
   set: (key: keyof PersonAssets, u: Record<string, unknown>) => void;
   mode: 'single' | 'couple';
   p1Label: string; p2Label: string;
-  /** When set, person 1's joint GIA is shown read-only instead of a separate input. */
-  jointGia?: PersonAssets['generalInvestments'];
+  sharedGia: import('@/models/types').GIAAsset;
+  onSharedGiaChange: (updates: Partial<import('@/models/types').GIAAsset>) => void;
 }) {
   const { cashSavings, isaInvestments, generalInvestments, property } = assets;
-  const giaGain  = generalInvestments.enabled ? Math.max(0, generalInvestments.totalValue - generalInvestments.baseCost) : 0;
-  const propGain = property.enabled           ? Math.max(0, property.propertyValue - property.baseCost) : 0;
+  const giaGain      = generalInvestments.enabled ? Math.max(0, generalInvestments.totalValue - generalInvestments.baseCost) : 0;
+  const jointGiaGain = sharedGia.enabled ? Math.max(0, sharedGia.totalValue - sharedGia.baseCost) : 0;
+  const propGain     = property.enabled  ? Math.max(0, property.propertyValue - property.baseCost) : 0;
 
   return (
     <div className="space-y-4">
@@ -316,39 +317,9 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label, jointGia }: {
         </div>
       </SourceCard>
 
-      {/* Joint GIA — read-only mirror when owned jointly on person 1 */}
-      {jointGia ? (
-        <div className="rounded-2xl border-2 border-orange-200 bg-white overflow-hidden">
-          <div className="flex items-start justify-between p-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl mt-0.5">📊</span>
-              <div>
-                <p className="font-bold text-sm text-slate-800">General Investments (GIA)</p>
-                <p className="text-xs text-slate-400 mt-0.5">Joint asset — managed under {p1Label}&apos;s assets</p>
-              </div>
-            </div>
-            <span className="text-xs font-bold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full">Joint</span>
-          </div>
-          <div className="border-t border-orange-100 px-4 pb-3 space-y-0">
-            <FieldRow label="Current market value">
-              <span className="text-sm font-bold text-slate-700">£{jointGia.totalValue.toLocaleString('en-GB')}</span>
-            </FieldRow>
-            <FieldRow label="Purchase price / base cost">
-              <span className="text-sm font-bold text-slate-700">£{jointGia.baseCost.toLocaleString('en-GB')}</span>
-            </FieldRow>
-            <FieldRow label="Annual growth rate">
-              <span className="text-sm font-bold text-slate-700">{jointGia.growthRate}%</span>
-            </FieldRow>
-            {jointGia.totalValue > jointGia.baseCost && (
-              <div className="py-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3">
-                Unrealised gain: <strong>£{(jointGia.totalValue - jointGia.baseCost).toLocaleString('en-GB')}</strong> · Gains split equally between both persons&apos; CGT allowances.
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-      <SourceCard icon="📊" title="General Investments (GIA)"
-        desc="Shares, funds or bonds held outside an ISA"
+      {/* Individual GIA */}
+      <SourceCard icon="📊" title="GIA — Individual"
+        desc="Shares, funds or bonds held in your own name"
         enabled={generalInvestments.enabled} onToggle={(v) => set('generalInvestments', { enabled: v })}
       >
         <FieldRow label="Current market value">
@@ -360,18 +331,34 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label, jointGia }: {
         <FieldRow label="Annual growth rate">
           <PctInput value={generalInvestments.growthRate} onChange={(v) => set('generalInvestments', { growthRate: v })} />
         </FieldRow>
-        {mode === 'couple' && (
-          <FieldRow label="Ownership" hint="Joint splits CGT gains between both persons">
-            <OwnerSelect value={generalInvestments.owner ?? 'p1'} onChange={(v) => set('generalInvestments', { owner: v })} mode={mode} p1Label={p1Label} p2Label={p2Label} />
-          </FieldRow>
-        )}
         {giaGain > 0 && (
           <div className="py-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3">
-            Unrealised gain: <strong>£{giaGain.toLocaleString('en-GB')}</strong> · CGT applies on gains above £3,000 annual exempt amount.
-            {generalInvestments.owner === 'joint' && ' Joint ownership splits gains across both persons\' CGT allowances.'}
+            Unrealised gain: <strong>£{giaGain.toLocaleString('en-GB')}</strong> · CGT applies on gains above the £3,000 annual exempt amount.
           </div>
         )}
       </SourceCard>
+
+      {/* Joint GIA — shared between both persons, editable from either tab */}
+      {mode === 'couple' && (
+        <SourceCard icon="🤝" title="GIA — Joint"
+          desc={`Jointly-held investments — gains split 50/50 between ${p1Label} & ${p2Label} for CGT`}
+          enabled={sharedGia.enabled} onToggle={(v) => onSharedGiaChange({ enabled: v })}
+        >
+          <FieldRow label="Current market value">
+            <CurrencyInput value={sharedGia.totalValue} onChange={(v) => onSharedGiaChange({ totalValue: v })} max={2000000} step={1000} />
+          </FieldRow>
+          <FieldRow label="Purchase price / base cost" hint="Original cost — for CGT calculation">
+            <CurrencyInput value={sharedGia.baseCost} onChange={(v) => onSharedGiaChange({ baseCost: v })} max={2000000} step={1000} />
+          </FieldRow>
+          <FieldRow label="Annual growth rate">
+            <PctInput value={sharedGia.growthRate} onChange={(v) => onSharedGiaChange({ growthRate: v })} />
+          </FieldRow>
+          {jointGiaGain > 0 && (
+            <div className="py-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3">
+              Unrealised gain: <strong>£{jointGiaGain.toLocaleString('en-GB')}</strong> · Gains split equally across both persons&apos; CGT allowances.
+            </div>
+          )}
+        </SourceCard>
       )}
 
       <SourceCard icon="🏘️" title="Rental Property"
@@ -419,6 +406,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
     mode, fiAge,
     person1, setP1Income, setP1Asset,
     person2, setP2Income, setP2Asset,
+    jointGia, setJointGia,
     assumptions, updateAssumptions,
   } = usePlannerStore();
 
@@ -487,11 +475,8 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
         <AssetsSection
           assets={person.assets} set={setAsset} mode={mode}
           p1Label={p1Label} p2Label={p2Label}
-          jointGia={
-            !isPerson1 && person1.assets.generalInvestments.enabled && person1.assets.generalInvestments.owner === 'joint'
-              ? person1.assets.generalInvestments
-              : undefined
-          }
+          sharedGia={jointGia}
+          onSharedGiaChange={setJointGia}
         />
       )}
 
