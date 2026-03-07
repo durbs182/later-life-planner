@@ -101,7 +101,7 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
                         updateLifeStage(lifeStages[i + 1].id, { startAge: v + 1 });
                       }
                     }}
-                    className="w-14 input-base text-center py-1 text-sm"
+                    className="w-16 input-base text-center py-1 text-sm"
                   />
                 ) : (
                   <span className="font-bold text-slate-800">{stage.endAge}</span>
