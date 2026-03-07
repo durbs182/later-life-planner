@@ -17,7 +17,7 @@ const AssetChart    = dynamic(() => import('@/components/charts/AssetChart'),   
 
 interface Props { onBack: () => void }
 
-const STAGE_COLORS = { active: '#f97316', gradual: '#10b981', later: '#8b5cf6' } as const;
+const STAGE_COLORS = { 'go-go': '#f97316', 'slo-go': '#10b981', 'no-go': '#8b5cf6' } as const;
 
 // ─── Lifestyle level indicator ─────────────────────────────────────────────────
 

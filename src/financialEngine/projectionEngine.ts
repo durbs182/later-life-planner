@@ -362,7 +362,7 @@ export function getSustainableRlssLevel(
 export function calculateGamificationMetrics(state: PlannerState): GamificationMetrics {
   const projections = calculateProjections(state);
   const firstYear = projections[0];
-  const firstStageId = state.lifeStages[0]?.id ?? 'active';
+  const firstStageId = state.lifeStages[0]?.id ?? 'go-go';
 
   // Income stability: guaranteed income / spending in year 1
   const guaranteedIncome = (firstYear?.p1StatePension ?? 0) + (firstYear?.p1DbPension ?? 0)

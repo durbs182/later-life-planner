@@ -40,7 +40,7 @@ export function dobFromAge(age: number): string {
 /**
  * Build the three post-work life stages, anchored to fiAge.
  * Everything before fiAge is the working phase; the projection engine uses
- * the Active Years spending amounts for those years as a baseline.
+ * the Go-Go Years spending amounts for those years as a baseline.
  */
 export function buildDefaultLifeStages(
   fiAge: number = DEFAULT_ASSUMPTIONS.FI_AGE,
@@ -49,9 +49,9 @@ export function buildDefaultLifeStages(
   const activeEnd  = fiAge + 10;
   const gradualEnd = fiAge + 20;
   return [
-    { id: 'active',  label: 'Active Years',      startAge: fiAge,          endAge: activeEnd,      color: '#f97316' },
-    { id: 'gradual', label: 'Gradual Transition', startAge: activeEnd + 1,  endAge: gradualEnd,     color: '#10b981' },
-    { id: 'later',   label: 'Later Years',        startAge: gradualEnd + 1, endAge: lifeExpectancy, color: '#8b5cf6' },
+    { id: 'go-go',  label: 'Go-Go Years',   startAge: fiAge,          endAge: activeEnd,      color: '#f97316' },
+    { id: 'slo-go', label: 'Slo-Go Years',  startAge: activeEnd + 1,  endAge: gradualEnd,     color: '#10b981' },
+    { id: 'no-go',  label: 'No-Go Years',   startAge: gradualEnd + 1, endAge: lifeExpectancy, color: '#8b5cf6' },
   ];
 }
 
@@ -64,7 +64,7 @@ export function buildDefaultLifeStages(
 //   variable      → Other      (home improvements, major purchases, buffer)
 
 function sa(a: number, g: number, l: number): Record<string, number> {
-  return { active: a, gradual: g, later: l };
+  return { 'go-go': a, 'slo-go': g, 'no-go': l };
 }
 
 export function buildDefaultCategories(): SpendingCategory[] {
@@ -95,10 +95,10 @@ export function buildDefaultCategories(): SpendingCategory[] {
   ];
 }
 
-// ─── Default active-stage total (used for RLSS template scaling) ─────────────
+// ─── Default go-go-stage total (used for RLSS template scaling) ─────────────
 
 export function getDefaultActiveTotal(): number {
-  return buildDefaultCategories().reduce((s, c) => s + (c.amounts['active'] ?? 0), 0);
+  return buildDefaultCategories().reduce((s, c) => s + (c.amounts['go-go'] ?? 0), 0);
 }
 
 export function buildCategoriesForRlss(

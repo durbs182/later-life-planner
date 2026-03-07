@@ -16,7 +16,7 @@ const ASPIRATIONS: { tag: AspirationTag; label: string; icon: string }[] = [
   { tag: 'fitness',      label: 'Fitness',       icon: '🏃'  },
 ];
 
-const STAGE_COLORS = { active: '#f97316', gradual: '#10b981', later: '#8b5cf6' } as const;
+const STAGE_COLORS = { 'go-go': '#f97316', 'slo-go': '#10b981', 'no-go': '#8b5cf6' } as const;
 
 interface Props { onNext: () => void; onBack: () => void }
 

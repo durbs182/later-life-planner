@@ -146,7 +146,7 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
       <div className="game-card">
         <h3 className="section-heading">Financial independence age</h3>
         <p className="section-subheading">
-          When do you plan to stop working? Life stages — Active Years, Gradual Transition, Later Years — begin from this age.
+          When do you plan to stop working? Life stages — Go-Go Years, Slo-Go Years, No-Go Years — begin from this age.
           The projection still models income and assets from today.
         </p>
         <div className="flex items-center gap-4">

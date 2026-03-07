@@ -22,7 +22,7 @@ const STANDARD_CFG: Record<RlssStandard, { bg: string; ring: string; text: strin
   comfortable: { bg: 'bg-emerald-50', ring: 'ring-emerald-400', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-700' },
 };
 
-const STAGE_COLORS = { active: '#f97316', gradual: '#10b981', later: '#8b5cf6' };
+const STAGE_COLORS = { 'go-go': '#f97316', 'slo-go': '#10b981', 'no-go': '#8b5cf6' };
 
 export default function Step2SpendingGoals({ onNext, onBack }: Props) {
   const state = usePlannerStore();

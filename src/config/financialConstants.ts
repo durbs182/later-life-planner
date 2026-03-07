@@ -128,7 +128,7 @@ export const DEFAULT_ASSUMPTIONS = {
 
   /**
    * Default financial independence / end-of-work age.
-   * Life stages (Active Years, Gradual Transition, Later Years) start from this age.
+   * Life stages (Go-Go Years, Slo-Go Years, No-Go Years) start from this age.
    * Everything before this is modelled as working years.
    */
   FI_AGE: 65,
