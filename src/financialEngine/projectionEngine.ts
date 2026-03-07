@@ -288,6 +288,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       giaDrawdown:  p1GiaD  + p2GiaD + jointGiaD,
       cashDrawdown: p1CashD + p2CashD,
       dcDrawdown:   p1DcD   + p2DcD,
+      pclsAmount:   p1PclsAmount + p2PclsAmount,
       propertyRent: p1Inc.rent + p2RentEffective,
 
       p1CapitalGain: p1GiaCG, p2CapitalGain: p2GiaCG,

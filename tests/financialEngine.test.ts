@@ -295,7 +295,7 @@ describe('income vs spending chart invariant', () => {
                         + p.p1OtherIncome  + p.p2OtherIncome
                         + p.propertyRent;
       const assetDrawdowns = p.isaDrawdown + p.giaDrawdown + p.cashDrawdown + p.dcDrawdown;
-      const spendingGap = Math.max(0, p.spending - fixedIncome);
+      const spendingGap = Math.max(0, p.spending - fixedIncome - p.pclsAmount);
       assert.ok(
         assetDrawdowns <= spendingGap + 0.01,
         `Age ${p.p1Age}: drawdowns £${assetDrawdowns.toFixed(0)} > spending gap £${spendingGap.toFixed(0)}`,
@@ -303,15 +303,18 @@ describe('income vs spending chart invariant', () => {
     });
   });
 
-  it('total chart bars never exceed spending', () => {
+  it('total chart bars never exceed spending (PCLS capped at spending gap)', () => {
     const projections = calculateProjections(createMockDemoState());
     projections.forEach(p => {
-      const chartBars = p.p1StatePension + p.p2StatePension
-                      + p.p1DbPension    + p.p2DbPension
-                      + p.p1PartTimeWork + p.p2PartTimeWork
-                      + p.p1OtherIncome  + p.p2OtherIncome
-                      + p.propertyRent
-                      + p.isaDrawdown + p.giaDrawdown + p.cashDrawdown + p.dcDrawdown;
+      const nonPcls = p.p1StatePension + p.p2StatePension
+                    + p.p1DbPension    + p.p2DbPension
+                    + p.p1PartTimeWork + p.p2PartTimeWork
+                    + p.p1OtherIncome  + p.p2OtherIncome
+                    + p.propertyRent
+                    + p.isaDrawdown + p.giaDrawdown + p.cashDrawdown + p.dcDrawdown;
+      // PCLS is capped at the remaining gap (as in the chart's toChartData)
+      const pclsCapped = Math.max(0, Math.min(p.pclsAmount, Math.max(0, p.spending - nonPcls)));
+      const chartBars = nonPcls + pclsCapped;
       assert.ok(
         chartBars <= p.spending + 0.01,
         `Age ${p.p1Age}: chart bars £${chartBars.toFixed(0)} > spending £${p.spending.toFixed(0)}`,

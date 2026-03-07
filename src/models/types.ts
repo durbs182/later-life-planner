@@ -213,6 +213,7 @@ export interface YearlyProjection {
   giaDrawdown: number;
   cashDrawdown: number;
   dcDrawdown: number;
+  pclsAmount: number;
   propertyRent: number;
 
   // CGT
