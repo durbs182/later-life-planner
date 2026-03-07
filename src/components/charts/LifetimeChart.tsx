@@ -1,0 +1,104 @@
+'use client';
+
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis,
+  CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import type { YearlyProjection, PlanningMode } from '@/lib/types';
+import { formatCurrency } from '@/lib/calculations';
+
+interface Props {
+  projections: YearlyProjection[];
+  mode: PlanningMode;
+  p1Name: string;
+  p2Name: string;
+}
+
+function toChartData(p: YearlyProjection) {
+  return {
+    age:          p.p1Age,
+    p2Age:        p.p2Age,
+    statePension: Math.round(p.p1StatePension + p.p2StatePension),
+    dbPension:    Math.round(p.p1DbPension    + p.p2DbPension),
+    workIncome:   Math.round(p.p1PartTimeWork + p.p2PartTimeWork),
+    propertyRent: Math.round(p.propertyRent),
+    otherIncome:  Math.round(p.p1OtherIncome  + p.p2OtherIncome),
+    isaDrawdown:  Math.round(p.isaDrawdown),
+    giaDrawdown:  Math.round(p.giaDrawdown),
+    cashDrawdown: Math.round(p.cashDrawdown),
+    dcDrawdown:   Math.round(p.dcDrawdown),
+    spending:     Math.round(p.spending),
+  };
+}
+
+const BARS = [
+  { key: 'statePension',  label: 'State Pension',     color: '#2563eb' },
+  { key: 'dbPension',     label: 'DB Pension',        color: '#7c3aed' },
+  { key: 'workIncome',    label: 'Work / Consulting', color: '#059669' },
+  { key: 'propertyRent',  label: 'Rental Income',     color: '#0891b2' },
+  { key: 'otherIncome',   label: 'Other Income',      color: '#06b6d4' },
+  { key: 'isaDrawdown',   label: 'ISA',               color: '#10b981' },
+  { key: 'giaDrawdown',   label: 'Investments (GIA)', color: '#84cc16' },
+  { key: 'cashDrawdown',  label: 'Cash Savings',      color: '#f59e0b' },
+  { key: 'dcDrawdown',    label: 'Pension Drawdown',  color: '#ef4444' },
+];
+
+function formatY(v: number) { return v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`; }
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+  const spending = payload.find((p: any) => p.dataKey === 'spending');
+  const totalIncome = payload.filter((p: any) => p.dataKey !== 'spending').reduce((s: number, p: any) => s + (p.value ?? 0), 0);
+  const gap  = totalIncome - (spending?.value ?? 0);
+  const p2   = payload[0]?.payload?.p2Age;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm min-w-[200px]">
+      <p className="font-bold text-slate-800 mb-2">Age {label}{p2 != null ? ` / ${p2}` : ''}</p>
+      {payload.filter((p: any) => p.dataKey !== 'spending' && p.value > 0).map((p: any) => (
+        <div key={p.dataKey} className="flex items-center justify-between gap-4 mb-1">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ backgroundColor: p.fill }} />
+            {p.name}
+          </span>
+          <span className="font-medium">{formatCurrency(p.value)}</span>
+        </div>
+      ))}
+      <div className="border-t border-slate-200 mt-2 pt-2 space-y-1">
+        <div className="flex justify-between"><span>Total income</span><span className="font-semibold">{formatCurrency(totalIncome)}</span></div>
+        <div className="flex justify-between">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />Spending</span>
+          <span className="font-semibold">{formatCurrency(spending?.value ?? 0)}</span>
+        </div>
+        <div className={`flex justify-between font-bold pt-1 ${gap >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+          <span>{gap >= 0 ? 'Surplus' : 'Shortfall'}</span>
+          <span>{gap >= 0 ? '+' : ''}{formatCurrency(gap)}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function LifetimeChart({ projections }: Props) {
+  const data = projections.filter((_, i) => i % 2 === 0 || projections.length <= 20).map(toChartData);
+  const activeBars = BARS.filter(b => data.some(d => (d as any)[b.key] > 0));
+
+  return (
+    <ResponsiveContainer width="100%" height={400}>
+      <ComposedChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis dataKey="age" tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false}
+          label={{ value: 'Age', position: 'insideBottom', offset: -2, fontSize: 12, fill: '#94a3b8' }} />
+        <YAxis tickFormatter={formatY} tick={{ fontSize: 12, fill: '#64748b' }} tickLine={false} axisLine={false} width={55} />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '12px' }} iconType="square" iconSize={10} />
+        {activeBars.map((b, i) => (
+          <Bar key={b.key} dataKey={b.key} name={b.label} stackId="income" fill={b.color}
+            radius={i === activeBars.length - 1 ? [4, 4, 0, 0] : undefined} />
+        ))}
+        <Line dataKey="spending" name="Desired Spending" type="monotone"
+          stroke="#f43f5e" strokeWidth={2.5} dot={false} strokeDasharray="6 3" />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
