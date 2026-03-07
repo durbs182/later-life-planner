@@ -339,8 +339,8 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
         )}
       </SourceCard>
 
-      <SourceCard icon="🏘️" title="Property"
-        desc="Main home or rental — rental income feeds into Priority 2"
+      <SourceCard icon="🏘️" title="Rental Property"
+        desc="Capture property value for CGT planning and rental income for projections"
         enabled={property.enabled} onToggle={(v) => set('property', { enabled: v })}
       >
         <FieldRow label="Current property value">
@@ -349,7 +349,7 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
         <FieldRow label="Purchase price / base cost" hint="For CGT planning">
           <CurrencyInput value={property.baseCost} onChange={(v) => set('property', { baseCost: v })} max={5000000} step={5000} />
         </FieldRow>
-        <FieldRow label="Annual net rental income" hint="0 if owner-occupied">
+        <FieldRow label="Annual net rental income" hint="After mortgage, tax and expenses">
           <CurrencyInput value={property.annualRent} onChange={(v) => set('property', { annualRent: v })} max={100000} step={500} />
         </FieldRow>
         {mode === 'couple' && (
