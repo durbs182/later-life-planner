@@ -19,40 +19,33 @@ export default function SummaryBar() {
     : (person1.name || `Age ${person1.currentAge}`);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-3 text-sm">
-      <span className="text-slate-400 text-xs font-medium">{ageLabel}</span>
-      <span className="w-px h-4 bg-slate-200" />
+    <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-2 text-sm overflow-hidden">
+      <span className="text-slate-400 text-xs font-medium hidden sm:block shrink-0">{ageLabel}</span>
+      <span className="w-px h-4 bg-slate-200 hidden sm:block shrink-0" />
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-slate-500">Spending</span>
-        <span className="font-bold text-slate-800">{formatCurrency(annualSpending)}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="text-slate-500 text-xs">Spend</span>
+        <span className="font-bold text-slate-800 text-xs">{formatCurrency(annualSpending)}</span>
       </div>
 
-      <span className="w-px h-4 bg-slate-200 hidden sm:block" />
+      <span className="w-px h-4 bg-slate-200 shrink-0" />
 
-      <div className="flex items-center gap-1.5">
-        <span className="text-slate-500">Income</span>
-        <span className="font-bold text-slate-800">{formatCurrency(totalIncome)}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        <span className="text-slate-500 text-xs">Income</span>
+        <span className="font-bold text-slate-800 text-xs">{formatCurrency(totalIncome)}</span>
       </div>
 
-      <span className="w-px h-4 bg-slate-200 hidden sm:block" />
+      <span className="w-px h-4 bg-slate-200 shrink-0" />
 
-      <div className="flex items-center gap-1.5">
-        <span className={`font-bold text-sm ${surplus ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {surplus ? '▲' : '▼'} {surplus ? '+' : ''}{formatCurrency(gap)}
-        </span>
-      </div>
+      <span className={`font-bold text-xs shrink-0 ${surplus ? 'text-emerald-600' : 'text-rose-600'}`}>
+        {surplus ? '▲' : '▼'} {surplus ? '+' : ''}{formatCurrency(gap)}
+      </span>
 
       {rlssStandard && (
-        <>
-          <span className="w-px h-4 bg-slate-200 hidden sm:block" />
-          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-orange-100 text-orange-700">
-            {RLSS_STANDARDS[mode][rlssStandard].emoji} {RLSS_STANDARDS[mode][rlssStandard].label}
-          </span>
-        </>
+        <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 shrink-0">
+          {RLSS_STANDARDS[mode][rlssStandard].emoji} {RLSS_STANDARDS[mode][rlssStandard].label}
+        </span>
       )}
-
-      <span className="ml-auto text-xs text-slate-400 hidden md:block">Live · today&apos;s £</span>
     </div>
   );
 }

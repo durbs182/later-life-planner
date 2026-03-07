@@ -70,7 +70,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
           UK Retirement Living Standards (PLSA 2024) · <strong>{mode === 'couple' ? 'Two-person' : 'One-person'}</strong> household
         </p>
 
-        <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="grid grid-cols-3 gap-2 mb-3">
           {(['minimum', 'moderate', 'comfortable'] as RlssStandard[]).map((key) => {
             const std   = standards[key];
             const cfg   = STANDARD_CFG[key];
@@ -80,20 +80,20 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
                 key={key}
                 onClick={() => applyRlssTemplate(key)}
                 className={clsx(
-                  'relative text-left p-4 rounded-2xl border-2 transition-all focus:outline-none',
+                  'relative text-left p-3 rounded-2xl border-2 transition-all focus:outline-none',
                   active
                     ? `${cfg.bg} ring-2 ${cfg.ring} ring-offset-1 border-transparent`
                     : 'bg-white border-slate-200 hover:border-slate-300'
                 )}
               >
-                {active && <span className="absolute top-2.5 right-2.5 text-base">✓</span>}
-                <div className="text-2xl mb-2">{std.emoji}</div>
-                <p className={clsx('font-black text-sm mb-1', active ? cfg.text : 'text-slate-700')}>{std.label}</p>
-                <p className="text-2xl font-black text-slate-900 leading-none">
+                {active && <span className="absolute top-2 right-2 text-sm">✓</span>}
+                <div className="text-xl mb-1.5">{std.emoji}</div>
+                <p className={clsx('font-black text-xs mb-1', active ? cfg.text : 'text-slate-700')}>{std.label}</p>
+                <p className="text-lg font-black text-slate-900 leading-none">
                   {formatCurrency(std.annual, true)}
-                  <span className="text-xs font-normal text-slate-400">/yr</span>
                 </p>
-                <p className="text-xs text-slate-500 mt-1.5 leading-snug">{std.description}</p>
+                <p className="text-xs font-normal text-slate-400 mb-1">/yr</p>
+                <p className="text-xs text-slate-500 leading-snug line-clamp-2">{std.description}</p>
               </button>
             );
           })}
