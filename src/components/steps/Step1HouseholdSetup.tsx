@@ -10,6 +10,7 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
     mode, setMode,
     person1, setP1Name, setP1Dob,
     person2, setP2Name, setP2Dob,
+    fiAge, setFiAge,
     assumptions, updateAssumptions,
   } = usePlannerStore();
 
@@ -139,6 +140,31 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Financial independence age */}
+      <div className="game-card">
+        <h3 className="section-heading">Financial independence age</h3>
+        <p className="section-subheading">
+          When do you plan to stop working? Life stages — Active Years, Gradual Transition, Later Years — begin from this age.
+          The projection still models income and assets from today.
+        </p>
+        <div className="flex items-center gap-4">
+          <input
+            type="range" min={person1.currentAge + 1} max={assumptions.lifeExpectancy - 1} step={1}
+            value={fiAge}
+            onChange={(e) => setFiAge(parseInt(e.target.value))}
+            className="flex-1"
+            style={{ background: `linear-gradient(to right, #f97316 ${((fiAge - (person1.currentAge + 1)) / (assumptions.lifeExpectancy - 2 - person1.currentAge)) * 100}%, #e2e8f0 ${((fiAge - (person1.currentAge + 1)) / (assumptions.lifeExpectancy - 2 - person1.currentAge)) * 100}%)` }}
+          />
+          <div className="w-16 h-14 bg-orange-500 text-white font-black text-xl rounded-2xl flex items-center justify-center flex-shrink-0">
+            {fiAge}
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+          <span>Working years: {person1.currentAge} → {fiAge - 1}</span>
+          <span>Life stages start: age {fiAge}</span>
+        </div>
       </div>
 
       {/* Planning horizon */}

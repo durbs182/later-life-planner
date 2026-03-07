@@ -79,7 +79,11 @@ function personIncome(
 // ─── Stage lookup ─────────────────────────────────────────────────────────────
 
 function getStageForAge(stages: LifeStage[], age: number): LifeStage {
-  return stages.find(s => age >= s.startAge && age <= s.endAge) ?? stages[stages.length - 1];
+  return (
+    stages.find(s => age >= s.startAge && age <= s.endAge) ??
+    // Pre-FI working years use the first stage's spending as a baseline
+    (age < stages[0].startAge ? stages[0] : stages[stages.length - 1])
+  );
 }
 
 // ─── Main projection loop ─────────────────────────────────────────────────────

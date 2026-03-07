@@ -37,15 +37,21 @@ export function dobFromAge(age: number): string {
 
 // ─── Life stages ─────────────────────────────────────────────────────────────
 
+/**
+ * Build the three post-work life stages, anchored to fiAge.
+ * Everything before fiAge is the working phase; the projection engine uses
+ * the Active Years spending amounts for those years as a baseline.
+ */
 export function buildDefaultLifeStages(
-  currentAge: number,
+  fiAge: number = DEFAULT_ASSUMPTIONS.FI_AGE,
   lifeExpectancy: number = DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY,
 ): LifeStage[] {
-  const activeEnd = Math.min(64, Math.max(currentAge + 1, 60));
+  const activeEnd  = fiAge + 10;
+  const gradualEnd = fiAge + 20;
   return [
-    { id: 'active',  label: 'Active Years',      startAge: currentAge,    endAge: activeEnd,      color: '#f97316' },
-    { id: 'gradual', label: 'Gradual Transition', startAge: activeEnd + 1, endAge: 75,             color: '#10b981' },
-    { id: 'later',   label: 'Later Years',        startAge: 76,            endAge: lifeExpectancy, color: '#8b5cf6' },
+    { id: 'active',  label: 'Active Years',      startAge: fiAge,          endAge: activeEnd,      color: '#f97316' },
+    { id: 'gradual', label: 'Gradual Transition', startAge: activeEnd + 1,  endAge: gradualEnd,     color: '#10b981' },
+    { id: 'later',   label: 'Later Years',        startAge: gradualEnd + 1, endAge: lifeExpectancy, color: '#8b5cf6' },
   ];
 }
 
@@ -141,6 +147,7 @@ export function buildDefaultAssets(): PersonAssets {
 // ─── Default state ────────────────────────────────────────────────────────────
 
 export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFAULT_AGE): PlannerState {
+  const fiAge = Math.max(primaryAge + 1, DEFAULT_ASSUMPTIONS.FI_AGE);
   return {
     currentStep: 0,
     mode: 'single',
@@ -158,9 +165,10 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
       incomeSources: buildDefaultIncome(55),
       assets: buildDefaultAssets(),
     },
+    fiAge,
     lifeVision: '',
     aspirations: [],
-    lifeStages: buildDefaultLifeStages(primaryAge, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
+    lifeStages: buildDefaultLifeStages(fiAge, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
     spendingCategories: buildDefaultCategories(),
     assumptions: {
       investmentGrowth: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH,
@@ -178,6 +186,8 @@ export function createMockDemoState(): PlannerState {
   return {
     ...base,
     mode: 'couple',
+    fiAge: 65,
+    lifeStages: buildDefaultLifeStages(65, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
     rlssStandard: 'comfortable',
     person1: {
       name: 'Alex',

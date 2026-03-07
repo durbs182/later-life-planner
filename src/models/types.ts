@@ -162,6 +162,13 @@ export interface PlannerState {
   mode: PlanningMode;
   person1: Person;
   person2: Person;
+  /**
+   * Financial independence / end-of-work age for person1.
+   * Life stages (Active Years, Gradual Transition, Later Years) start from this age.
+   * The period from person1.currentAge to fiAge-1 is the working phase, still
+   * modelled in projections but using Active Years spending as a baseline.
+   */
+  fiAge: number;
   lifeVision: string;
   aspirations: AspirationTag[];
   lifeStages: LifeStage[];

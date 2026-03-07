@@ -15,6 +15,8 @@ type Actions = {
   setCurrentStep: (step: number) => void;
   setMode: (mode: PlanningMode) => void;
 
+  setFiAge: (age: number) => void;
+
   setP1Name:  (name: string) => void;
   setP1Dob:   (dob: string)  => void;
   setP1Age:   (age: number)  => void;
@@ -47,6 +49,13 @@ export const usePlannerStore = create<PlannerState & Actions>()(
 
       setCurrentStep: (step) => set({ currentStep: step }),
       setMode: (mode) => set({ mode }),
+
+      // FI age setter — rebuilds life stages anchored to new FI age
+      setFiAge: (fiAge) =>
+        set((s) => ({
+          fiAge,
+          lifeStages: buildDefaultLifeStages(fiAge, s.assumptions.lifeExpectancy),
+        })),
 
       setP1Name: (name) => set((s) => ({ person1: { ...s.person1, name } })),
 
@@ -143,6 +152,7 @@ export const usePlannerStore = create<PlannerState & Actions>()(
           return { assumptions: newAssumptions };
         }),
 
+
       applyRlssTemplate: (standard) =>
         set((s) => ({
           rlssStandard: standard,
@@ -154,6 +164,6 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       loadDemo: () => set(createMockDemoState()),
       resetPlan: () => set(createDefaultState(57)),
     }),
-    { name: 'life-planner-v4' }
+    { name: 'life-planner-v5' }
   )
 );

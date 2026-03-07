@@ -125,6 +125,13 @@ export const DEFAULT_ASSUMPTIONS = {
    * Default primary user age when no age is stored.
    */
   DEFAULT_AGE: 57,
+
+  /**
+   * Default financial independence / end-of-work age.
+   * Life stages (Active Years, Gradual Transition, Later Years) start from this age.
+   * Everything before this is modelled as working years.
+   */
+  FI_AGE: 65,
 } as const;
 
 // ─── Withdrawal order ─────────────────────────────────────────────────────────

@@ -82,6 +82,11 @@ Support single users or couples. Capture all income streams individually per per
 ### Step 1 — Household Setup
 - Single or Couple
 - Each person captured individually (name, date of birth)
+- **Financial independence age** (FI age): when person 1 plans to stop working.
+  Life stages (Active Years, Gradual Transition, Later Years) are anchored to this age —
+  they do NOT start from current age. The working period (current age → FI age - 1) is
+  still fully modelled in projections (income, asset growth) using Active Years spending
+  as a baseline. Default FI age: 65. FI age must be > current age and < life expectancy.
 
 ### Step 2 — Life Vision
 - Capture life goals: travel, family, hobbies, learning, giving, property changes
