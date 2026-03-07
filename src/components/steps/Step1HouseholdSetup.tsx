@@ -67,7 +67,7 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
             <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center font-black text-sm">
               {mode === 'couple' ? '1' : 'Me'}
             </div>
-            <h3 className="font-black text-slate-800">{mode === 'couple' ? 'Person 1' : 'Your details'}</h3>
+            <h3 className="font-black text-slate-800">{person1.name || (mode === 'couple' ? 'Person 1' : 'Your details')}</h3>
           </div>
 
           <div>
@@ -107,7 +107,7 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
               <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-black text-sm">
                 2
               </div>
-              <h3 className="font-black text-slate-800">Person 2</h3>
+              <h3 className="font-black text-slate-800">{person2.name || 'Person 2'}</h3>
             </div>
 
             <div>

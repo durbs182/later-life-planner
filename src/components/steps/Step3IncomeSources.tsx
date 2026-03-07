@@ -50,13 +50,14 @@ function PctInput({ value, onChange, label = 'Growth' }: { value: number; onChan
   );
 }
 
-function OwnerSelect({ value, onChange, mode }: {
+function OwnerSelect({ value, onChange, mode, p1Label, p2Label }: {
   value: AssetOwner; onChange: (v: AssetOwner) => void; mode: 'single' | 'couple';
+  p1Label: string; p2Label: string;
 }) {
   if (mode === 'single') return null;
   const opts: { v: AssetOwner; label: string }[] = [
-    { v: 'p1',    label: 'Person 1' },
-    { v: 'p2',    label: 'Person 2' },
+    { v: 'p1',    label: p1Label },
+    { v: 'p2',    label: p2Label },
     { v: 'joint', label: 'Joint' },
   ];
   return (
@@ -276,10 +277,11 @@ function IncomeSection({ currentAge, src, assets, set }: {
 
 // ─── Assets section ───────────────────────────────────────────────────────────
 
-function AssetsSection({ assets, set, mode }: {
+function AssetsSection({ assets, set, mode, p1Label, p2Label }: {
   assets: PersonAssets;
   set: (key: keyof PersonAssets, u: Record<string, unknown>) => void;
   mode: 'single' | 'couple';
+  p1Label: string; p2Label: string;
 }) {
   const { cashSavings, isaInvestments, generalInvestments, property } = assets;
   const giaGain  = generalInvestments.enabled ? Math.max(0, generalInvestments.totalValue - generalInvestments.baseCost) : 0;
@@ -326,7 +328,7 @@ function AssetsSection({ assets, set, mode }: {
         </FieldRow>
         {mode === 'couple' && (
           <FieldRow label="Ownership" hint="Joint splits CGT gains between both persons">
-            <OwnerSelect value={generalInvestments.owner ?? 'p1'} onChange={(v) => set('generalInvestments', { owner: v })} mode={mode} />
+            <OwnerSelect value={generalInvestments.owner ?? 'p1'} onChange={(v) => set('generalInvestments', { owner: v })} mode={mode} p1Label={p1Label} p2Label={p2Label} />
           </FieldRow>
         )}
         {giaGain > 0 && (
@@ -352,7 +354,7 @@ function AssetsSection({ assets, set, mode }: {
         </FieldRow>
         {mode === 'couple' && (
           <FieldRow label="Ownership">
-            <OwnerSelect value={property.owner ?? 'p1'} onChange={(v) => set('property', { owner: v })} mode={mode} />
+            <OwnerSelect value={property.owner ?? 'p1'} onChange={(v) => set('property', { owner: v })} mode={mode} p1Label={p1Label} p2Label={p2Label} />
           </FieldRow>
         )}
         {property.annualRent > 0 && (
@@ -447,7 +449,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
       {activeTab === 'income' ? (
         <IncomeSection currentAge={person.currentAge} src={person.incomeSources} assets={person.assets} set={setIncome} />
       ) : (
-        <AssetsSection assets={person.assets} set={setAsset} mode={mode} />
+        <AssetsSection assets={person.assets} set={setAsset} mode={mode} p1Label={p1Label} p2Label={p2Label} />
       )}
 
       {/* Assumptions */}
