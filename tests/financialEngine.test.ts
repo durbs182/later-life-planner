@@ -283,6 +283,43 @@ describe('getAssetDepletionAge', () => {
   });
 });
 
+// ─── Income vs spending invariant ─────────────────────────────────────────────
+
+describe('income vs spending chart invariant', () => {
+  it('asset drawdowns never exceed the spending gap (bars never exceed spending)', () => {
+    const projections = calculateProjections(createMockDemoState());
+    projections.forEach(p => {
+      const fixedIncome = p.p1StatePension + p.p2StatePension
+                        + p.p1DbPension    + p.p2DbPension
+                        + p.p1PartTimeWork + p.p2PartTimeWork
+                        + p.p1OtherIncome  + p.p2OtherIncome
+                        + p.propertyRent;
+      const assetDrawdowns = p.isaDrawdown + p.giaDrawdown + p.cashDrawdown + p.dcDrawdown;
+      const spendingGap = Math.max(0, p.spending - fixedIncome);
+      assert.ok(
+        assetDrawdowns <= spendingGap + 0.01,
+        `Age ${p.p1Age}: drawdowns £${assetDrawdowns.toFixed(0)} > spending gap £${spendingGap.toFixed(0)}`,
+      );
+    });
+  });
+
+  it('total chart bars never exceed spending', () => {
+    const projections = calculateProjections(createMockDemoState());
+    projections.forEach(p => {
+      const chartBars = p.p1StatePension + p.p2StatePension
+                      + p.p1DbPension    + p.p2DbPension
+                      + p.p1PartTimeWork + p.p2PartTimeWork
+                      + p.p1OtherIncome  + p.p2OtherIncome
+                      + p.propertyRent
+                      + p.isaDrawdown + p.giaDrawdown + p.cashDrawdown + p.dcDrawdown;
+      assert.ok(
+        chartBars <= p.spending + 0.01,
+        `Age ${p.p1Age}: chart bars £${chartBars.toFixed(0)} > spending £${p.spending.toFixed(0)}`,
+      );
+    });
+  });
+});
+
 // ─── formatCurrency ───────────────────────────────────────────────────────────
 
 describe('formatCurrency', () => {

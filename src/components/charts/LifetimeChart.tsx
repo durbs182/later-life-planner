@@ -97,7 +97,7 @@ export default function LifetimeChart({ projections }: Props) {
             radius={i === activeBars.length - 1 ? [4, 4, 0, 0] : undefined} />
         ))}
         <Line dataKey="spending" name="Desired Spending" type="monotone"
-          stroke="#f43f5e" strokeWidth={2.5} dot={false} strokeDasharray="6 3" />
+          stroke="#0f172a" strokeWidth={2.5} dot={false} strokeDasharray="6 3" />
       </ComposedChart>
     </ResponsiveContainer>
   );

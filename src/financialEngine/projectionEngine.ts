@@ -41,20 +41,21 @@ function personIncome(
   yearIndex: number,
   inflRate: number,
 ): { sp: number; db: number; ptw: number; other: number; rent: number } {
-  const inflFrom = (startAge: number) =>
-    Math.pow(1 + inflRate / 100, Math.max(0, personAge - startAge));
+  // Inflation factor from year 0 (today) — consistent with spending inflation.
+  // Income amounts are entered in today's money; nominal values grow from now.
+  const inflFactor = Math.pow(1 + inflRate / 100, yearIndex);
 
-  // State Pension — indexed from start age
+  // State Pension — in today's money, grows with inflation from year 0
   const sp = src.statePension.enabled && personAge >= src.statePension.startAge
-    ? src.statePension.weeklyAmount * 52 * inflFrom(src.statePension.startAge) : 0;
+    ? src.statePension.weeklyAmount * 52 * inflFactor : 0;
 
-  // DB Pension — indexed from start age
+  // DB Pension — in today's money, grows with inflation from year 0
   const db = src.dbPension.enabled && personAge >= src.dbPension.startAge
-    ? src.dbPension.annualIncome * inflFrom(src.dbPension.startAge) : 0;
+    ? src.dbPension.annualIncome * inflFactor : 0;
 
-  // Annuity — indexed from start age (combined into 'other' for chart simplicity)
+  // Annuity — in today's money, grows with inflation from year 0
   const annuity = src.annuity?.enabled && personAge >= (src.annuity?.startAge ?? 999)
-    ? src.annuity.annualIncome * inflFrom(src.annuity.startAge) : 0;
+    ? src.annuity.annualIncome * inflFactor : 0;
 
   // Part-time work — not inflation-linked (nominal income)
   const ptw = src.partTimeWork.enabled && personAge < src.partTimeWork.stopAge
