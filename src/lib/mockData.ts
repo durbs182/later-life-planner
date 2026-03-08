@@ -91,7 +91,6 @@ export function buildDefaultCategories(): SpendingCategory[] {
     { id: 'home_impr',   name: 'Home Improvements',        tier: 'variable',     icon: '🔨', maxValue: 20000, description: 'Renovations, repairs, adaptations',           amounts: sa(2000,  1000,  500) },
     { id: 'major_purch', name: 'Major Purchases',          tier: 'variable',     icon: '📦', maxValue: 30000, description: 'New car, furniture, large one-off items',     amounts: sa(1500,   500,    0) },
     { id: 'buffer',      name: 'Contingency Buffer',       tier: 'variable',     icon: '🛟', maxValue: 10000, description: 'Unexpected expenses and peace-of-mind buffer', amounts: sa(1000,  1000, 1000) },
-    { id: 'care',        name: 'Care Costs',               tier: 'variable',     icon: '🏥', maxValue: 60000, description: 'Home care, care home, assisted living',        amounts: sa(0,        0,    0) },
   ];
 }
 

@@ -14,7 +14,7 @@ const TIER_CFG: Record<SpendingTier, { label: string; desc: string; color: strin
   essential:    { label: 'Essential',       desc: 'Housing, food, utilities, transport, insurance, healthcare', color: 'text-sky-700',    bg: 'bg-sky-50',    border: 'border-sky-200' },
   moderate:     { label: 'Lifestyle',       desc: 'Travel, dining, hobbies',                                   color: 'text-emerald-700',bg: 'bg-emerald-50',border: 'border-emerald-200' },
   aspirational: { label: 'Family & Giving', desc: 'Family support, charity, gifts',                           color: 'text-violet-700', bg: 'bg-violet-50', border: 'border-violet-200' },
-  variable:     { label: 'Other',           desc: 'Home improvements, major purchases, buffer',                color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
+  variable:     { label: 'Other',           desc: 'Home improvements, major purchases, contingency buffer',    color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
 };
 
 const STANDARD_CFG: Record<RlssStandard, { bg: string; ring: string; text: string; badge: string }> = {

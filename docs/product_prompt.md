@@ -100,7 +100,7 @@ Support single users or couples. Capture all income streams individually per per
   - Essential (housing, food, utilities, transport, insurance, healthcare)
   - Lifestyle (travel, dining, hobbies)
   - Family & Giving (family support, charity, gifts)
-  - Other (home improvements, major purchases, buffer)
+  - Other (home improvements, major purchases, contingency buffer)
 - Total spending updates dynamically
 
 #### Retirement Spending Smile
