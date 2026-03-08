@@ -31,6 +31,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
 
   const [activeStageId, setActiveStageId] = useState(lifeStages[0]?.id ?? 'active');
   const [openTiers, setOpenTiers] = useState<Record<string, boolean>>({ essential: true, moderate: true, aspirational: false, variable: false });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const activeStage = lifeStages.find(s => s.id === activeStageId) ?? lifeStages[0];
   const totalSpend  = getStageTotalSpending(state, activeStageId);
@@ -66,7 +67,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
 
       {/* RLSS Lifestyle cards */}
       <div className="game-card bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
-        <h3 className="section-heading">Choose your lifestyle starting point</h3>
+        <h3 className="section-heading">Choose your lifestyle</h3>
         <p className="text-xs text-slate-500 mb-4">
           UK Retirement Living Standards (PLSA 2024) · <strong>{mode === 'couple' ? 'Two-person' : 'One-person'}</strong> household
         </p>
@@ -101,7 +102,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
         </div>
 
         <p className="text-xs text-slate-400">
-          Selecting a template scales all categories proportionally. Customise below.
+          Selecting a standard sets your spending plan. Customise by category below if needed.
         </p>
       </div>
 
@@ -123,6 +124,15 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
         ))}
       </div>
 
+      {/* Total + benchmark */}
+      <div className="bg-slate-800 text-white rounded-2xl p-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs text-slate-400 mb-1">Annual spending · {activeStage?.label}</p>
+          <p className="text-3xl font-black">{formatCurrency(totalSpend, true)}</p>
+        </div>
+        <p className={clsx('text-sm font-semibold', benchmarkColor)}>{benchmarkLabel}</p>
+      </div>
+
       {/* Retirement Spending Smile explanation */}
       <div className="game-card-sm bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100">
         <div className="flex items-start gap-3">
@@ -132,122 +142,12 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
             <p className="text-xs text-slate-600 leading-relaxed">
               Research consistently shows that spending follows a natural curve in later life — highest in the
               early active years, gently declining through mid-retirement, with a possible uptick in
-              later years for care needs. This pattern forms a smile shape. Your three life stages already reflect
-              this: spend more confidently in your Go-Go Years, knowing that spending naturally
-              reduces over time — letting your money last longer.
+              later years for care needs. Your three life stages already reflect this — spend more confidently
+              in your Go-Go Years, knowing spending naturally reduces over time.
             </p>
           </div>
         </div>
       </div>
-
-      {/* Total + benchmark */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="col-span-2 sm:col-span-1 bg-slate-800 text-white rounded-2xl p-4">
-          <p className="text-xs text-slate-400 mb-1">Total annual</p>
-          <p className="text-3xl font-black">{formatCurrency(totalSpend, true)}</p>
-          <p className={clsx('text-xs font-semibold mt-1', benchmarkColor)}>{benchmarkLabel}</p>
-        </div>
-        {tierTotals.map(({ tier, total }) => {
-          const cfg = TIER_CFG[tier as SpendingTier];
-          return (
-            <div key={tier} className={`rounded-2xl p-4 border ${cfg.bg} ${cfg.border}`}>
-              <p className={`text-xs font-bold mb-1 ${cfg.color}`}>{cfg.label}</p>
-              <p className="text-xl font-black text-slate-800">{formatCurrency(total, true)}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* RLSS benchmark bar */}
-      <div className="game-card-sm">
-        <div className="flex justify-between mb-2">
-          <span className="text-xs font-semibold text-slate-500">vs UK standards</span>
-          <span className={clsx('text-xs font-bold', benchmarkColor)}>{benchmarkLabel}</span>
-        </div>
-        <div className="relative h-3 rounded-full bg-slate-100 overflow-hidden">
-          <div className="absolute inset-y-0 left-0 bg-slate-200 rounded-l-full" style={{ width: `${Math.min(100, (min / (com * 1.3)) * 100)}%` }} />
-          <div className="absolute inset-y-0 bg-sky-100" style={{ left: `${(min / (com * 1.3)) * 100}%`, width: `${((mod - min) / (com * 1.3)) * 100}%` }} />
-          <div className="absolute inset-y-0 bg-emerald-100" style={{ left: `${(mod / (com * 1.3)) * 100}%`, width: `${((com - mod) / (com * 1.3)) * 100}%` }} />
-          <div className="absolute inset-y-0 w-1 bg-slate-800 rounded-full -translate-x-1/2"
-            style={{ left: `${Math.min(98, (totalSpend / (com * 1.3)) * 100)}%` }} />
-        </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-xs text-slate-400">Min {formatCurrency(min, true)}</span>
-          <span className="text-xs text-slate-400">Mod {formatCurrency(mod, true)}</span>
-          <span className="text-xs text-slate-400">Com {formatCurrency(com, true)}</span>
-        </div>
-      </div>
-
-      {/* Copy from stage */}
-      {lifeStages.indexOf(activeStage) > 0 && (
-        <div className="text-right">
-          <button
-            onClick={() => {
-              const prev = lifeStages[lifeStages.indexOf(activeStage) - 1];
-              spendingCategories.forEach(cat => {
-                updateSpendingAmount(cat.id, activeStageId, cat.amounts[prev.id] ?? 0);
-              });
-            }}
-            className="text-sm text-orange-600 hover:text-orange-700 font-semibold"
-          >
-            ↩ Copy from &quot;{lifeStages[lifeStages.indexOf(activeStage) - 1]?.label}&quot;
-          </button>
-        </div>
-      )}
-
-      {/* Category sliders by tier */}
-      {(['essential', 'moderate', 'aspirational', 'variable'] as SpendingTier[]).map(tier => {
-        const cfg  = TIER_CFG[tier];
-        const cats = spendingCategories.filter(c => c.tier === tier);
-        const tot  = tierTotals.find(t => t.tier === tier)?.total ?? 0;
-        const open = openTiers[tier];
-        return (
-          <div key={tier} className={`rounded-2xl border ${cfg.bg} ${cfg.border} overflow-hidden`}>
-            <button
-              onClick={() => toggleTier(tier)}
-              className="w-full flex items-center justify-between p-4 text-left"
-            >
-              <div>
-                <span className={`font-black text-base ${cfg.color}`}>{cfg.label}</span>
-                <span className="text-xs text-slate-500 ml-2">{cfg.desc}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`font-black text-lg ${cfg.color}`}>{formatCurrency(tot, true)}</span>
-                <span className="text-slate-400 text-sm">{open ? '▲' : '▼'}</span>
-              </div>
-            </button>
-
-            {open && (
-              <div className="border-t border-slate-200/60 px-4 pb-2">
-                {cats.map(cat => {
-                  const val = cat.amounts[activeStageId] ?? 0;
-                  const pct = (val / cat.maxValue) * 100;
-                  return (
-                    <div key={cat.id} className="py-3 border-b border-slate-100/80 last:border-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">{cat.icon}</span>
-                          <div>
-                            <p className="font-semibold text-sm text-slate-800">{cat.name}</p>
-                            <p className="text-xs text-slate-400">{cat.description}</p>
-                          </div>
-                        </div>
-                        <span className={clsx('font-black text-base', cfg.color)}>{formatCurrency(val, true)}</span>
-                      </div>
-                      <input
-                        type="range" min={0} max={cat.maxValue} step={100} value={val}
-                        onChange={(e) => updateSpendingAmount(cat.id, activeStageId, parseInt(e.target.value))}
-                        className="w-full"
-                        style={{ background: `linear-gradient(to right, ${STAGE_COLORS[activeStageId as keyof typeof STAGE_COLORS] ?? '#f97316'} ${pct}%, #e2e8f0 ${pct}%)` }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
 
       {/* Care Reserve */}
       <div className="game-card border border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50">
@@ -309,6 +209,127 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
           </div>
         )}
       </div>
+
+      {/* Advanced planning toggle */}
+      <div>
+        <button
+          onClick={() => setShowAdvanced(p => !p)}
+          className="w-full flex items-center justify-between py-3 px-4 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-all text-sm font-semibold"
+        >
+          <span>⚙️ Advanced: customise spending by category</span>
+          <span>{showAdvanced ? '▲ Hide' : '▼ Show'}</span>
+        </button>
+      </div>
+
+      {/* Advanced: category breakdown */}
+      {showAdvanced && (
+        <div className="space-y-4">
+
+          {/* Tier totals */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {tierTotals.map(({ tier, total }) => {
+              const cfg = TIER_CFG[tier as SpendingTier];
+              return (
+                <div key={tier} className={`rounded-2xl p-4 border ${cfg.bg} ${cfg.border}`}>
+                  <p className={`text-xs font-bold mb-1 ${cfg.color}`}>{cfg.label}</p>
+                  <p className="text-xl font-black text-slate-800">{formatCurrency(total, true)}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* RLSS benchmark bar */}
+          <div className="game-card-sm">
+            <div className="flex justify-between mb-2">
+              <span className="text-xs font-semibold text-slate-500">vs UK standards</span>
+              <span className={clsx('text-xs font-bold', benchmarkColor)}>{benchmarkLabel}</span>
+            </div>
+            <div className="relative h-3 rounded-full bg-slate-100 overflow-hidden">
+              <div className="absolute inset-y-0 left-0 bg-slate-200 rounded-l-full" style={{ width: `${Math.min(100, (min / (com * 1.3)) * 100)}%` }} />
+              <div className="absolute inset-y-0 bg-sky-100" style={{ left: `${(min / (com * 1.3)) * 100}%`, width: `${((mod - min) / (com * 1.3)) * 100}%` }} />
+              <div className="absolute inset-y-0 bg-emerald-100" style={{ left: `${(mod / (com * 1.3)) * 100}%`, width: `${((com - mod) / (com * 1.3)) * 100}%` }} />
+              <div className="absolute inset-y-0 w-1 bg-slate-800 rounded-full -translate-x-1/2"
+                style={{ left: `${Math.min(98, (totalSpend / (com * 1.3)) * 100)}%` }} />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-slate-400">Min {formatCurrency(min, true)}</span>
+              <span className="text-xs text-slate-400">Mod {formatCurrency(mod, true)}</span>
+              <span className="text-xs text-slate-400">Com {formatCurrency(com, true)}</span>
+            </div>
+          </div>
+
+          {/* Copy from stage */}
+          {lifeStages.indexOf(activeStage) > 0 && (
+            <div className="text-right">
+              <button
+                onClick={() => {
+                  const prev = lifeStages[lifeStages.indexOf(activeStage) - 1];
+                  spendingCategories.forEach(cat => {
+                    updateSpendingAmount(cat.id, activeStageId, cat.amounts[prev.id] ?? 0);
+                  });
+                }}
+                className="text-sm text-orange-600 hover:text-orange-700 font-semibold"
+              >
+                ↩ Copy from &quot;{lifeStages[lifeStages.indexOf(activeStage) - 1]?.label}&quot;
+              </button>
+            </div>
+          )}
+
+          {/* Category sliders by tier */}
+          {(['essential', 'moderate', 'aspirational', 'variable'] as SpendingTier[]).map(tier => {
+            const cfg  = TIER_CFG[tier];
+            const cats = spendingCategories.filter(c => c.tier === tier);
+            const tot  = tierTotals.find(t => t.tier === tier)?.total ?? 0;
+            const open = openTiers[tier];
+            return (
+              <div key={tier} className={`rounded-2xl border ${cfg.bg} ${cfg.border} overflow-hidden`}>
+                <button
+                  onClick={() => toggleTier(tier)}
+                  className="w-full flex items-center justify-between p-4 text-left"
+                >
+                  <div>
+                    <span className={`font-black text-base ${cfg.color}`}>{cfg.label}</span>
+                    <span className="text-xs text-slate-500 ml-2">{cfg.desc}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`font-black text-lg ${cfg.color}`}>{formatCurrency(tot, true)}</span>
+                    <span className="text-slate-400 text-sm">{open ? '▲' : '▼'}</span>
+                  </div>
+                </button>
+
+                {open && (
+                  <div className="border-t border-slate-200/60 px-4 pb-2">
+                    {cats.map(cat => {
+                      const val = cat.amounts[activeStageId] ?? 0;
+                      const pct = (val / cat.maxValue) * 100;
+                      return (
+                        <div key={cat.id} className="py-3 border-b border-slate-100/80 last:border-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{cat.icon}</span>
+                              <div>
+                                <p className="font-semibold text-sm text-slate-800">{cat.name}</p>
+                                <p className="text-xs text-slate-400">{cat.description}</p>
+                              </div>
+                            </div>
+                            <span className={clsx('font-black text-base', cfg.color)}>{formatCurrency(val, true)}</span>
+                          </div>
+                          <input
+                            type="range" min={0} max={cat.maxValue} step={100} value={val}
+                            onChange={(e) => updateSpendingAmount(cat.id, activeStageId, parseInt(e.target.value))}
+                            className="w-full"
+                            style={{ background: `linear-gradient(to right, ${STAGE_COLORS[activeStageId as keyof typeof STAGE_COLORS] ?? '#f97316'} ${pct}%, #e2e8f0 ${pct}%)` }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex justify-between pt-4">
         <button onClick={onBack} className="btn-secondary">← Back</button>

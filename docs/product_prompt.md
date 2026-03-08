@@ -95,13 +95,15 @@ Support single users or couples. Capture all income streams individually per per
 - Represent visually using cards or tiles
 
 ### Step 3 — Spending Goals (today's money)
-- Option A: Simplified Retirement Living Standards template (Minimum / Moderate / Comfortable, single or couple)
-- Option B: Custom categories:
+- Default to the PLSA **Minimum** standard on first load (single household).
+- Primary UI: choose a UK Retirement Living Standard (Minimum / Moderate / Comfortable, single or couple).
+  Selecting a standard scales all spending categories proportionally.
+- **Advanced planning option** (collapsed by default): customise spending by category:
   - Essential (housing, food, utilities, transport, insurance, healthcare)
   - Lifestyle (travel, dining, hobbies)
   - Family & Giving (family support, charity, gifts)
   - Other (home improvements, major purchases, contingency buffer)
-- Total spending updates dynamically
+- Total spending updates dynamically. Benchmark bar and tier breakdown shown inside the advanced section.
 
 #### Retirement Spending Smile
 The existing three-stage spending model (Go-Go → Slo-Go → No-Go) is presented as the **Retirement Spending Smile**.

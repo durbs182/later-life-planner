@@ -168,13 +168,13 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
     lifeVision: '',
     aspirations: [],
     lifeStages: buildDefaultLifeStages(fiAge, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
-    spendingCategories: buildDefaultCategories(),
+    spendingCategories: buildCategoriesForRlss('minimum', 'single'),
     assumptions: {
       investmentGrowth: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH,
       inflation:        DEFAULT_ASSUMPTIONS.INFLATION,
       lifeExpectancy:   DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY,
     },
-    rlssStandard: null,
+    rlssStandard: 'minimum',
     jointGia: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
     careReserve: { enabled: false, amount: CARE_RESERVE.DEFAULT_AMOUNT },
   };
