@@ -18,6 +18,12 @@
  *   is then drawn via the UFPLS model (UFPLS_TAX_FREE_FRACTION of each
  *   subsequent withdrawal is tax-free).
  *
+ *   PCLS is also subject to the HMRC Lump Sum Allowance (LSA) of £268,275.
+ *   This is the maximum total tax-free cash a person can take from all pension
+ *   schemes in their lifetime (introduced in Finance Act 2024 when the Lifetime
+ *   Allowance was abolished). The PCLS taken is capped at
+ *   min(25% of pot, remaining LSA for that person).
+ *
  * Joint GIA:
  *   When a GIA has owner = 'joint', capital gains are split equally
  *   between both persons for CGT purposes, allowing each person's
@@ -119,9 +125,12 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   const p2DcG      = (person2.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
   const jointGiaG  = (jointGia.growthRate ?? investmentGrowth) / 100;
 
-  // ── PCLS tracking — taken once at crystallisation ─────────────────────────
+  // ── PCLS tracking — taken once at crystallisation, capped at LSA ────────
   let p1PclsTaken = false;
   let p2PclsTaken = false;
+  // Cumulative PCLS taken per person, tracked against the Lump Sum Allowance.
+  let p1LifetimePcls = 0;
+  let p2LifetimePcls = 0;
 
   const maxYears   = lifeExpectancy - person1.currentAge;
   const projections: YearlyProjection[] = [];
@@ -165,13 +174,19 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
     const dc1 = person1.incomeSources.dcPension;
     if (!p1PclsTaken && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
-      p1PclsAmount = p1Dc * PENSION_RULES.PCLS_MAX_FRACTION;
+      // Cap at min(25% of pot, remaining Lump Sum Allowance for this person)
+      const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
+      p1PclsAmount = Math.min(p1Dc * PENSION_RULES.PCLS_MAX_FRACTION, p1RemainingLsa);
+      p1LifetimePcls += p1PclsAmount;
       p1Dc -= p1PclsAmount;
       p1PclsTaken = true;
     }
     const dc2 = person2.incomeSources.dcPension;
     if (mode === 'couple' && !p2PclsTaken && p2Dc > 0 && dc2.enabled && p2Age !== null && p2Age >= fiAge) {
-      p2PclsAmount = p2Dc * PENSION_RULES.PCLS_MAX_FRACTION;
+      // Cap at min(25% of pot, remaining Lump Sum Allowance for this person)
+      const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
+      p2PclsAmount = Math.min(p2Dc * PENSION_RULES.PCLS_MAX_FRACTION, p2RemainingLsa);
+      p2LifetimePcls += p2PclsAmount;
       p2Dc -= p2PclsAmount;
       p2PclsTaken = true;
     }
@@ -375,7 +390,8 @@ export function getSustainableRlssLevel(
  */
 export function calculateGamificationMetrics(state: PlannerState): GamificationMetrics {
   const projections = calculateProjections(state);
-  const firstYear = projections[0];
+  // Use the FI age year as "year 1" — income and spending are only meaningful from FI age onwards.
+  const firstYear = projections.find(p => p.p1Age >= state.fiAge) ?? projections[0];
   const firstStageId = state.lifeStages[0]?.id ?? 'go-go';
 
   // Income stability: guaranteed income / spending in year 1

@@ -107,6 +107,10 @@ Support single users or couples. Capture all income streams individually per per
 - Property income (owner: A/B/Joint)
 - Investment assets:
   - Pension (DC): owner, current value, growth. PCLS is fixed at 25% (HMRC maximum) — NOT user-configurable. PCLS is entirely tax-free and has no bearing on income tax bands, so offering a variable % would be misleading.
+    - PCLS is also subject to the HMRC **Lump Sum Allowance (LSA)** of £268,275 per person (Finance Act 2024).
+      This is the maximum total tax-free cash a person can take from all pension schemes in their lifetime.
+      PCLS taken must be capped at `min(25% of pot, remaining LSA)`. Excess above the LSA is taxable as income.
+      The LSA is tracked cumulatively per person in the projection engine. Defined in `/config/financialConstants.ts` as `PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE`.
   - ISA: owner, value, growth
   - GIA: owner (A/B/Joint), current value, base cost, growth. If joint, allow drawdown individually to optimise CGT per person
   - Cash savings: owner, balance
@@ -123,6 +127,10 @@ Support single users or couples. Capture all income streams individually per per
 
 ### Step 6 — Dashboard / Lifetime Timeline
 - Visualisation of income sources, spending, assets by age
+- **Income and spending display starts from the Financial Independence (FI) age**, not current age.
+  The projection engine still models asset growth from current age (to track portfolio value correctly),
+  but all charts, tables, and stat cards show only data from the FI age onward.
+  This reflects that the planning horizon is the post-work period.
 - Life stage timeline, spending bars, income stacks, asset projections, lifestyle indicators
 - Gamified progress bars and interactive UI elements
 - Timeline sliders to adjust spending/income dynamically

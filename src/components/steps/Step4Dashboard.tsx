@@ -42,7 +42,7 @@ function LifestyleLevel({ mode, annualIncome, rlssStandard }: {
   return (
     <div className="game-card bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="section-heading mb-0">Lifestyle level — Year 1</h3>
+        <h3 className="section-heading mb-0">Lifestyle level — at FI age</h3>
         <span className={clsx('text-sm font-black px-3 py-1 rounded-full', levelBg, levelColor)}>
           {level === 0 ? '—' : ['', standards.minimum.emoji, standards.moderate.emoji, standards.comfortable.emoji][level]}{' '}
           {levelLabel}
@@ -239,10 +239,16 @@ function ProjectionTable({ projections }: { projections: YearlyProjection[] }) {
 
 export default function Step4Dashboard({ onBack }: Props) {
   const state = usePlannerStore();
-  const { mode, person1, person2, lifeStages, rlssStandard, updateSpendingAmount, spendingCategories } = state;
+  const { mode, person1, person2, lifeStages, rlssStandard, updateSpendingAmount, spendingCategories, fiAge } = state;
 
   const projections   = useMemo(() => calculateProjections(state), [state]);
-  const firstYear     = projections[0];
+  // Income and spending only starts at FI age — filter for display, but keep full
+  // projections for asset depletion checks (assets grow from current age).
+  const displayProjections = useMemo(
+    () => projections.filter(p => p.p1Age >= fiAge),
+    [projections, fiAge],
+  );
+  const firstYear     = displayProjections[0] ?? projections[0];
   const depletionAge  = getAssetDepletionAge(projections);
   const firstStageId  = lifeStages[0]?.id ?? 'active';
   const annualSpend   = getStageTotalSpending(state, firstStageId);
@@ -269,7 +275,7 @@ export default function Step4Dashboard({ onBack }: Props) {
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">plan</span>
         </h2>
         <p className="text-slate-500">
-          Age {person1.currentAge}{mode === 'couple' ? ` / ${person2.currentAge}` : ''} → {state.assumptions.lifeExpectancy} · nominal £
+          From age {fiAge}{mode === 'couple' ? ` / ${person2.currentAge + (fiAge - person1.currentAge)}` : ''} → {state.assumptions.lifeExpectancy} · nominal £
         </p>
       </div>
 
@@ -292,10 +298,10 @@ export default function Step4Dashboard({ onBack }: Props) {
         <StatCard icon="💰" label="Annual spending" value={formatCurrency(annualSpend, true)}
           sub={rlssStandard ? `${RLSS_STANDARDS[mode][rlssStandard].label} lifestyle` : "today's £"}
           accent="slate" />
-        <StatCard icon="📥" label="Year 1 income" value={formatCurrency(firstYear?.totalIncome ?? 0, true)}
+        <StatCard icon="📥" label={`Income at ${fiAge}`} value={formatCurrency(firstYear?.totalIncome ?? 0, true)}
           sub={`${formatCurrency(firstYear?.netIncome ?? 0, true)} after tax`}
           accent="sky" />
-        <StatCard icon="🏦" label="Assets today" value={formatCurrency(firstYear?.totalAssets ?? 0, true)}
+        <StatCard icon="🏦" label={`Assets at ${fiAge}`} value={formatCurrency(firstYear?.totalAssets ?? 0, true)}
           sub={unrealisedGain > 0 ? `${formatCurrency(unrealisedGain, true)} unrealised gain` : 'across all accounts'}
           accent="orange" />
         <StatCard
@@ -310,7 +316,7 @@ export default function Step4Dashboard({ onBack }: Props) {
       <LifestyleLevel mode={mode} annualIncome={firstYear?.totalIncome ?? 0} rlssStandard={rlssStandard} />
 
       {/* Life stage timeline */}
-      <StageTimeline projections={projections} lifeStages={lifeStages} p1Age={person1.currentAge} />
+      <StageTimeline projections={displayProjections} lifeStages={lifeStages} p1Age={fiAge} />
 
       {/* Gamification metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -372,13 +378,13 @@ export default function Step4Dashboard({ onBack }: Props) {
       <div className="game-card">
         <h3 className="section-heading">Income vs spending — lifetime view</h3>
         <p className="text-xs text-slate-500 mb-4">Stacked bars = income sources. Dashed line = desired spending.</p>
-        <LifetimeChart projections={projections} mode={mode} p1Name={p1Name} p2Name={p2Name} />
+        <LifetimeChart projections={displayProjections} mode={mode} p1Name={p1Name} p2Name={p2Name} />
       </div>
 
       <div className="game-card">
         <h3 className="section-heading">Asset balances over time</h3>
         <p className="text-xs text-slate-500 mb-4">Combined ISA, GIA, cash and pension as you draw from them.</p>
-        <AssetChart projections={projections} />
+        <AssetChart projections={displayProjections} />
       </div>
 
       {/* Quick adjust */}
@@ -420,10 +426,10 @@ export default function Step4Dashboard({ onBack }: Props) {
       </div>
 
       {/* Tax strategy */}
-      <TaxOverview projections={projections} />
+      <TaxOverview projections={displayProjections} />
 
       {/* Projection table */}
-      <ProjectionTable projections={projections} />
+      <ProjectionTable projections={displayProjections} />
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 justify-between pt-2 no-print">

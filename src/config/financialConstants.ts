@@ -91,6 +91,15 @@ export const PENSION_RULES = {
    * (Pension Commencement Lump Sum) at crystallisation.
    */
   PCLS_MAX_FRACTION: 0.25,
+  /**
+   * Lifetime Lump Sum Allowance (LSA) — the maximum total tax-free cash a person
+   * can take from all pension schemes in their lifetime.
+   * Source: HMRC Finance Act 2024 — the LSA replaced the Lifetime Allowance.
+   * £268,275 = 25% of the former standard Lifetime Allowance (£1,073,100).
+   * Any PCLS above this amount would be subject to income tax.
+   * Update annually if HMRC revises the LSA figure.
+   */
+  PCLS_LUMP_SUM_ALLOWANCE: 268_275,
   /** Minimum age at which DC pension can be accessed (rising to 57 in 2028). */
   MIN_ACCESS_AGE: 55,
 } as const;
