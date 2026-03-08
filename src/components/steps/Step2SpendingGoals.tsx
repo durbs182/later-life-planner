@@ -149,81 +149,89 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
         </div>
       </div>
 
-      {/* Care Reserve */}
-      <div className="game-card border border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl flex-shrink-0">🛡️</span>
-            <div>
-              <h3 className="section-heading mb-0">Care Reserve</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Earmark a portion of your portfolio for potential late-life care costs — kept invested
-                but excluded from your normal spending plan.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setCareReserve({ enabled: !careReserve?.enabled })}
-            className={clsx(
-              'flex-shrink-0 ml-4 w-12 h-6 rounded-full transition-colors relative',
-              careReserve?.enabled ? 'bg-teal-500' : 'bg-slate-200'
-            )}
-          >
-            <span className={clsx(
-              'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform',
-              careReserve?.enabled ? 'translate-x-6' : 'translate-x-0.5'
-            )} />
-          </button>
-        </div>
-
-        {careReserve?.enabled && (
-          <div className="border-t border-teal-100 pt-4 space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-slate-700">Reserve amount</span>
-                <span className="text-base font-black text-teal-700">{formatCurrency(careReserve.amount)}</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={CARE_RESERVE.MAX_AMOUNT}
-                step={5000}
-                value={careReserve.amount}
-                onChange={(e) => setCareReserve({ amount: parseInt(e.target.value) })}
-                className="w-full"
-                style={{
-                  background: `linear-gradient(to right, #0d9488 ${(careReserve.amount / CARE_RESERVE.MAX_AMOUNT) * 100}%, #e2e8f0 ${(careReserve.amount / CARE_RESERVE.MAX_AMOUNT) * 100}%)`
-                }}
-              />
-              <div className="flex justify-between mt-1 text-xs text-slate-400">
-                <span>£0</span>
-                <span>{formatCurrency(CARE_RESERVE.DEFAULT_AMOUNT, true)} suggested</span>
-                <span>{formatCurrency(CARE_RESERVE.MAX_AMOUNT, true)}</span>
-              </div>
-            </div>
-            <div className="rounded-xl bg-teal-50/80 border border-teal-100 p-3 text-xs text-teal-800 space-y-1">
-              <p>✓ Grows with your portfolio — it stays invested.</p>
-              <p>✓ Excluded from your spending projections — no false confidence in the numbers.</p>
-              <p>✓ If care costs never arise, it remains part of your final estate.</p>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Advanced planning toggle */}
-      <div>
+      <div className={clsx(
+        'rounded-2xl border-2 overflow-hidden transition-all',
+        showAdvanced ? 'border-slate-200' : 'border-slate-300 bg-gradient-to-br from-slate-50 to-slate-100'
+      )}>
         <button
           onClick={() => setShowAdvanced(p => !p)}
-          className="w-full flex items-center justify-between py-3 px-4 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 transition-all text-sm font-semibold"
+          className="w-full flex items-center justify-between p-4 text-left"
         >
-          <span>⚙️ Advanced: customise spending by category</span>
-          <span>{showAdvanced ? '▲ Hide' : '▼ Show'}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⚙️</span>
+            <div>
+              <p className="font-black text-base text-slate-800">Advanced planning</p>
+              <p className="text-xs text-slate-500">Customise by category · Care Reserve</p>
+            </div>
+          </div>
+          <span className="text-slate-400 font-semibold text-sm">{showAdvanced ? '▲ Hide' : '▼ Show'}</span>
         </button>
-      </div>
 
-      {/* Advanced: category breakdown */}
+      {/* Advanced: category breakdown + Care Reserve */}
       {showAdvanced && (
-        <div className="space-y-4">
+        <div className="border-t border-slate-200 p-4 space-y-4">
+
+          {/* Care Reserve */}
+          <div className="game-card border border-teal-100 bg-gradient-to-br from-teal-50 to-cyan-50">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl flex-shrink-0">🛡️</span>
+                <div>
+                  <h3 className="section-heading mb-0">Care Reserve</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Earmark a portion of your portfolio for potential late-life care costs — kept invested
+                    but excluded from your normal spending plan.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setCareReserve({ enabled: !careReserve?.enabled })}
+                className={clsx(
+                  'flex-shrink-0 ml-4 w-12 h-6 rounded-full transition-colors relative',
+                  careReserve?.enabled ? 'bg-teal-500' : 'bg-slate-200'
+                )}
+              >
+                <span className={clsx(
+                  'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform',
+                  careReserve?.enabled ? 'translate-x-6' : 'translate-x-0.5'
+                )} />
+              </button>
+            </div>
+
+            {careReserve?.enabled && (
+              <div className="border-t border-teal-100 pt-4 space-y-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-slate-700">Reserve amount</span>
+                    <span className="text-base font-black text-teal-700">{formatCurrency(careReserve.amount)}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={CARE_RESERVE.MAX_AMOUNT}
+                    step={5000}
+                    value={careReserve.amount}
+                    onChange={(e) => setCareReserve({ amount: parseInt(e.target.value) })}
+                    className="w-full"
+                    style={{
+                      background: `linear-gradient(to right, #0d9488 ${(careReserve.amount / CARE_RESERVE.MAX_AMOUNT) * 100}%, #e2e8f0 ${(careReserve.amount / CARE_RESERVE.MAX_AMOUNT) * 100}%)`
+                    }}
+                  />
+                  <div className="flex justify-between mt-1 text-xs text-slate-400">
+                    <span>£0</span>
+                    <span>{formatCurrency(CARE_RESERVE.DEFAULT_AMOUNT, true)} suggested</span>
+                    <span>{formatCurrency(CARE_RESERVE.MAX_AMOUNT, true)}</span>
+                  </div>
+                </div>
+                <div className="rounded-xl bg-teal-50/80 border border-teal-100 p-3 text-xs text-teal-800 space-y-1">
+                  <p>✓ Grows with your portfolio — it stays invested.</p>
+                  <p>✓ Excluded from your spending projections — no false confidence in the numbers.</p>
+                  <p>✓ If care costs never arise, it remains part of your final estate.</p>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Tier totals */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -330,6 +338,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
           })}
         </div>
       )}
+      </div>
 
       <div className="flex justify-between pt-4">
         <button onClick={onBack} className="btn-secondary">← Back</button>
