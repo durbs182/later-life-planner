@@ -82,9 +82,11 @@ Support single users or couples. Capture all income streams individually per per
 ### Step 1 — Household Setup
 - Single or Couple
 - Each person captured individually (name, date of birth)
-- **Financial independence age** (FI age): when person 1 plans to stop working.
+- **Financial independence age** (FI age): the age from which work becomes a choice, not a necessity.
+  Language must reflect agency and options — avoid phrases like "when do you plan to stop working".
+  Frame this as: "the age from which work is optional", "freedom phase", or "when you have the choice to step back".
   Life stages (Go-Go Years, Slo-Go Years, No-Go Years) are anchored to this age —
-  they do NOT start from current age. The working period (current age → FI age - 1) is
+  they do NOT start from current age. The building phase (current age → FI age - 1) is
   still fully modelled in projections (income, asset growth) using Go-Go Years spending
   as a baseline. Default FI age: 65. FI age must be > current age and < life expectancy.
 

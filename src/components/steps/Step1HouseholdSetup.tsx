@@ -146,8 +146,8 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
       <div className="game-card">
         <h3 className="section-heading">Financial independence age</h3>
         <p className="section-subheading">
-          When do you plan to stop working? Life stages — Go-Go Years, Slo-Go Years, No-Go Years — begin from this age.
-          The projection still models income and assets from today.
+          The age from which work becomes a choice, not a necessity. Life stages — Go-Go Years, Slo-Go Years,
+          No-Go Years — begin here. You can still work beyond this age if you want to — this is about having options.
         </p>
         <div className="flex items-center gap-4">
           <input
@@ -162,8 +162,8 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-          <span>Working years: {person1.currentAge} → {fiAge - 1}</span>
-          <span>Life stages start: age {fiAge}</span>
+          <span>Building phase: age {person1.currentAge} → {fiAge - 1}</span>
+          <span>Freedom phase starts: age {fiAge}</span>
         </div>
       </div>
 

@@ -38,8 +38,8 @@ export function dobFromAge(age: number): string {
 // ─── Life stages ─────────────────────────────────────────────────────────────
 
 /**
- * Build the three post-work life stages, anchored to fiAge.
- * Everything before fiAge is the working phase; the projection engine uses
+ * Build the three life stages, anchored to fiAge (financial independence age).
+ * Everything before fiAge is the building phase; the projection engine uses
  * the Go-Go Years spending amounts for those years as a baseline.
  */
 export function buildDefaultLifeStages(

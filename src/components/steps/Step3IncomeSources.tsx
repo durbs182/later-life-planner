@@ -247,7 +247,7 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
           <FieldRow label="Annual income">
             <CurrencyInput value={src.partTimeWork.annualIncome} onChange={(v) => set('partTimeWork', { annualIncome: v })} max={150000} step={500} />
           </FieldRow>
-          <FieldRow label="Stop working at age">
+          <FieldRow label="Work optional from age">
             <AgeInput value={src.partTimeWork.stopAge} onChange={(v) => set('partTimeWork', { stopAge: v })} min={currentAge + 1} max={80} />
           </FieldRow>
         </SourceCard>

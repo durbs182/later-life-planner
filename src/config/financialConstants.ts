@@ -136,9 +136,9 @@ export const DEFAULT_ASSUMPTIONS = {
   DEFAULT_AGE: 57,
 
   /**
-   * Default financial independence / end-of-work age.
+   * Default financial independence age — the age from which work becomes a choice.
    * Life stages (Go-Go Years, Slo-Go Years, No-Go Years) start from this age.
-   * Everything before this is modelled as working years.
+   * Everything before this is the building phase, still fully modelled in projections.
    */
   FI_AGE: 65,
 } as const;

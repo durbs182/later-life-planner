@@ -157,9 +157,9 @@ export interface PlannerState {
   person1: Person;
   person2: Person;
   /**
-   * Financial independence / end-of-work age for person1.
+   * Financial independence age for person1 — the age from which work becomes a choice.
    * Life stages (Go-Go Years, Slo-Go Years, No-Go Years) start from this age.
-   * The period from person1.currentAge to fiAge-1 is the working phase, still
+   * The period from person1.currentAge to fiAge-1 is the building phase, still
    * modelled in projections but using Go-Go Years spending as a baseline.
    */
   fiAge: number;
