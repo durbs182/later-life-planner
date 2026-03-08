@@ -125,6 +125,12 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   const p2DcG      = (person2.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
   const jointGiaG  = (jointGia.growthRate ?? investmentGrowth) / 100;
 
+  // ── Care Reserve — earmarked capital, invested but not drawn for spending ─
+  // Grows at the portfolio investment growth rate each year.
+  // Never enters the drawdown waterfall; tracked separately in projections.
+  let careReserveBalance = (state.careReserve?.enabled && state.careReserve.amount > 0)
+    ? state.careReserve.amount : 0;
+
   // ── PCLS tracking — taken once at crystallisation, capped at LSA ────────
   let p1PclsTaken = false;
   let p2PclsTaken = false;
@@ -158,13 +164,15 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
                       + p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
 
     // ── Asset growth (before drawdown) ────────────────────────────────────
-    if (p1Isa     > 0) p1Isa     *= (1 + p1IsaG);
-    if (p1GiaV    > 0) p1GiaV    *= (1 + p1GiaG);
-    if (p1Dc      > 0) p1Dc      *= (1 + p1DcG);
-    if (p2Isa     > 0) p2Isa     *= (1 + p2IsaG);
-    if (p2GiaV    > 0) p2GiaV    *= (1 + p2GiaG);
-    if (p2Dc      > 0) p2Dc      *= (1 + p2DcG);
-    if (jointGiaV > 0) jointGiaV *= (1 + jointGiaG);
+    if (p1Isa            > 0) p1Isa            *= (1 + p1IsaG);
+    if (p1GiaV           > 0) p1GiaV           *= (1 + p1GiaG);
+    if (p1Dc             > 0) p1Dc             *= (1 + p1DcG);
+    if (p2Isa            > 0) p2Isa            *= (1 + p2IsaG);
+    if (p2GiaV           > 0) p2GiaV           *= (1 + p2GiaG);
+    if (p2Dc             > 0) p2Dc             *= (1 + p2DcG);
+    if (jointGiaV        > 0) jointGiaV        *= (1 + jointGiaG);
+    // Care reserve grows at the global investment growth rate (it's invested within the portfolio)
+    if (careReserveBalance > 0) careReserveBalance *= (1 + investmentGrowth / 100);
 
     // ── PCLS: one-off tax-free lump sum at crystallisation ────────────────
     // Taken in the first year the DC pension becomes available. Reduces the
@@ -318,9 +326,13 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       p2IsaBalance:  clamp(p2Isa),  p2GiaValue: clamp(p2GiaV), p2GiaBaseCost: clamp(p2GiaBC),
       p2CashBalance: clamp(p2Cash), p2DcBalance: clamp(p2Dc),
       jointGiaValue: clamp(jointGiaV), jointGiaBaseCost: clamp(jointGiaBC),
+      // totalAssets excludes care reserve — depletion logic should only fire when
+      // spendable assets are exhausted, not earmarked capital.
       totalAssets: clamp(p1Isa) + clamp(p1GiaV) + clamp(p1Cash) + clamp(p1Dc)
                  + clamp(p2Isa) + clamp(p2GiaV) + clamp(p2Cash) + clamp(p2Dc)
                  + clamp(jointGiaV),
+      // Care reserve tracked separately — earmarked, never drawn for spending.
+      careReserveBalance: Math.round(careReserveBalance),
     });
   }
 

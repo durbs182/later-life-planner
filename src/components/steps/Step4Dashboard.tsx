@@ -312,6 +312,20 @@ export default function Step4Dashboard({ onBack }: Props) {
           accent={surplus ? 'emerald' : 'rose'} />
       </div>
 
+      {/* Care Reserve callout */}
+      {state.careReserve?.enabled && (
+        <div className="rounded-2xl bg-teal-50 border border-teal-200 p-4 flex items-start gap-3">
+          <span className="text-2xl flex-shrink-0">🛡️</span>
+          <div>
+            <p className="font-black text-teal-800">Care Reserve — {formatCurrency(firstYear?.careReserveBalance ?? state.careReserve.amount, true)}</p>
+            <p className="text-sm text-teal-600 mt-0.5">
+              Earmarked for potential late-life care costs. Invested and growing, but excluded from your spending projections above.
+              If care costs never arise, this remains part of your estate.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Lifestyle level indicator */}
       <LifestyleLevel mode={mode} annualIncome={firstYear?.totalIncome ?? 0} rlssStandard={rlssStandard} />
 
@@ -376,14 +390,24 @@ export default function Step4Dashboard({ onBack }: Props) {
 
       {/* Charts */}
       <div className="game-card">
-        <h3 className="section-heading">Income vs spending — lifetime view</h3>
-        <p className="text-xs text-slate-500 mb-4">Stacked bars = income sources. Dashed line = desired spending.</p>
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="section-heading mb-0">Income vs spending — lifetime view</h3>
+          <span className="text-lg ml-2 flex-shrink-0">😊</span>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Stacked bars = income sources. Dashed line = <strong>Spending Smile</strong> — spending is higher in active early years and naturally declines over time, giving your plan long-term resilience.
+        </p>
         <LifetimeChart projections={displayProjections} mode={mode} p1Name={p1Name} p2Name={p2Name} />
       </div>
 
       <div className="game-card">
         <h3 className="section-heading">Asset balances over time</h3>
-        <p className="text-xs text-slate-500 mb-4">Combined ISA, GIA, cash and pension as you draw from them.</p>
+        <p className="text-xs text-slate-500 mb-4">
+          Combined ISA, GIA, cash and pension as you draw from them.
+          {state.careReserve?.enabled && (
+            <span className="ml-1 text-teal-600 font-semibold">Care Reserve shown separately — earmarked, not drawn for spending.</span>
+          )}
+        </p>
         <AssetChart projections={displayProjections} />
       </div>
 

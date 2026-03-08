@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
-  PlannerState, PlanningMode, LifeStage, GIAAsset,
+  PlannerState, PlanningMode, LifeStage, GIAAsset, CareReserve,
   PersonIncomeSources, PersonAssets, Assumptions, AspirationTag, RlssStandard,
 } from '@/models/types';
 import {
@@ -30,6 +30,7 @@ type Actions = {
   setP2Asset:  (key: keyof PersonAssets,        updates: Record<string, unknown>) => void;
 
   setJointGia: (updates: Partial<GIAAsset>) => void;
+  setCareReserve: (updates: Partial<CareReserve>) => void;
 
   setLifeVision: (vision: string) => void;
   toggleAspiration: (tag: AspirationTag) => void;
@@ -127,6 +128,9 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setJointGia: (updates) =>
         set((s) => ({ jointGia: { ...s.jointGia, ...updates } })),
 
+      setCareReserve: (updates) =>
+        set((s) => ({ careReserve: { ...s.careReserve, ...updates } })),
+
       setLifeVision: (lifeVision) => set({ lifeVision }),
       toggleAspiration: (tag) =>
         set((s) => ({
@@ -169,6 +173,6 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       loadDemo: () => set(createMockDemoState()),
       resetPlan: () => set(createDefaultState(57)),
     }),
-    { name: 'life-planner-v5' }
+    { name: 'life-planner-v6' }
   )
 );

@@ -143,6 +143,21 @@ export const DEFAULT_ASSUMPTIONS = {
   FI_AGE: 65,
 } as const;
 
+// ─── Care Reserve ────────────────────────────────────────────────────────────
+// An optional earmarked capital reserve for late-life care costs.
+// Excluded from the normal drawdown waterfall; grows at the portfolio growth rate.
+
+export const CARE_RESERVE = {
+  /**
+   * Default suggested amount.
+   * Source: UK care home costs average c.£35k–£50k/yr; a £100k reserve
+   * covers roughly 2–3 years of residential care (Laing Buisson 2024 estimates).
+   */
+  DEFAULT_AMOUNT: 100_000,
+  /** Maximum slider value. */
+  MAX_AMOUNT: 500_000,
+} as const;
+
 // ─── Withdrawal order ─────────────────────────────────────────────────────────
 // The app follows this UK tax-efficient ordering.
 // Source: Standard UK financial planning practice.

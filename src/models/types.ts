@@ -28,6 +28,20 @@ export interface LifeStage {
   color: string;
 }
 
+// ─── Care Reserve ─────────────────────────────────────────────────────────────
+
+/**
+ * Optional earmarked capital set aside for potential late-life care costs.
+ * The reserve is invested (grows with the portfolio rate) but excluded from
+ * the normal spending drawdown waterfall. If care costs never materialise,
+ * it remains part of total portfolio value.
+ */
+export interface CareReserve {
+  enabled: boolean;
+  /** Amount in today's £. Grows with investmentGrowth in projections. */
+  amount: number;
+}
+
 // ─── Spending ─────────────────────────────────────────────────────────────────
 
 export interface SpendingCategory {
@@ -175,6 +189,11 @@ export interface PlannerState {
    * Only relevant in couple mode; ignored in single mode.
    */
   jointGia: GIAAsset;
+  /**
+   * Optional earmarked care reserve — excluded from normal drawdown.
+   * See CareReserve interface above.
+   */
+  careReserve: CareReserve;
 }
 
 // ─── Projection output ────────────────────────────────────────────────────────
@@ -233,6 +252,9 @@ export interface YearlyProjection {
   totalTaxPaid: number;
   netIncome: number;
   gap: number;
+
+  // Care Reserve balance (earmarked, not drawn for spending)
+  careReserveBalance: number;
 
   // Asset balances (end of year)
   p1IsaBalance: number;

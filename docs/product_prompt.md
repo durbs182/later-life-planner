@@ -103,6 +103,25 @@ Support single users or couples. Capture all income streams individually per per
   - Other (home improvements, major purchases, buffer)
 - Total spending updates dynamically
 
+#### Retirement Spending Smile
+The existing three-stage spending model (Go-Go → Slo-Go → No-Go) is presented as the **Retirement Spending Smile**.
+Research shows spending typically peaks in early active years and naturally declines — forming a smile-shaped curve.
+The UI includes an explanatory panel communicating this concept, empowering users to spend more confidently
+in early years knowing the model already accounts for natural decline. The spending line in the lifetime chart
+is labelled **"Spending Smile"** rather than "desired spending".
+No new spending mechanics are required — this is purely a framing and education layer over the existing model.
+
+#### Care Reserve
+An optional earmarked capital reserve for potential late-life care costs — separate from normal spending.
+- Toggle to enable/disable. Configurable amount (default £100,000, range £0–£500,000).
+- **Excluded from the normal drawdown waterfall** — never automatically drawn to cover spending shortfalls.
+- **Grows at the portfolio investment growth rate** — it remains invested within the portfolio.
+- Shown as a separate area in the asset chart (teal dashed line) and a separate callout card on the dashboard.
+- `totalAssets` in projections excludes the care reserve so depletion logic fires correctly on spendable assets only.
+- A separate `careReserveBalance` field in `YearlyProjection` tracks its growth over time.
+- If no care costs arise, the reserve remains part of final portfolio value (inheritance/estate).
+- Configuration: `CARE_RESERVE.DEFAULT_AMOUNT` and `CARE_RESERVE.MAX_AMOUNT` in `/config/financialConstants.ts`.
+
 ### Step 4 — Income Sources
 - Individual capture per person
 - Guaranteed income: State Pension, Defined Benefit Pension, Annuities

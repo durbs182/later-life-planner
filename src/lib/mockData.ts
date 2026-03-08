@@ -3,7 +3,7 @@ import type {
   PersonIncomeSources, PersonAssets, RlssStandard,
 } from '@/models/types';
 import {
-  RLSS, DEFAULT_ASSUMPTIONS, STATE_PENSION, PENSION_RULES,
+  RLSS, DEFAULT_ASSUMPTIONS, STATE_PENSION, PENSION_RULES, CARE_RESERVE,
 } from '@/config/financialConstants';
 
 // ─── Re-export RLSS for components that import from here ─────────────────────
@@ -177,6 +177,7 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
     },
     rlssStandard: null,
     jointGia: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
+    careReserve: { enabled: false, amount: CARE_RESERVE.DEFAULT_AMOUNT },
   };
 }
 
