@@ -133,15 +133,15 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
         <p className={clsx('text-sm font-semibold', benchmarkColor)}>{benchmarkLabel}</p>
       </div>
 
-      {/* Retirement Spending Smile explanation */}
+      {/* Spending Smile explanation */}
       <div className="game-card-sm bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100">
         <div className="flex items-start gap-3">
-          <span className="text-2xl flex-shrink-0">😊</span>
+          <span className="text-2xl flex-shrink-0">📉</span>
           <div>
-            <p className="font-black text-sm text-violet-800 mb-1">The Retirement Spending Smile</p>
+            <p className="font-black text-sm text-violet-800 mb-1">The Spending Smile</p>
             <p className="text-xs text-slate-600 leading-relaxed">
               Research consistently shows that spending follows a natural curve in later life — highest in the
-              early active years, gently declining through mid-retirement, with a possible uptick in
+              Go-Go years, gently declining through the Slo-Go years, with a possible uptick in
               later years for care needs. Your three life stages already reflect this — spend more confidently
               in your Go-Go Years, knowing spending naturally reduces over time.
             </p>
