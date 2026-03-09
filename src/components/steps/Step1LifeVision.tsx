@@ -27,7 +27,7 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
     lifeVision, setLifeVision,
     aspirations, toggleAspiration,
     lifeStages, updateLifeStage,
-    assumptions,
+    assumptions, updateAssumptions,
   } = usePlannerStore();
 
   return (
@@ -56,62 +56,76 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
           We divide your plan into three stages. Adjust the boundaries to match your vision.
         </p>
 
-        {/* Visual timeline bar */}
+        {/* Visual timeline bar — always 100% wide; each segment is its share of all stage years */}
         <div className="flex rounded-2xl overflow-hidden mb-5 h-12 shadow-inner-soft">
-          {lifeStages.map((stage) => {
-            const span  = stage.endAge - stage.startAge + 1;
-            const total = assumptions.lifeExpectancy - person1.currentAge + 1;
-            const pct   = (span / total) * 100;
-            return (
-              <div
-                key={stage.id}
-                className="flex items-center justify-center text-white text-xs font-bold gap-1 transition-all"
-                style={{ width: `${pct}%`, backgroundColor: stage.color }}
-              >
-                <span>{stage.startAge}</span>
-                <span className="hidden sm:inline">— {stage.label}</span>
-              </div>
-            );
-          })}
+          {(() => {
+            const totalSpan = lifeStages.reduce((s, st) => s + (st.endAge - st.startAge + 1), 0);
+            return lifeStages.map((stage) => {
+              const span = stage.endAge - stage.startAge + 1;
+              const pct  = totalSpan > 0 ? (span / totalSpan) * 100 : 0;
+              return (
+                <div
+                  key={stage.id}
+                  className="flex items-center justify-center text-white text-xs font-bold gap-1 transition-all"
+                  style={{ width: `${pct}%`, backgroundColor: stage.color }}
+                >
+                  <span>{stage.startAge}</span>
+                  <span className="hidden sm:inline">— {stage.label}</span>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         <div className="space-y-3">
-          {lifeStages.map((stage, i) => (
-            <div key={stage.id} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-              <div className="w-3 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-              <input
-                type="text"
-                value={stage.label}
-                onChange={(e) => updateLifeStage(stage.id, { label: e.target.value })}
-                className="flex-1 font-semibold text-slate-800 bg-transparent border-0 border-b border-dashed border-slate-300 focus:outline-none focus:border-orange-400 text-sm"
-              />
-              <div className="flex items-center gap-1.5 text-sm text-slate-600 flex-shrink-0">
-                <span className="font-bold text-slate-800">{stage.startAge}</span>
-                <span className="text-slate-400">–</span>
-                {i < lifeStages.length - 1 ? (
-                  <input
-                    type="number"
-                    min={stage.startAge + 1}
-                    max={lifeStages[i + 1]?.endAge ?? 95}
-                    value={stage.endAge}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value);
-                      if (!isNaN(v)) {
+          {lifeStages.map((stage, i) => {
+            const isLast = i === lifeStages.length - 1;
+            return (
+              <div key={stage.id} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="w-3 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                <input
+                  type="text"
+                  value={stage.label}
+                  onChange={(e) => updateLifeStage(stage.id, { label: e.target.value })}
+                  className="flex-1 font-semibold text-slate-800 bg-transparent border-0 border-b border-dashed border-slate-300 focus:outline-none focus:border-orange-400 text-sm"
+                />
+                <div className="flex items-center gap-1.5 text-sm text-slate-600 flex-shrink-0">
+                  <span className="font-bold text-slate-800">{stage.startAge}</span>
+                  <span className="text-slate-400">–</span>
+                  {!isLast ? (
+                    <input
+                      type="number"
+                      min={stage.startAge + 1}
+                      value={stage.endAge}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (isNaN(v) || v <= stage.startAge) return;
                         updateLifeStage(stage.id, { endAge: v });
-                        updateLifeStage(lifeStages[i + 1].id, { startAge: v + 1 });
-                      }
-                    }}
-                    className="w-16 input-base text-center py-1 text-sm [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  />
-                ) : (
-                  <span className="font-bold text-slate-800">{stage.endAge}</span>
-                )}
+                        const next = lifeStages[i + 1];
+                        const newNextStart = v + 1;
+                        updateLifeStage(next.id, { startAge: newNextStart });
+                        // If this pushes the next stage's end backwards, extend it.
+                        // For the final stage, also extend the planning horizon to match.
+                        if (newNextStart > next.endAge) {
+                          const newEnd = newNextStart + 1;
+                          updateLifeStage(next.id, { endAge: newEnd });
+                          if (i + 1 === lifeStages.length - 1) {
+                            updateAssumptions({ lifeExpectancy: newEnd });
+                          }
+                        }
+                      }}
+                      className="w-16 input-base text-center py-1 text-sm [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                  ) : (
+                    <span className="font-bold text-slate-800">{stage.endAge}</span>
+                  )}
+                </div>
+                <span className="text-xs text-slate-400 hidden sm:block">
+                  {stage.endAge - stage.startAge + 1}yr
+                </span>
               </div>
-              <span className="text-xs text-slate-400 hidden sm:block">
-                {stage.endAge - stage.startAge + 1}yr
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
