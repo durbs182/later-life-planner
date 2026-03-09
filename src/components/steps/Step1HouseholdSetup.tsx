@@ -12,6 +12,7 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
     person2, setP2Name, setP2Dob,
     fiAge, setFiAge,
     assumptions, updateAssumptions,
+    rlssStandard, applyRlssTemplate,
   } = usePlannerStore();
 
   // Format a date value for display (age label)
@@ -43,7 +44,7 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
           {(['single', 'couple'] as const).map((m) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => { setMode(m); if (rlssStandard) applyRlssTemplate(rlssStandard); }}
               className={clsx(
                 'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 font-semibold transition-all',
                 mode === m
