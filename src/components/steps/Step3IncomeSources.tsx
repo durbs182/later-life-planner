@@ -188,8 +188,8 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
           <FieldRow label="Weekly amount" hint={<>Check your forecast at{' '}<a href="https://www.gov.uk/check-state-pension" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">gov.uk/check-state-pension</a></>}>
             <CurrencyInput value={src.statePension.weeklyAmount} onChange={(v) => set('statePension', { weeklyAmount: v })} max={300} step={1} />
           </FieldRow>
-          <FieldRow label="Start age" hint="Currently 66, rising to 67 by 2028">
-            <AgeStepper value={src.statePension.startAge} onChange={(v) => set('statePension', { startAge: v })} min={60} max={75} />
+          <FieldRow label="Start age" hint="Statutory minimum is 66, rising to 67 by 2028">
+            <AgeStepper value={src.statePension.startAge} onChange={(v) => set('statePension', { startAge: v })} min={66} max={75} />
           </FieldRow>
           <div className="py-2 text-xs text-sky-700 bg-sky-50 rounded-xl px-3">
             Annual: <strong>£{(src.statePension.weeklyAmount * 52).toLocaleString('en-GB')}</strong> · Indexed to inflation
@@ -524,7 +524,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
       <div className="game-card bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200">
         <h3 className="section-heading">Model assumptions</h3>
         <p className="text-xs text-slate-500 mb-4">Applied to all projections. Defaults are UK long-run averages.</p>
-        <div className="grid sm:grid-cols-2 gap-0">
+        <div className="grid sm:grid-cols-2 sm:gap-x-8">
           <FieldRow label="Investment growth" hint="Expected annual return on investments">
             <PctInput value={assumptions.investmentGrowth} onChange={(v) => updateAssumptions({ investmentGrowth: v })} />
           </FieldRow>
@@ -533,28 +533,12 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
           </FieldRow>
         </div>
 
-        {/* State Pension tax exemption toggle */}
+        {/* State Pension sole-income exemption — UI-hidden, code-controlled via assumptions.statePensionSoleIncomeExempt */}
         <div className="border-t border-slate-200 mt-3 pt-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-slate-700">State Pension sole-income exemption</p>
-              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                The UK government has stated that people whose only income is the State Pension will not pay income
-                tax on it. When on, the model exempts State Pension from tax in any year where it is a person&apos;s
-                sole taxable income. Turn off to model the risk that this policy is reversed.
-              </p>
-            </div>
-            <button
-              onClick={() => updateAssumptions({ statePensionSoleIncomeExempt: !(assumptions.statePensionSoleIncomeExempt ?? true) })}
-              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative mt-0.5 ${
-                (assumptions.statePensionSoleIncomeExempt ?? true) ? 'bg-emerald-500' : 'bg-slate-200'
-              }`}
-            >
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                (assumptions.statePensionSoleIncomeExempt ?? true) ? 'translate-x-6' : 'translate-x-0.5'
-              }`} />
-            </button>
-          </div>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            In the 2024 Autumn Budget the UK government confirmed that people whose only income is the State Pension
+            will not pay income tax on it. This plan reflects that commitment.
+          </p>
         </div>
       </div>
 
