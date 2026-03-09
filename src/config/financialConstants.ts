@@ -26,18 +26,19 @@ export const INCOME_TAX = {
   ADDITIONAL_RATE: 0.45,
 } as const;
 
-// ─── Capital Gains Tax 2024/25 ────────────────────────────────────────────────
+// ─── Capital Gains Tax ────────────────────────────────────────────────────────
 // Source: HMRC — https://www.gov.uk/capital-gains-tax/rates
-// Note: Annual exempt was cut from £6,000 (2023/24) to £3,000 (2024/25).
-// User-adjustable: No (HMRC-defined).
+// Rates on non-property assets raised in Autumn Budget 30 Oct 2024.
+// Annual exempt cut from £6,000 (2023/24) to £3,000 (2024/25).
+// User-adjustable: No (HMRC-defined). Update annually.
 
 export const CGT = {
   /** Annual exempt amount per person. Gains below this are not taxed. */
   ANNUAL_EXEMPT: 3_000,
-  /** CGT rate for basic-rate taxpayers on non-property assets. */
-  BASIC_RATE: 0.10,
-  /** CGT rate for higher-rate taxpayers on non-property assets. */
-  HIGHER_RATE: 0.20,
+  /** CGT rate for basic-rate taxpayers on non-property assets (from 30 Oct 2024). */
+  BASIC_RATE: 0.18,
+  /** CGT rate for higher-rate taxpayers on non-property assets (from 30 Oct 2024). */
+  HIGHER_RATE: 0.24,
   /** CGT rate for basic-rate taxpayers on residential property gains. */
   PROPERTY_BASIC_RATE: 0.18,
   /** CGT rate for higher-rate taxpayers on residential property gains. */

@@ -47,7 +47,7 @@ const BARS = [
   { key: 'isaDrawdown',   label: 'ISA',               color: '#10b981' },
   { key: 'giaDrawdown',   label: 'Investments (GIA)', color: '#84cc16' },
   { key: 'cashDrawdown',  label: 'Cash Savings',      color: '#f59e0b' },
-  { key: 'dcDrawdown',    label: 'Pension (UFPLS)',   color: '#f97316' },
+  { key: 'dcDrawdown',    label: 'DC Pension',        color: '#f97316' },
 ];
 
 const SHORTFALL_COLOR = '#ef4444';
