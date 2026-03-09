@@ -492,6 +492,30 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
             <PctInput value={assumptions.inflation} onChange={(v) => updateAssumptions({ inflation: v })} />
           </FieldRow>
         </div>
+
+        {/* State Pension tax exemption toggle */}
+        <div className="border-t border-slate-200 mt-3 pt-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">State Pension sole-income exemption</p>
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                The UK government has stated that people whose only income is the State Pension will not pay income
+                tax on it. When on, the model exempts State Pension from tax in any year where it is a person&apos;s
+                sole taxable income. Turn off to model the risk that this policy is reversed.
+              </p>
+            </div>
+            <button
+              onClick={() => updateAssumptions({ statePensionSoleIncomeExempt: !(assumptions.statePensionSoleIncomeExempt ?? true) })}
+              className={`flex-shrink-0 w-12 h-6 rounded-full transition-colors relative mt-0.5 ${
+                (assumptions.statePensionSoleIncomeExempt ?? true) ? 'bg-emerald-500' : 'bg-slate-200'
+              }`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                (assumptions.statePensionSoleIncomeExempt ?? true) ? 'translate-x-6' : 'translate-x-0.5'
+              }`} />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-between pt-4">

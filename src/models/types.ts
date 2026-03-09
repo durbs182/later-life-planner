@@ -161,6 +161,13 @@ export interface Assumptions {
   investmentGrowth: number;   // % p.a. — default from DEFAULT_ASSUMPTIONS
   inflation: number;          // % p.a. — default from DEFAULT_ASSUMPTIONS
   lifeExpectancy: number;     // Planning horizon age
+  /**
+   * When true, State Pension income is excluded from the taxable income
+   * calculation in years where it is the person's only taxable income source.
+   * Reflects the UK government's stated policy (2024) that sole-SP recipients
+   * will not pay income tax. Togglable because policy may change.
+   */
+  statePensionSoleIncomeExempt: boolean;
 }
 
 // ─── Top-level planner state ──────────────────────────────────────────────────

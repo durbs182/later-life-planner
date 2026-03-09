@@ -339,10 +339,20 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     // Joint GIA: capital gain split equally between both persons' CGT allowances
     const jointGainEach = jointGiaCG / 2;
 
-    const p1TaxBasis = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent
-                     + (p1DcD - p1DcTaxFree);
-    const p2TaxBasis = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective
-                     + (p2DcD - p2DcTaxFree);
+    // State Pension sole-income exemption:
+    // Per UK government policy (2024), a person whose only income is the State
+    // Pension will not pay income tax on it. When the assumption is enabled, we
+    // exclude SP from the tax basis for any person where it is their sole taxable
+    // income (i.e. all other taxable items are zero). The toggle exists because
+    // the policy may change.
+    const spExempt = assumptions.statePensionSoleIncomeExempt ?? true;
+    const p1OtherTaxable = p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent + (p1DcD - p1DcTaxFree);
+    const p2OtherTaxable = p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective + (p2DcD - p2DcTaxFree);
+    const p1SpTaxable = (spExempt && p1OtherTaxable === 0) ? 0 : p1Inc.sp;
+    const p2SpTaxable = (spExempt && p2OtherTaxable === 0) ? 0 : p2Inc.sp;
+
+    const p1TaxBasis = p1SpTaxable + p1OtherTaxable;
+    const p2TaxBasis = p2SpTaxable + p2OtherTaxable;
 
     const p1IncomeTax = calcIncomeTax(p1TaxBasis);
     const p2IncomeTax = calcIncomeTax(p2TaxBasis);
