@@ -125,9 +125,12 @@ function StatCard({ icon, label, value, sub, accent = 'slate' }: {
 // ─── Tax overview ──────────────────────────────────────────────────────────────
 
 function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
-  const now          = projections[0];
-  const lifetimeTax  = projections.reduce((s, p) => s + p.totalTaxPaid, 0);
-  const lifetimeCGT  = projections.reduce((s, p) => s + p.totalCgtPaid, 0);
+  const lifetimeIncomeTax = projections.reduce((s, p) => s + p.incomeTaxPaid, 0);
+  const lifetimeCGT       = projections.reduce((s, p) => s + p.totalCgtPaid, 0);
+  const lifetimeTotalTax  = lifetimeIncomeTax + lifetimeCGT;
+  const lifetimeIncome    = projections.reduce((s, p) => s + p.totalIncome, 0);
+  const taxFreeYears      = projections.filter(p => p.totalTaxPaid === 0).length;
+  const effectiveRate     = lifetimeIncome > 0 ? (lifetimeTotalTax / lifetimeIncome) * 100 : 0;
 
   return (
     <div className="game-card">
@@ -137,27 +140,25 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        <div className="rounded-2xl p-3 bg-sky-50 border border-sky-100">
-          <p className="text-xs text-sky-600 font-bold mb-1">Income tax (yr 1)</p>
-          <p className="text-xl font-black text-sky-800">{formatCurrency(now?.incomeTaxPaid ?? 0, true)}</p>
-          <p className="text-xs text-sky-500 mt-0.5">
-            {now && now.totalIncome > 0 ? `${((now.incomeTaxPaid / now.totalIncome) * 100).toFixed(1)}% effective` : '—'}
-          </p>
-        </div>
-        <div className="rounded-2xl p-3 bg-amber-50 border border-amber-100">
-          <p className="text-xs text-amber-600 font-bold mb-1">CGT (yr 1)</p>
-          <p className="text-xl font-black text-amber-800">{formatCurrency(now?.totalCgtPaid ?? 0, true)}</p>
-          <p className="text-xs text-amber-500 mt-0.5">on GIA gains</p>
-        </div>
         <div className="rounded-2xl p-3 bg-rose-50 border border-rose-100">
           <p className="text-xs text-rose-600 font-bold mb-1">Lifetime income tax</p>
-          <p className="text-xl font-black text-rose-800">{formatCurrency(lifetimeTax - lifetimeCGT, true)}</p>
-          <p className="text-xs text-rose-500 mt-0.5">all years</p>
+          <p className="text-xl font-black text-rose-800">{formatCurrency(lifetimeIncomeTax, true)}</p>
+          <p className="text-xs text-rose-500 mt-0.5">across all years</p>
         </div>
         <div className="rounded-2xl p-3 bg-amber-50 border border-amber-100">
           <p className="text-xs text-amber-600 font-bold mb-1">Lifetime CGT</p>
           <p className="text-xl font-black text-amber-800">{formatCurrency(lifetimeCGT, true)}</p>
-          <p className="text-xs text-amber-500 mt-0.5">all years</p>
+          <p className="text-xs text-amber-500 mt-0.5">on GIA gains</p>
+        </div>
+        <div className="rounded-2xl p-3 bg-emerald-50 border border-emerald-100">
+          <p className="text-xs text-emerald-600 font-bold mb-1">Tax-free years</p>
+          <p className="text-xl font-black text-emerald-800">{taxFreeYears}</p>
+          <p className="text-xs text-emerald-500 mt-0.5">of {projections.length} projected</p>
+        </div>
+        <div className="rounded-2xl p-3 bg-sky-50 border border-sky-100">
+          <p className="text-xs text-sky-600 font-bold mb-1">Effective rate</p>
+          <p className="text-xl font-black text-sky-800">{effectiveRate.toFixed(1)}%</p>
+          <p className="text-xs text-sky-500 mt-0.5">avg tax on income</p>
         </div>
       </div>
 
