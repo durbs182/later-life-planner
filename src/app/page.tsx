@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { usePlannerStore } from '@/store/plannerStore';
 import Header from '@/components/Header';
@@ -24,6 +25,10 @@ export default function Home() {
   const { currentStep, setCurrentStep } = usePlannerStore();
   const goNext = () => setCurrentStep(Math.min(currentStep + 1, STEPS.length - 1));
   const goBack = () => setCurrentStep(Math.max(currentStep - 1, 0));
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [currentStep]);
 
   return (
     <div className="min-h-screen flex flex-col bg-cream-100">
