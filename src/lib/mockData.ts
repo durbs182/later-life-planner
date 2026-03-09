@@ -23,7 +23,10 @@ export function ageFromDOB(dob: string, fallback: number = DEFAULT_ASSUMPTIONS.D
   let age = today.getFullYear() - birth.getFullYear();
   const m = today.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-  return Math.max(0, age);
+  // Guard against partial date input (e.g. browser fires with year "0001" while
+  // the user is still typing). An age outside 0–120 is not a real DOB yet.
+  if (age < 0 || age > 120) return fallback;
+  return age;
 }
 
 /**

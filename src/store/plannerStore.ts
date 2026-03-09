@@ -71,7 +71,8 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setP1Dob: (dateOfBirth) =>
         set((s) => {
           const age = ageFromDOB(dateOfBirth, s.person1.currentAge);
-          const fiAge = age >= s.fiAge ? age : s.fiAge;
+          const maxFiAge = s.assumptions.lifeExpectancy - 1;
+          const fiAge = Math.min(age >= s.fiAge ? age : s.fiAge, maxFiAge);
           return {
             person1: { ...s.person1, dateOfBirth, currentAge: age },
             fiAge,
@@ -85,7 +86,8 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       // Legacy age setter (used by slider fallback)
       setP1Age: (age) =>
         set((s) => {
-          const fiAge = age >= s.fiAge ? age : s.fiAge;
+          const maxFiAge = s.assumptions.lifeExpectancy - 1;
+          const fiAge = Math.min(age >= s.fiAge ? age : s.fiAge, maxFiAge);
           return {
             person1: { ...s.person1, currentAge: age },
             fiAge,
