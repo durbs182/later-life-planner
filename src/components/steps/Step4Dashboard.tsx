@@ -443,7 +443,7 @@ export default function Step4Dashboard({ onBack }: Props) {
                 </div>
               );
             })}
-            <p className="text-xs text-slate-400 pt-1">Go to Step 2 to adjust all categories across all life stages.</p>
+            <p className="text-xs text-slate-400 pt-1">Go to the Spending tab to adjust all categories across all life stages.</p>
           </div>
         )}
       </div>
