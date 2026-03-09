@@ -183,201 +183,233 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     const dc1 = person1.incomeSources.dcPension;
     const dc2 = person2.incomeSources.dcPension;
 
-    // ── Per-year UFPLS tax-free tracking ──────────────────────────────────
-    // Each DC withdrawal is 25% tax-free (UFPLS). The tax-free portion
-    // accumulates against the LSA. Calculated in the DC drawdown section below.
-    let p1DcTaxFree = 0;
-    let p2DcTaxFree = 0;
+    // ── Taxable fixed income per person (constant regardless of draw amounts) ──
+    const p1TaxableFixed = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent;
+    const p2TaxableFixed = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
+    const spExempt = assumptions.statePensionSoleIncomeExempt ?? true;
 
-    // ── Drawdown to cover gap (FI age onwards only) ───────────────────────
-    // All asset drawdown is deferred until FI age. Pre-FI spending is assumed
-    // to be covered by working income; entering part-time work income models
-    // the transition. Post-FI priority:
-    //   1. DC pension within personal allowance  (UFPLS, 0% effective tax)
-    //   2. GIA within annual CGT exempt amount   (steps up base cost, tax-free)
-    //   3. ISA                                   (always tax-free)
-    //   4. Remaining GIA                         (CGT taxable above exempt)
-    //   5. Cash                                  (tax-free withdrawal)
-    //   6. DC pension above personal allowance   (income tax at marginal rate)
-    let remaining = spending - fixedIncome;
+    // ── Save asset state after growth, before any drawdown ────────────────
+    // Needed to restore between gross-up iterations.
+    const preDrawSnap = {
+      p1Isa, p1GiaV, p1GiaBC, p1Cash, p1Dc,
+      p2Isa, p2GiaV, p2GiaBC, p2Cash, p2Dc,
+      jointGiaV, jointGiaBC,
+      p1LifetimePcls, p2LifetimePcls,
+    };
 
+    // ── Draw variables (declared outside loop; final-iteration values used below) ──
+    let p1DcTaxFree = 0, p2DcTaxFree = 0;
     let p1IsaD = 0, p1GiaD = 0, p1GiaCG = 0, p1CashD = 0, p1DcD = 0;
     let p2IsaD = 0, p2GiaD = 0, p2GiaCG = 0, p2CashD = 0, p2DcD = 0;
     let jointGiaD = 0, jointGiaCG = 0;
 
-    // Taxable fixed income per person — determines personal allowance headroom.
-    const p1TaxableFixed = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent;
-    const p2TaxableFixed = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
+    // ── Tax result variables (updated each iteration) ────────────────────────
+    let totalIncome = 0;
+    let jointGainEach = 0;
+    let p1OtherTaxable = 0, p2OtherTaxable = 0;
+    let p1SpTaxable = 0, p2SpTaxable = 0;
+    let p1TaxBasis = 0, p2TaxBasis = 0;
+    let p1IncomeTax = 0, p2IncomeTax = 0, incomeTaxPaid = 0;
+    let p1TotalCG = 0, p2TotalCG = 0;
+    let p1CgtPaid = 0, p2CgtPaid = 0, totalCgtPaid = 0;
+    let totalTaxPaid = 0;
 
-    if (remaining > 0) {
-      // ── Step 1: DC pension (UFPLS) up to personal allowance headroom ──────
-      // Before drawing tax-free ISA, use any unused personal allowance capacity.
-      // Each UFPLS withdrawal is 75% taxable; drawing up to the headroom keeps
-      // effective income tax at 0% and leaves the pension growing tax-free for longer.
-      // Only draws what is actually needed to cover spending (remaining).
-      if (p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
-        const p1Headroom = Math.max(0, INCOME_TAX.PERSONAL_ALLOWANCE - p1TaxableFixed);
-        const maxWithinAllowance = p1Headroom / (1 - PENSION_RULES.UFPLS_TAX_FREE_FRACTION);
-        const d = Math.min(maxWithinAllowance, p1Dc, remaining);
-        if (d > 0) {
-          p1DcD += d; p1Dc -= d; remaining -= d;
-          const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
-          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
-          p1DcTaxFree += tf; p1LifetimePcls += tf;
-        }
-      }
-      if (mode === 'couple' && remaining > 0 && p2Age !== null && p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
-        const p2Headroom = Math.max(0, INCOME_TAX.PERSONAL_ALLOWANCE - p2TaxableFixed);
-        const maxWithinAllowance = p2Headroom / (1 - PENSION_RULES.UFPLS_TAX_FREE_FRACTION);
-        const d = Math.min(maxWithinAllowance, p2Dc, remaining);
-        if (d > 0) {
-          p2DcD += d; p2Dc -= d; remaining -= d;
-          const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
-          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
-          p2DcTaxFree += tf; p2LifetimePcls += tf;
-        }
-      }
+    // ── Gross-up iteration ────────────────────────────────────────────────
+    // The waterfall draws enough gross income to cover the spending target.
+    // But tax on those draws reduces net income below spending. We iterate:
+    //   grossTarget = spending + taxFromPreviousPass
+    // This converges in 2–3 passes. When ISA/Cash cover the extra draw the
+    // tax is unchanged and convergence is exact in a single extra iteration.
+    // Post-FI priority:
+    //   1. DC within personal allowance  (UFPLS, 0% effective tax)
+    //   2. GIA within CGT exempt amount  (steps up base cost, tax-free)
+    //   3. ISA                           (always tax-free)
+    //   4. Remaining GIA                 (CGT taxable above exempt)
+    //   5. Cash                          (tax-free withdrawal)
+    //   6. DC above personal allowance   (income tax at marginal rate)
+    let grossTarget = spending;
 
-      // ── Step 2: GIA up to annual CGT exempt amount ────────────────────────
-      // Crystallising gains within the CGT allowance (£3,000/person) is tax-free
-      // and steps up the base cost — always worth doing when cash is needed.
-      // GIA drawdown is deferred until FI age to preserve the tax-efficient
-      // retirement waterfall — ISA/cash cover any pre-FI spending gap instead.
-      if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
-        const gainFrac = p1GiaV > p1GiaBC ? (p1GiaV - p1GiaBC) / p1GiaV : 0;
-        const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p1GiaV;
-        const d = Math.min(maxForCgt, p1GiaV, remaining);
-        if (d > 0) {
-          const r = drawFromGIA(p1GiaV, p1GiaBC, d);
+    for (let grossIter = 0; grossIter < 4; grossIter++) {
+      // ── Restore asset state ────────────────────────────────────────────
+      ({ p1Isa, p1GiaV, p1GiaBC, p1Cash, p1Dc,
+         p2Isa, p2GiaV, p2GiaBC, p2Cash, p2Dc,
+         jointGiaV, jointGiaBC,
+         p1LifetimePcls, p2LifetimePcls } = preDrawSnap);
+
+      // ── Reset draw accumulators ────────────────────────────────────────
+      p1DcTaxFree = 0; p2DcTaxFree = 0;
+      p1IsaD = 0; p1GiaD = 0; p1GiaCG = 0; p1CashD = 0; p1DcD = 0;
+      p2IsaD = 0; p2GiaD = 0; p2GiaCG = 0; p2CashD = 0; p2DcD = 0;
+      jointGiaD = 0; jointGiaCG = 0;
+
+      let remaining = grossTarget - fixedIncome;
+
+      if (remaining > 0) {
+        // ── Step 1: DC pension (UFPLS) up to personal allowance headroom ────
+        // Before drawing tax-free ISA, use any unused personal allowance capacity.
+        // Each UFPLS withdrawal is 75% taxable; drawing up to the headroom keeps
+        // effective income tax at 0% and leaves the pension growing tax-free for longer.
+        // Only draws what is actually needed to cover spending (remaining).
+        if (p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
+          const p1Headroom = Math.max(0, INCOME_TAX.PERSONAL_ALLOWANCE - p1TaxableFixed);
+          const maxWithinAllowance = p1Headroom / (1 - PENSION_RULES.UFPLS_TAX_FREE_FRACTION);
+          const d = Math.min(maxWithinAllowance, p1Dc, remaining);
+          if (d > 0) {
+            p1DcD += d; p1Dc -= d; remaining -= d;
+            const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
+            const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
+            p1DcTaxFree += tf; p1LifetimePcls += tf;
+          }
+        }
+        if (mode === 'couple' && remaining > 0 && p2Age !== null && p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
+          const p2Headroom = Math.max(0, INCOME_TAX.PERSONAL_ALLOWANCE - p2TaxableFixed);
+          const maxWithinAllowance = p2Headroom / (1 - PENSION_RULES.UFPLS_TAX_FREE_FRACTION);
+          const d = Math.min(maxWithinAllowance, p2Dc, remaining);
+          if (d > 0) {
+            p2DcD += d; p2Dc -= d; remaining -= d;
+            const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
+            const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
+            p2DcTaxFree += tf; p2LifetimePcls += tf;
+          }
+        }
+
+        // ── Step 2: GIA up to annual CGT exempt amount ──────────────────────
+        // Crystallising gains within the CGT allowance (£3,000/person) is tax-free
+        // and steps up the base cost — always worth doing when cash is needed.
+        // GIA drawdown is deferred until FI age to preserve the tax-efficient
+        // retirement waterfall — ISA/cash cover any pre-FI spending gap instead.
+        if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
+          const gainFrac = p1GiaV > p1GiaBC ? (p1GiaV - p1GiaBC) / p1GiaV : 0;
+          const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p1GiaV;
+          const d = Math.min(maxForCgt, p1GiaV, remaining);
+          if (d > 0) {
+            const r = drawFromGIA(p1GiaV, p1GiaBC, d);
+            p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
+            p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
+            remaining -= r.drawn;
+          }
+        }
+        if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
+          const gainFrac = p2GiaV > p2GiaBC ? (p2GiaV - p2GiaBC) / p2GiaV : 0;
+          const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p2GiaV;
+          const d = Math.min(maxForCgt, p2GiaV, remaining);
+          if (d > 0) {
+            const r = drawFromGIA(p2GiaV, p2GiaBC, d);
+            p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
+            p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
+            remaining -= r.drawn;
+          }
+        }
+        if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
+          // Joint GIA gains are split 50/50, so effective CGT capacity is 2× the individual allowance
+          const effectiveCgt = mode === 'couple' ? CGT.ANNUAL_EXEMPT * 2 : CGT.ANNUAL_EXEMPT;
+          const gainFrac = jointGiaV > jointGiaBC ? (jointGiaV - jointGiaBC) / jointGiaV : 0;
+          const maxForCgt = gainFrac > 0 ? effectiveCgt / gainFrac : jointGiaV;
+          const d = Math.min(maxForCgt, jointGiaV, remaining);
+          if (d > 0) {
+            const r = drawFromGIA(jointGiaV, jointGiaBC, d);
+            jointGiaD += r.drawn; jointGiaCG += r.capitalGain;
+            jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
+            remaining -= r.drawn;
+          }
+        }
+
+        // ── Step 3: ISA ─────────────────────────────────────────────────────
+        // Deferred until FI age — pre-FI spending is assumed covered by working
+        // income, preserving the ISA wrapper for tax-efficient retirement drawdown.
+        if (remaining > 0 && p1Isa > 0 && p1Age >= fiAge) {
+          const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
+        }
+        if (remaining > 0 && p2Isa > 0 && p2Age !== null && p2Age >= fiAge) {
+          const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
+        }
+
+        // ── Step 4: Remaining GIA (gains above CGT allowance, now taxable) ──
+        if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
+          const r = drawFromGIA(p1GiaV, p1GiaBC, remaining);
           p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
           p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
           remaining -= r.drawn;
         }
-      }
-      if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
-        const gainFrac = p2GiaV > p2GiaBC ? (p2GiaV - p2GiaBC) / p2GiaV : 0;
-        const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p2GiaV;
-        const d = Math.min(maxForCgt, p2GiaV, remaining);
-        if (d > 0) {
-          const r = drawFromGIA(p2GiaV, p2GiaBC, d);
+        if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
+          const r = drawFromGIA(p2GiaV, p2GiaBC, remaining);
           p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
           p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
           remaining -= r.drawn;
         }
-      }
-      if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
-        // Joint GIA gains are split 50/50, so effective CGT capacity is 2× the individual allowance
-        const effectiveCgt = mode === 'couple' ? CGT.ANNUAL_EXEMPT * 2 : CGT.ANNUAL_EXEMPT;
-        const gainFrac = jointGiaV > jointGiaBC ? (jointGiaV - jointGiaBC) / jointGiaV : 0;
-        const maxForCgt = gainFrac > 0 ? effectiveCgt / gainFrac : jointGiaV;
-        const d = Math.min(maxForCgt, jointGiaV, remaining);
-        if (d > 0) {
-          const r = drawFromGIA(jointGiaV, jointGiaBC, d);
+        if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
+          const r = drawFromGIA(jointGiaV, jointGiaBC, remaining);
           jointGiaD += r.drawn; jointGiaCG += r.capitalGain;
           jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
           remaining -= r.drawn;
         }
-      }
 
-      // ── Step 3: ISA ───────────────────────────────────────────────────────
-      // Deferred until FI age — pre-FI spending is assumed covered by working
-      // income, preserving the ISA wrapper for tax-efficient retirement drawdown.
-      if (remaining > 0 && p1Isa > 0 && p1Age >= fiAge) {
-        const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
-      }
-      if (remaining > 0 && p2Isa > 0 && p2Age !== null && p2Age >= fiAge) {
-        const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
-      }
-
-      // ── Step 4: Remaining GIA (gains above CGT allowance, now taxable) ────
-      if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
-        const r = drawFromGIA(p1GiaV, p1GiaBC, remaining);
-        p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
-        p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
-        remaining -= r.drawn;
-      }
-      if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
-        const r = drawFromGIA(p2GiaV, p2GiaBC, remaining);
-        p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
-        p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
-        remaining -= r.drawn;
-      }
-      if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
-        const r = drawFromGIA(jointGiaV, jointGiaBC, remaining);
-        jointGiaD += r.drawn; jointGiaCG += r.capitalGain;
-        jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
-        remaining -= r.drawn;
-      }
-
-      // ── Step 5: Cash ──────────────────────────────────────────────────────
-      if (remaining > 0 && p1Cash > 0 && p1Age >= fiAge) {
-        const d = Math.min(p1Cash, remaining); p1CashD = d; p1Cash -= d; remaining -= d;
-      }
-      if (remaining > 0 && p2Cash > 0 && p2Age !== null && p2Age >= fiAge) {
-        const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
-      }
-
-      // ── Step 6: DC pension — remaining gap (above personal allowance) ─────
-      // This portion is taxable at marginal rate (20%+). Only reached when all
-      // other sources are exhausted or the gap exceeds the personal allowance.
-      if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
-        const d = Math.min(p1Dc, remaining); p1DcD += d; p1Dc -= d; remaining -= d;
-        const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
-        const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
-        p1DcTaxFree += tf; p1LifetimePcls += tf;
-      }
-      if (remaining > 0 && mode === 'couple' && p2Age !== null) {
-        if (p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
-          const d = Math.min(p2Dc, remaining); p2DcD += d; p2Dc -= d; remaining -= d;
-          const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
-          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
-          p2DcTaxFree += tf; p2LifetimePcls += tf;
+        // ── Step 5: Cash ────────────────────────────────────────────────────
+        if (remaining > 0 && p1Cash > 0 && p1Age >= fiAge) {
+          const d = Math.min(p1Cash, remaining); p1CashD = d; p1Cash -= d; remaining -= d;
         }
+        if (remaining > 0 && p2Cash > 0 && p2Age !== null && p2Age >= fiAge) {
+          const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
+        }
+
+        // ── Step 6: DC pension — remaining gap (above personal allowance) ───
+        // This portion is taxable at marginal rate (20%+). Only reached when all
+        // other sources are exhausted or the gap exceeds the personal allowance.
+        if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
+          const d = Math.min(p1Dc, remaining); p1DcD += d; p1Dc -= d; remaining -= d;
+          const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
+          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
+          p1DcTaxFree += tf; p1LifetimePcls += tf;
+        }
+        if (remaining > 0 && mode === 'couple' && p2Age !== null) {
+          if (p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
+            const d = Math.min(p2Dc, remaining); p2DcD += d; p2Dc -= d; remaining -= d;
+            const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
+            const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
+            p2DcTaxFree += tf; p2LifetimePcls += tf;
+          }
+        }
+      } else {
+        // Surplus (fixed income already exceeds gross target) — park in P1 cash
+        p1Cash += Math.abs(remaining);
       }
-    } else {
-      // Surplus (fixed income already exceeds spending) — park in P1 cash
-      p1Cash += Math.abs(remaining);
+
+      // ── Compute tax for this iteration ──────────────────────────────────
+      totalIncome = fixedIncome
+                  + p1IsaD + p1GiaD + p1CashD + p1DcD
+                  + p2IsaD + p2GiaD + p2CashD + p2DcD
+                  + jointGiaD;
+
+      // UFPLS: each DC withdrawal is 25% tax-free (tracked per-year via p1DcTaxFree).
+      // Once the LSA is exhausted, p1DcTaxFree = 0 and the full withdrawal is taxable.
+      // Joint GIA: capital gain split equally between both persons' CGT allowances.
+      jointGainEach    = jointGiaCG / 2;
+      p1OtherTaxable   = p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent + (p1DcD - p1DcTaxFree);
+      p2OtherTaxable   = p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective + (p2DcD - p2DcTaxFree);
+      // State Pension sole-income exemption: per UK government policy (2024), SP is
+      // not taxed when it is the person's only income source.
+      p1SpTaxable      = (spExempt && p1OtherTaxable === 0) ? 0 : p1Inc.sp;
+      p2SpTaxable      = (spExempt && p2OtherTaxable === 0) ? 0 : p2Inc.sp;
+      p1TaxBasis       = p1SpTaxable + p1OtherTaxable;
+      p2TaxBasis       = p2SpTaxable + p2OtherTaxable;
+      p1IncomeTax      = calcIncomeTax(p1TaxBasis);
+      p2IncomeTax      = calcIncomeTax(p2TaxBasis);
+      incomeTaxPaid    = p1IncomeTax + p2IncomeTax;
+      p1TotalCG        = p1GiaCG + jointGainEach;
+      p2TotalCG        = p2GiaCG + jointGainEach;
+      p1CgtPaid        = calcCGT(p1TotalCG, isHigherRateTaxpayer(p1TaxBasis));
+      p2CgtPaid        = calcCGT(p2TotalCG, isHigherRateTaxpayer(p2TaxBasis));
+      totalCgtPaid     = p1CgtPaid + p2CgtPaid;
+      totalTaxPaid     = incomeTaxPaid + totalCgtPaid;
+
+      // ── Convergence check ─────────────────────────────────────────────────
+      // Once the target equals spending + this iteration's tax, net ≈ spending.
+      const newTarget = spending + totalTaxPaid;
+      if (Math.abs(newTarget - grossTarget) < 1) break;
+      grossTarget = newTarget;
     }
 
-    const totalIncome = fixedIncome
-                      + p1IsaD + p1GiaD + p1CashD + p1DcD
-                      + p2IsaD + p2GiaD + p2CashD + p2DcD
-                      + jointGiaD;
-
-    // ── Tax per person ────────────────────────────────────────────────────
-    // UFPLS: each DC withdrawal is 25% tax-free (tracked per-year via p1DcTaxFree).
-    // Once the LSA is exhausted, p1DcTaxFree = 0 and the full withdrawal is taxable.
-
-    // Joint GIA: capital gain split equally between both persons' CGT allowances
-    const jointGainEach = jointGiaCG / 2;
-
-    // State Pension sole-income exemption:
-    // Per UK government policy (2024), a person whose only income is the State
-    // Pension will not pay income tax on it. When the assumption is enabled, we
-    // exclude SP from the tax basis for any person where it is their sole taxable
-    // income (i.e. all other taxable items are zero). The toggle exists because
-    // the policy may change.
-    const spExempt = assumptions.statePensionSoleIncomeExempt ?? true;
-    const p1OtherTaxable = p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent + (p1DcD - p1DcTaxFree);
-    const p2OtherTaxable = p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective + (p2DcD - p2DcTaxFree);
-    const p1SpTaxable = (spExempt && p1OtherTaxable === 0) ? 0 : p1Inc.sp;
-    const p2SpTaxable = (spExempt && p2OtherTaxable === 0) ? 0 : p2Inc.sp;
-
-    const p1TaxBasis = p1SpTaxable + p1OtherTaxable;
-    const p2TaxBasis = p2SpTaxable + p2OtherTaxable;
-
-    const p1IncomeTax = calcIncomeTax(p1TaxBasis);
-    const p2IncomeTax = calcIncomeTax(p2TaxBasis);
-    const incomeTaxPaid = p1IncomeTax + p2IncomeTax;
-
-    // CGT per person: individual gain + half of joint GIA gain
-    const p1TotalCG = p1GiaCG + jointGainEach;
-    const p2TotalCG = p2GiaCG + jointGainEach;
-    const p1CgtPaid = calcCGT(p1TotalCG, isHigherRateTaxpayer(p1TaxBasis));
-    const p2CgtPaid = calcCGT(p2TotalCG, isHigherRateTaxpayer(p2TaxBasis));
-    const totalCgtPaid  = p1CgtPaid + p2CgtPaid;
-    const totalTaxPaid  = incomeTaxPaid + totalCgtPaid;
-    const netIncome     = totalIncome - totalTaxPaid;
+    const netIncome = totalIncome - totalTaxPaid;
 
     const clamp = (v: number) => Math.max(0, v);
 
