@@ -243,7 +243,7 @@ function ProjectionTable({ projections, lifeStages }: {
 
 export default function Step4Dashboard({ onBack }: Props) {
   const state = usePlannerStore();
-  const { mode, person1, person2, lifeStages, rlssStandard, updateSpendingAmount, spendingCategories, fiAge } = state;
+  const { mode, person1, person2, lifeStages, rlssStandard, spendingCategories, fiAge } = state;
 
   const projections   = useMemo(() => calculateProjections(state), [state]);
   // Income and spending only starts at FI age — filter for display, but keep full
@@ -260,8 +260,6 @@ export default function Step4Dashboard({ onBack }: Props) {
   const surplus       = depletionAge === null;
   const unrealisedGain  = getTotalUnrealisedGain(state);
   const gamification    = useMemo(() => calculateGamificationMetrics(state), [state]);
-
-  const [showAdjust, setShowAdjust] = useState(false);
 
   const p1Name = person1.name || (mode === 'couple' ? 'Partner 1' : 'You');
   const p2Name = person2.name || 'Partner 2';
@@ -412,48 +410,6 @@ export default function Step4Dashboard({ onBack }: Props) {
           )}
         </p>
         <AssetChart projections={displayProjections} />
-      </div>
-
-      {/* Quick adjust */}
-      <div className="game-card">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h3 className="section-heading mb-0">Quick-adjust spending</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Tweak key categories and see the charts update live.</p>
-          </div>
-          <button onClick={() => setShowAdjust(v => !v)} aria-expanded={showAdjust} className="text-sm text-orange-600 hover:text-orange-700 font-bold">
-            {showAdjust ? '▲ Hide' : '▼ Show'}
-          </button>
-        </div>
-        {showAdjust && (
-          <div className="border-t border-slate-100 pt-3 space-y-2">
-            {spendingCategories.slice(0, 8).map(cat => {
-              const val = cat.amounts[firstStageId] ?? 0;
-              const pct = (val / cat.maxValue) * 100;
-              return (
-                <div key={cat.id} className="py-2">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{cat.icon}</span>
-                      <span className="text-sm font-semibold text-slate-700">{cat.name}</span>
-                    </div>
-                    <span className="text-sm font-black text-orange-600">{formatCurrency(val, true)}</span>
-                  </div>
-                  <input type="range" min={0} max={cat.maxValue} step={100} value={val}
-                    onChange={(e) => updateSpendingAmount(cat.id, firstStageId, parseInt(e.target.value))}
-                    className="w-full"
-                    style={{ background: `linear-gradient(to right, #f97316 ${pct}%, #e2e8f0 ${pct}%)` }}
-                  />
-                </div>
-              );
-            })}
-            {spendingCategories.length > 8 && (
-              <p className="text-xs text-slate-400 pt-1">
-                Showing 8 of {spendingCategories.length} categories — go to the Spending tab to adjust all of them across every life stage.
-              </p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Tax strategy */}
