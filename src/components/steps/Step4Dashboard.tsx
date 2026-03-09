@@ -277,7 +277,7 @@ export default function Step4Dashboard({ onBack }: Props) {
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">plan</span>
         </h2>
         <p className="text-slate-500">
-          From age {fiAge}{mode === 'couple' ? ` / ${person2.currentAge + (fiAge - person1.currentAge)}` : ''} → {state.assumptions.lifeExpectancy} · nominal £
+          From age {fiAge} → {state.assumptions.lifeExpectancy} · nominal £
         </p>
       </div>
 
