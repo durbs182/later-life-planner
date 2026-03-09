@@ -91,11 +91,14 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
               return (
                 <div
                   key={stage.id}
-                  className="flex items-center justify-center text-white text-xs font-bold gap-1 transition-all"
+                  className="flex items-center justify-center text-white text-xs font-bold gap-1 transition-all overflow-hidden"
                   style={{ width: `${pct}%`, backgroundColor: stage.color }}
                 >
-                  <span>{stage.startAge}</span>
-                  <span className="hidden sm:inline">— {stage.label}</span>
+                  {pct >= 20 ? (
+                    <span className="truncate px-1">{stage.startAge} — {stage.label}</span>
+                  ) : pct >= 10 ? (
+                    <span className="truncate px-1">{stage.startAge}</span>
+                  ) : null}
                 </div>
               );
             });
