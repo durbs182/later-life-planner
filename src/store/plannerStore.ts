@@ -10,6 +10,7 @@ import {
   createDefaultState, createMockDemoState, buildDefaultLifeStages,
   buildCategoriesForRlss, ageFromDOB,
 } from '@/lib/mockData';
+import { STATE_PENSION } from '@/config/financialConstants';
 
 type Actions = {
   setCurrentStep: (step: number) => void;
@@ -48,7 +49,7 @@ type Actions = {
 export const usePlannerStore = create<PlannerState & Actions>()(
   persist(
     (set) => ({
-      ...createDefaultState(57),
+      ...createDefaultState(STATE_PENSION.DEFAULT_AGE),
 
       setCurrentStep: (step) => set((s) => ({
         currentStep: step,
@@ -174,7 +175,7 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setRlssStandard: (rlssStandard) => set({ rlssStandard }),
 
       loadDemo: () => set(createMockDemoState()),
-      resetPlan: () => set(createDefaultState(57)),
+      resetPlan: () => set(createDefaultState(STATE_PENSION.DEFAULT_AGE)),
     }),
     { name: 'life-planner-v6' }
   )
