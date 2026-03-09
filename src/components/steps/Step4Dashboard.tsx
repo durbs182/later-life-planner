@@ -20,54 +20,6 @@ interface Props { onBack: () => void }
 
 const STAGE_COLORS = { 'go-go': '#f97316', 'slo-go': '#10b981', 'no-go': '#8b5cf6' } as const;
 
-// ─── Lifestyle level indicator ─────────────────────────────────────────────────
-
-function LifestyleLevel({ mode, annualIncome, rlssStandard }: {
-  mode: 'single' | 'couple'; annualIncome: number; rlssStandard: string | null;
-}) {
-  const standards = RLSS_STANDARDS[mode];
-  const min = standards.minimum.annual;
-  const mod = standards.moderate.annual;
-  const com = standards.comfortable.annual;
-
-  let level = 0;
-  let levelLabel = 'Below Minimum';
-  let levelColor = 'text-slate-500';
-  let levelBg    = 'bg-slate-100';
-  if (annualIncome >= com)  { level = 3; levelLabel = 'Comfortable'; levelColor = 'text-emerald-700'; levelBg = 'bg-emerald-100'; }
-  else if (annualIncome >= mod) { level = 2; levelLabel = 'Moderate';    levelColor = 'text-sky-700';     levelBg = 'bg-sky-100'; }
-  else if (annualIncome >= min) { level = 1; levelLabel = 'Minimum';     levelColor = 'text-amber-700';   levelBg = 'bg-amber-100'; }
-
-  const pct = Math.min(100, (annualIncome / (com * 1.2)) * 100);
-
-  return (
-    <div className="game-card bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="section-heading mb-0">Lifestyle level — at FI age</h3>
-        <span className={clsx('text-sm font-black px-3 py-1 rounded-full', levelBg, levelColor)}>
-          {level === 0 ? '—' : ['', standards.minimum.emoji, standards.moderate.emoji, standards.comfortable.emoji][level]}{' '}
-          {levelLabel}
-        </span>
-      </div>
-      <div className="relative h-4 rounded-full bg-slate-100 overflow-hidden mb-2">
-        <div className="absolute inset-y-0 left-0 bg-slate-200 rounded-l-full"
-          style={{ width: `${(min / (com * 1.2)) * 100}%` }} />
-        <div className="absolute inset-y-0 bg-sky-100"
-          style={{ left: `${(min / (com * 1.2)) * 100}%`, width: `${((mod - min) / (com * 1.2)) * 100}%` }} />
-        <div className="absolute inset-y-0 bg-emerald-100"
-          style={{ left: `${(mod / (com * 1.2)) * 100}%`, width: `${((com - mod) / (com * 1.2)) * 100}%` }} />
-        <div className="absolute inset-y-0 w-1.5 bg-slate-800 rounded-full -translate-x-1/2 transition-all"
-          style={{ left: `${Math.min(97, pct)}%` }} />
-      </div>
-      <div className="flex justify-between text-xs text-slate-400">
-        <span>Min {formatCurrency(min, true)}</span>
-        <span>Mod {formatCurrency(mod, true)}</span>
-        <span>Com {formatCurrency(com, true)}</span>
-      </div>
-    </div>
-  );
-}
-
 // ─── Life stage timeline ───────────────────────────────────────────────────────
 
 function StageTimeline({ projections, lifeStages, p1Age }: {
@@ -327,9 +279,6 @@ export default function Step4Dashboard({ onBack }: Props) {
           </div>
         </div>
       )}
-
-      {/* Lifestyle level indicator */}
-      <LifestyleLevel mode={mode} annualIncome={firstYear?.netIncome ?? 0} rlssStandard={rlssStandard} />
 
       {/* Life stage timeline */}
       <StageTimeline projections={displayProjections} lifeStages={lifeStages} p1Age={fiAge} />
