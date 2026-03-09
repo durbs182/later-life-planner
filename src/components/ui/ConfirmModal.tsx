@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+
 interface Props {
   title: string;
   message: string;
@@ -9,6 +11,22 @@ interface Props {
 }
 
 export default function ConfirmModal({ title, message, confirmLabel = 'Confirm', onConfirm, onCancel }: Props) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Escape closes the modal from anywhere inside it
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onCancel();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  // Auto-focus Cancel (safe default) on open
+  useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
   return (
     <div
       role="dialog"
@@ -25,9 +43,8 @@ export default function ConfirmModal({ title, message, confirmLabel = 'Confirm',
         <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
         <div className="flex gap-2 justify-end">
           <button
-            autoFocus
+            ref={cancelRef}
             className="btn-ghost text-slate-500"
-            onKeyDown={(e) => e.key === 'Escape' && onCancel()}
             onClick={onCancel}
           >
             Cancel

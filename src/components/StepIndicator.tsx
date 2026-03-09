@@ -22,6 +22,7 @@ export default function StepIndicator({ steps, currentStep, onStepClick }: Props
             key={i}
             onClick={() => !locked && onStepClick(i)}
             disabled={locked}
+            aria-disabled={locked}
             className={clsx(
               'flex items-center gap-2 px-4 py-2 rounded-2xl text-sm font-semibold transition-all duration-200 flex-shrink-0',
               active  && 'bg-orange-500 text-white shadow-sm',

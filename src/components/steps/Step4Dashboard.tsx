@@ -12,8 +12,9 @@ import { RLSS_STANDARDS } from '@/lib/mockData';
 import type { YearlyProjection } from '@/lib/types';
 import clsx from 'clsx';
 
-const LifetimeChart = dynamic(() => import('@/components/charts/LifetimeChart'), { ssr: false });
-const AssetChart    = dynamic(() => import('@/components/charts/AssetChart'),    { ssr: false });
+const ChartSkeleton = () => <div className="h-64 bg-slate-100 rounded-2xl animate-pulse" />;
+const LifetimeChart = dynamic(() => import('@/components/charts/LifetimeChart'), { ssr: false, loading: ChartSkeleton });
+const AssetChart    = dynamic(() => import('@/components/charts/AssetChart'),    { ssr: false, loading: ChartSkeleton });
 
 interface Props { onBack: () => void }
 
@@ -417,7 +418,7 @@ export default function Step4Dashboard({ onBack }: Props) {
             <h3 className="section-heading mb-0">Quick-adjust spending</h3>
             <p className="text-xs text-slate-500 mt-0.5">Tweak key categories and see the charts update live.</p>
           </div>
-          <button onClick={() => setShowAdjust(v => !v)} className="text-sm text-orange-600 hover:text-orange-700 font-bold">
+          <button onClick={() => setShowAdjust(v => !v)} aria-expanded={showAdjust} className="text-sm text-orange-600 hover:text-orange-700 font-bold">
             {showAdjust ? '▲ Hide' : '▼ Show'}
           </button>
         </div>
@@ -443,7 +444,11 @@ export default function Step4Dashboard({ onBack }: Props) {
                 </div>
               );
             })}
-            <p className="text-xs text-slate-400 pt-1">Go to the Spending tab to adjust all categories across all life stages.</p>
+            {spendingCategories.length > 8 && (
+              <p className="text-xs text-slate-400 pt-1">
+                Showing 8 of {spendingCategories.length} categories — go to the Spending tab to adjust all of them across every life stage.
+              </p>
+            )}
           </div>
         )}
       </div>

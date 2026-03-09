@@ -156,6 +156,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
       )}>
         <button
           onClick={() => setShowAdvanced(p => !p)}
+          aria-expanded={showAdvanced}
           className="w-full flex items-center justify-between p-4 text-left"
         >
           <div className="flex items-center gap-3">
