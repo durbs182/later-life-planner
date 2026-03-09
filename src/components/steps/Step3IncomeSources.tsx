@@ -236,7 +236,7 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
             <span className="text-sm font-bold text-orange-600">Age {fiAge} <span className="font-normal text-slate-400">(your financial independence age)</span></span>
           </FieldRow>
           <div className="py-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3">
-            25% PCLS taken tax-free at crystallisation (HMRC maximum, fixed). Remaining pot drawn via UFPLS (25% of each withdrawal tax-free).
+            Drawn via UFPLS — each withdrawal is 25% tax-free and 75% taxable income. No lump sum taken upfront, so the full pot stays invested and tax-sheltered for longer. Before State Pension starts, the taxable portion is often absorbed by the personal allowance.
           </div>
         </SourceCard>
 

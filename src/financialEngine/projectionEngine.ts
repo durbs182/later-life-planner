@@ -10,19 +10,24 @@
  * - No React imports — this module is pure TypeScript
  * - Exported helpers (formatCurrency, etc.) are used by UI components
  *
- * PCLS model:
- *   In the year the DC pension is first drawn (drawdownAge), a Pension
- *   Commencement Lump Sum of 25% of the pot (HMRC maximum, fixed) is taken
- *   completely tax-free. PCLS is not user-configurable — it has no bearing on
- *   tax bands because it is entirely exempt from income tax. The remaining pot
- *   is then drawn via the UFPLS model (UFPLS_TAX_FREE_FRACTION of each
- *   subsequent withdrawal is tax-free).
+ * DC Pension drawdown model — UFPLS (Uncrystallised Funds Pension Lump Sum):
+ *   The engine uses a pure UFPLS strategy. No upfront PCLS lump sum is taken
+ *   at crystallisation. Instead, each DC pension withdrawal is 25% tax-free
+ *   and 75% taxable, spread naturally over the drawdown period.
  *
- *   PCLS is also subject to the HMRC Lump Sum Allowance (LSA) of £268,275.
- *   This is the maximum total tax-free cash a person can take from all pension
- *   schemes in their lifetime (introduced in Finance Act 2024 when the Lifetime
- *   Allowance was abolished). The PCLS taken is capped at
- *   min(25% of pot, remaining LSA for that person).
+ *   Rationale:
+ *   - Leaves the full pension pot invested (tax-free growth environment) for longer.
+ *   - Before the State Pension starts, the 75% taxable UFPLS portion can be
+ *     absorbed within the personal allowance (£12,570), making early draws
+ *     highly tax-efficient or completely tax-free.
+ *   - Avoids a large one-off lump sum being parked in cash where it earns less
+ *     and loses the pension's tax-free growth wrapper.
+ *
+ *   LSA tracking:
+ *   The Lump Sum Allowance (£268,275 per person) limits the total tax-free cash
+ *   taken from pensions in a lifetime (Finance Act 2024). The 25% tax-free
+ *   portion of each UFPLS withdrawal accumulates against the LSA. Once the LSA
+ *   is exhausted, subsequent DC withdrawals become fully taxable.
  *
  * Joint GIA:
  *   When a GIA has owner = 'joint', capital gains are split equally
@@ -131,10 +136,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   let careReserveBalance = (state.careReserve?.enabled && state.careReserve.amount > 0)
     ? state.careReserve.amount : 0;
 
-  // ── PCLS tracking — taken once at crystallisation, capped at LSA ────────
-  let p1PclsTaken = false;
-  let p2PclsTaken = false;
-  // Cumulative PCLS taken per person, tracked against the Lump Sum Allowance.
+  // ── Lifetime tax-free UFPLS tracking — accumulates against the LSA ─────
+  // The LSA (£268,275 per person) caps total tax-free cash from pensions.
+  // Each year's DC withdrawal contributes 25% tax-free to this running total.
+  // Once the LSA is exhausted, DC withdrawals become fully taxable.
   let p1LifetimePcls = 0;
   let p2LifetimePcls = 0;
 
@@ -174,34 +179,19 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     // Care reserve grows at the global investment growth rate (it's invested within the portfolio)
     if (careReserveBalance > 0) careReserveBalance *= (1 + investmentGrowth / 100);
 
-    // ── PCLS: one-off tax-free lump sum at crystallisation ────────────────
-    // Taken in the first year the DC pension becomes available. Reduces the
-    // pot immediately; treated as income this year (tax-free component).
-    let p1PclsAmount = 0;
-    let p2PclsAmount = 0;
-
+    // ── DC pension source handles ─────────────────────────────────────────
     const dc1 = person1.incomeSources.dcPension;
-    if (!p1PclsTaken && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
-      // Cap at min(25% of pot, remaining Lump Sum Allowance for this person)
-      const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
-      p1PclsAmount = Math.min(p1Dc * PENSION_RULES.PCLS_MAX_FRACTION, p1RemainingLsa);
-      p1LifetimePcls += p1PclsAmount;
-      p1Dc -= p1PclsAmount;
-      p1PclsTaken = true;
-    }
     const dc2 = person2.incomeSources.dcPension;
-    if (mode === 'couple' && !p2PclsTaken && p2Dc > 0 && dc2.enabled && p2Age !== null && p2Age >= fiAge) {
-      // Cap at min(25% of pot, remaining Lump Sum Allowance for this person)
-      const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
-      p2PclsAmount = Math.min(p2Dc * PENSION_RULES.PCLS_MAX_FRACTION, p2RemainingLsa);
-      p2LifetimePcls += p2PclsAmount;
-      p2Dc -= p2PclsAmount;
-      p2PclsTaken = true;
-    }
+
+    // ── Per-year UFPLS tax-free tracking ──────────────────────────────────
+    // Each DC withdrawal is 25% tax-free (UFPLS). The tax-free portion
+    // accumulates against the LSA. Calculated in the DC drawdown section below.
+    let p1DcTaxFree = 0;
+    let p2DcTaxFree = 0;
 
     // ── Drawdown to cover gap ─────────────────────────────────────────────
     // Priority: P1 ISA → P2 ISA → P1 GIA → P2 GIA → P1 Cash → P2 Cash → P1 DC → P2 DC
-    let remaining = spending - fixedIncome - p1PclsAmount - p2PclsAmount;
+    let remaining = spending - fixedIncome;
 
     let p1IsaD = 0, p1GiaD = 0, p1GiaCG = 0, p1CashD = 0, p1DcD = 0;
     let p2IsaD = 0, p2GiaD = 0, p2GiaCG = 0, p2CashD = 0, p2DcD = 0;
@@ -245,14 +235,20 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       if (remaining > 0 && p2Cash > 0) {
         const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
       }
-      // P1 DC Pension (UFPLS after PCLS)
+      // P1 DC Pension — UFPLS: 25% of each withdrawal is tax-free (tracked against LSA)
       if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
         const d = Math.min(p1Dc, remaining); p1DcD = d; p1Dc -= d; remaining -= d;
+        const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
+        p1DcTaxFree = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
+        p1LifetimePcls += p1DcTaxFree;
       }
-      // P2 DC Pension
+      // P2 DC Pension — UFPLS
       if (remaining > 0 && mode === 'couple' && p2Age !== null) {
         if (p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
           const d = Math.min(p2Dc, remaining); p2DcD = d; p2Dc -= d; remaining -= d;
+          const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
+          p2DcTaxFree = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
+          p2LifetimePcls += p2DcTaxFree;
         }
       }
     } else {
@@ -260,23 +256,22 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       p1Cash += Math.abs(remaining);
     }
 
-    const totalIncome = fixedIncome + p1PclsAmount + p2PclsAmount
+    const totalIncome = fixedIncome
                       + p1IsaD + p1GiaD + p1CashD + p1DcD
                       + p2IsaD + p2GiaD + p2CashD + p2DcD
                       + jointGiaD;
 
     // ── Tax per person ────────────────────────────────────────────────────
-    // PCLS is tax-free, so not included in tax basis.
-    // UFPLS: 75% of ongoing DC drawdown is taxable.
-    const taxFree = PENSION_RULES.UFPLS_TAX_FREE_FRACTION;
+    // UFPLS: each DC withdrawal is 25% tax-free (tracked per-year via p1DcTaxFree).
+    // Once the LSA is exhausted, p1DcTaxFree = 0 and the full withdrawal is taxable.
 
     // Joint GIA: capital gain split equally between both persons' CGT allowances
     const jointGainEach = jointGiaCG / 2;
 
     const p1TaxBasis = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent
-                     + p1DcD * (1 - taxFree);
+                     + (p1DcD - p1DcTaxFree);
     const p2TaxBasis = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective
-                     + p2DcD * (1 - taxFree);
+                     + (p2DcD - p2DcTaxFree);
 
     const p1IncomeTax = calcIncomeTax(p1TaxBasis);
     const p2IncomeTax = calcIncomeTax(p2TaxBasis);
@@ -311,7 +306,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       giaDrawdown:  p1GiaD  + p2GiaD + jointGiaD,
       cashDrawdown: p1CashD + p2CashD,
       dcDrawdown:   p1DcD   + p2DcD,
-      pclsAmount:   p1PclsAmount + p2PclsAmount,
+      dcTaxFreeDrawdown: p1DcTaxFree + p2DcTaxFree,
       propertyRent: p1Inc.rent + p2RentEffective,
 
       p1CapitalGain: p1GiaCG, p2CapitalGain: p2GiaCG,

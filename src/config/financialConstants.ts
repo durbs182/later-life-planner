@@ -76,27 +76,29 @@ export const RLSS = {
   },
 } as const;
 
-// ─── DC Pension: UFPLS / PCLS rules ──────────────────────────────────────────
+// ─── DC Pension: UFPLS rules ──────────────────────────────────────────────────
 // Source: HMRC pension rules
-// The app uses the UFPLS model for ongoing drawdown projections.
+// The app uses a pure UFPLS (Uncrystallised Funds Pension Lump Sum) strategy.
+// No upfront PCLS lump sum is taken at crystallisation — each withdrawal spreads
+// the 25% tax-free entitlement across the drawdown period, leaving the full pot
+// invested and tax-sheltered for longer.
 
 export const PENSION_RULES = {
   /**
    * Fraction of each UFPLS withdrawal that is tax-free.
    * Source: HMRC — 25% of each Uncrystallised Funds Pension Lump Sum is tax-free.
+   * The remaining 75% is taxable as income in the year of withdrawal.
+   * Before State Pension age, the 75% taxable portion can often be absorbed
+   * by the personal allowance, making early UFPLS draws highly tax-efficient.
    */
   UFPLS_TAX_FREE_FRACTION: 0.25,
-  /**
-   * Maximum fraction of DC pot that can be taken as a one-off tax-free PCLS
-   * (Pension Commencement Lump Sum) at crystallisation.
-   */
-  PCLS_MAX_FRACTION: 0.25,
   /**
    * Lifetime Lump Sum Allowance (LSA) — the maximum total tax-free cash a person
    * can take from all pension schemes in their lifetime.
    * Source: HMRC Finance Act 2024 — the LSA replaced the Lifetime Allowance.
    * £268,275 = 25% of the former standard Lifetime Allowance (£1,073,100).
-   * Any PCLS above this amount would be subject to income tax.
+   * The 25% tax-free UFPLS portion of each withdrawal accumulates against this limit.
+   * Once the LSA is exhausted, subsequent DC withdrawals are fully taxable.
    * Update annually if HMRC revises the LSA figure.
    */
   PCLS_LUMP_SUM_ALLOWANCE: 268_275,
@@ -165,11 +167,10 @@ export const CARE_RESERVE = {
 export const WITHDRAWAL_ORDER = [
   'personal_allowance', // Guaranteed income fills personal allowance first
   'cgt_allowance',      // Use CGT exempt amount on GIA disposals
-  'pcls',               // 25% pension tax-free lump sum at crystallisation
   'isa',                // ISA — fully tax-free at any time
   'gia',                // GIA — CGT on gains above annual exempt
   'cash',               // Cash savings — no tax on withdrawal
-  'dc_pension',         // Taxable pension drawdown (75% taxable via UFPLS)
+  'ufpls',              // DC pension via UFPLS — 25% tax-free per withdrawal, 75% taxable income
 ] as const;
 
 export type WithdrawalStep = typeof WITHDRAWAL_ORDER[number];

@@ -232,7 +232,8 @@ export interface YearlyProjection {
   giaDrawdown: number;
   cashDrawdown: number;
   dcDrawdown: number;
-  pclsAmount: number;
+  /** Tax-free portion of DC pension drawn via UFPLS this year (25% per withdrawal, capped at remaining LSA). */
+  dcTaxFreeDrawdown: number;
   propertyRent: number;
 
   // CGT

@@ -132,7 +132,7 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
     <div className="game-card">
       <h3 className="section-heading">Tax-efficient income strategy</h3>
       <p className="text-xs text-slate-500 mb-4">
-        Prioritised withdrawal order: personal allowance → CGT allowance → PCLS → ISA → taxable pension.
+        Prioritised withdrawal order: personal allowance → CGT allowance → ISA → GIA → cash → pension (UFPLS).
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
@@ -164,9 +164,9 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
         {[
           { n: 1, icon: '🏛️', label: 'Personal allowance first', desc: 'State Pension, DB and annuities fill £12,570 personal allowance — tax-free up to threshold.', color: 'bg-sky-50 border-sky-100' },
           { n: 2, icon: '📊', label: 'CGT allowance — GIA', desc: 'Use £3,000 annual exempt amount. Gains above taxed at 10% (basic) / 20% (higher).', color: 'bg-amber-50 border-amber-100' },
-          { n: 3, icon: '🏦', label: 'PCLS — pension tax-free cash', desc: 'Take up to 25% of DC pot as tax-free lump sum at crystallisation.', color: 'bg-violet-50 border-violet-100' },
-          { n: 4, icon: '✅', label: 'ISA withdrawals', desc: 'Completely tax-free. No income tax, no CGT, no personal allowance impact.', color: 'bg-emerald-50 border-emerald-100' },
-          { n: 5, icon: '💼', label: 'Taxable pension income', desc: '75% of DC drawdown beyond PCLS taxed as income. Maximise use of remaining personal allowance.', color: 'bg-slate-50 border-slate-100' },
+          { n: 3, icon: '✅', label: 'ISA withdrawals', desc: 'Completely tax-free. No income tax, no CGT, no personal allowance impact.', color: 'bg-emerald-50 border-emerald-100' },
+          { n: 4, icon: '📊', label: 'GIA & cash', desc: 'GIA gains taxed via CGT at 10%/20%. Cash withdrawals are tax-free. Both drawn before pension to preserve tax-sheltered growth.', color: 'bg-amber-50 border-amber-100' },
+          { n: 5, icon: '🏦', label: 'Pension via UFPLS', desc: 'Each withdrawal is 25% tax-free + 75% taxable income. Before State Pension starts, the 75% taxable portion is often absorbed by the personal allowance — making draws highly tax-efficient. The full pot stays invested and growing until drawn.', color: 'bg-violet-50 border-violet-100' },
         ].map(({ n, icon, label, desc, color }) => (
           <div key={n} className={clsx('flex gap-3 p-3 rounded-2xl border', color)}>
             <div className="w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center font-black text-xs flex-shrink-0 text-slate-700">
@@ -298,8 +298,8 @@ export default function Step4Dashboard({ onBack }: Props) {
         <StatCard icon="💰" label="Annual spending" value={formatCurrency(annualSpend, true)}
           sub={rlssStandard ? `${RLSS_STANDARDS[mode][rlssStandard].label} lifestyle` : "today's £"}
           accent="slate" />
-        <StatCard icon="📥" label={`Income at ${fiAge}`} value={formatCurrency(firstYear?.totalIncome ?? 0, true)}
-          sub={`${formatCurrency(firstYear?.netIncome ?? 0, true)} after tax`}
+        <StatCard icon="📥" label={`Income at ${fiAge}`} value={formatCurrency(firstYear?.netIncome ?? 0, true)}
+          sub="after tax — year 1"
           accent="sky" />
         <StatCard icon="🏦" label={`Assets at ${fiAge}`} value={formatCurrency(firstYear?.totalAssets ?? 0, true)}
           sub={unrealisedGain > 0 ? `${formatCurrency(unrealisedGain, true)} unrealised gain` : 'across all accounts'}
@@ -327,7 +327,7 @@ export default function Step4Dashboard({ onBack }: Props) {
       )}
 
       {/* Lifestyle level indicator */}
-      <LifestyleLevel mode={mode} annualIncome={firstYear?.totalIncome ?? 0} rlssStandard={rlssStandard} />
+      <LifestyleLevel mode={mode} annualIncome={firstYear?.netIncome ?? 0} rlssStandard={rlssStandard} />
 
       {/* Life stage timeline */}
       <StageTimeline projections={displayProjections} lifeStages={lifeStages} p1Age={fiAge} />

@@ -15,25 +15,18 @@ interface Props {
 }
 
 function toChartData(p: YearlyProjection) {
-  const statePension = Math.round(p.p1StatePension + p.p2StatePension);
-  const dbPension    = Math.round(p.p1DbPension    + p.p2DbPension);
-  const workIncome   = Math.round(p.p1PartTimeWork + p.p2PartTimeWork);
-  const propertyRent = Math.round(p.propertyRent);
-  const otherIncome  = Math.round(p.p1OtherIncome  + p.p2OtherIncome);
-  const isaDrawdown  = Math.round(p.isaDrawdown);
-  const giaDrawdown  = Math.round(p.giaDrawdown);
-  const cashDrawdown = Math.round(p.cashDrawdown);
-  const dcDrawdown   = Math.round(p.dcDrawdown);
-  // PCLS is a lump sum — only show the portion that fills the spending gap this year;
-  // the remainder is banked in cash for future years and should not inflate the bar.
-  const nonPcls = statePension + dbPension + workIncome + propertyRent + otherIncome
-                + isaDrawdown + giaDrawdown + cashDrawdown + dcDrawdown;
-  const pclsAmount = Math.max(0, Math.min(Math.round(p.pclsAmount), Math.max(0, Math.round(p.spending) - nonPcls)));
   return {
     age: p.p1Age, p2Age: p.p2Age,
-    statePension, dbPension, workIncome, propertyRent, otherIncome,
-    isaDrawdown, giaDrawdown, cashDrawdown, dcDrawdown, pclsAmount,
-    spending: Math.round(p.spending),
+    statePension: Math.round(p.p1StatePension + p.p2StatePension),
+    dbPension:    Math.round(p.p1DbPension    + p.p2DbPension),
+    workIncome:   Math.round(p.p1PartTimeWork + p.p2PartTimeWork),
+    propertyRent: Math.round(p.propertyRent),
+    otherIncome:  Math.round(p.p1OtherIncome  + p.p2OtherIncome),
+    isaDrawdown:  Math.round(p.isaDrawdown),
+    giaDrawdown:  Math.round(p.giaDrawdown),
+    cashDrawdown: Math.round(p.cashDrawdown),
+    dcDrawdown:   Math.round(p.dcDrawdown),
+    spending:     Math.round(p.spending),
   };
 }
 
@@ -46,8 +39,7 @@ const BARS = [
   { key: 'isaDrawdown',   label: 'ISA',               color: '#10b981' },
   { key: 'giaDrawdown',   label: 'Investments (GIA)', color: '#84cc16' },
   { key: 'cashDrawdown',  label: 'Cash Savings',      color: '#f59e0b' },
-  { key: 'pclsAmount',    label: 'Tax-Free Lump Sum', color: '#a855f7' },
-  { key: 'dcDrawdown',    label: 'Pension Drawdown',  color: '#ef4444' },
+  { key: 'dcDrawdown',    label: 'Pension (UFPLS)',   color: '#ef4444' },
 ];
 
 function formatY(v: number) { return v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`; }

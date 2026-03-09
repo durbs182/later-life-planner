@@ -129,22 +129,29 @@ An optional earmarked capital reserve for potential late-life care costs — sep
 - Guaranteed income: State Pension, Defined Benefit Pension, Annuities
 - Property income (owner: A/B/Joint)
 - Investment assets:
-  - Pension (DC): owner, current value, growth. PCLS is fixed at 25% (HMRC maximum) — NOT user-configurable. PCLS is entirely tax-free and has no bearing on income tax bands, so offering a variable % would be misleading.
-    - PCLS is also subject to the HMRC **Lump Sum Allowance (LSA)** of £268,275 per person (Finance Act 2024).
-      This is the maximum total tax-free cash a person can take from all pension schemes in their lifetime.
-      PCLS taken must be capped at `min(25% of pot, remaining LSA)`. Excess above the LSA is taxable as income.
-      The LSA is tracked cumulatively per person in the projection engine. Defined in `/config/financialConstants.ts` as `PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE`.
+  - Pension (DC): owner, current value, growth.
+    - **Drawdown strategy: pure UFPLS (Uncrystallised Funds Pension Lump Sum)** — no upfront PCLS lump sum is taken.
+      Each withdrawal is 25% tax-free and 75% taxable income, spread naturally over the drawdown period.
+      This leaves the full pot invested and growing in the tax-sheltered pension environment for longer.
+      Before State Pension starts, the 75% taxable UFPLS portion can typically be absorbed within the
+      personal allowance (£12,570), making early draws tax-efficient or completely free of income tax.
+    - The **Lump Sum Allowance (LSA)** of £268,275 per person (Finance Act 2024) caps total lifetime
+      tax-free cash from pensions. The 25% tax-free portion of each UFPLS withdrawal accumulates against
+      this limit. Once the LSA is exhausted, subsequent DC withdrawals are fully taxable.
+      Tracked cumulatively per person in the projection engine. Defined in `/config/financialConstants.ts`
+      as `PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE`.
   - ISA: owner, value, growth
   - GIA: owner (A/B/Joint), current value, base cost, growth. If joint, allow drawdown individually to optimise CGT per person
   - Cash savings: owner, balance
 
 ### Step 5 — Tax-Efficient Income Strategy
 - Withdrawal order:
-  1. Personal allowance
+  1. Personal allowance (guaranteed income fills this first)
   2. CGT allowance (GIA disposals)
-  3. Pension tax-free cash (PCLS)
-  4. ISA withdrawals
-  5. Taxable pension withdrawals
+  3. ISA withdrawals (fully tax-free)
+  4. GIA & cash (CGT on gains; cash is tax-free)
+  5. Pension via UFPLS (25% tax-free + 75% taxable per withdrawal — last to preserve tax-sheltered growth)
+- Before State Pension starts, UFPLS taxable portion is often within the personal allowance — zero income tax.
 - Optimised for couples: use both personal allowances and CGT allowances before taxable income
 - Allowances sourced from configuration, not hardcoded
 
