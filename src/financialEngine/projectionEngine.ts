@@ -233,7 +233,9 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       // ── Step 2: GIA up to annual CGT exempt amount ────────────────────────
       // Crystallising gains within the CGT allowance (£3,000/person) is tax-free
       // and steps up the base cost — always worth doing when cash is needed.
-      if (remaining > 0 && p1GiaV > 0) {
+      // GIA drawdown is deferred until FI age to preserve the tax-efficient
+      // retirement waterfall — ISA/cash cover any pre-FI spending gap instead.
+      if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
         const gainFrac = p1GiaV > p1GiaBC ? (p1GiaV - p1GiaBC) / p1GiaV : 0;
         const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p1GiaV;
         const d = Math.min(maxForCgt, p1GiaV, remaining);
@@ -244,7 +246,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
           remaining -= r.drawn;
         }
       }
-      if (remaining > 0 && p2GiaV > 0) {
+      if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
         const gainFrac = p2GiaV > p2GiaBC ? (p2GiaV - p2GiaBC) / p2GiaV : 0;
         const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p2GiaV;
         const d = Math.min(maxForCgt, p2GiaV, remaining);
@@ -255,7 +257,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
           remaining -= r.drawn;
         }
       }
-      if (remaining > 0 && jointGiaV > 0) {
+      if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
         // Joint GIA gains are split 50/50, so effective CGT capacity is 2× the individual allowance
         const effectiveCgt = mode === 'couple' ? CGT.ANNUAL_EXEMPT * 2 : CGT.ANNUAL_EXEMPT;
         const gainFrac = jointGiaV > jointGiaBC ? (jointGiaV - jointGiaBC) / jointGiaV : 0;
@@ -278,19 +280,19 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       }
 
       // ── Step 4: Remaining GIA (gains above CGT allowance, now taxable) ────
-      if (remaining > 0 && p1GiaV > 0) {
+      if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
         const r = drawFromGIA(p1GiaV, p1GiaBC, remaining);
         p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
         p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
-      if (remaining > 0 && p2GiaV > 0) {
+      if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
         const r = drawFromGIA(p2GiaV, p2GiaBC, remaining);
         p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
         p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
-      if (remaining > 0 && jointGiaV > 0) {
+      if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
         const r = drawFromGIA(jointGiaV, jointGiaBC, remaining);
         jointGiaD += r.drawn; jointGiaCG += r.capitalGain;
         jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
