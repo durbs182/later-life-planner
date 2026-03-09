@@ -40,7 +40,7 @@ import type {
   PersonIncomeSources, PersonAssets, SimulationResult,
   GamificationMetrics,
 } from '@/models/types';
-import { PENSION_RULES, RLSS } from '@/config/financialConstants';
+import { PENSION_RULES, INCOME_TAX, CGT, RLSS } from '@/config/financialConstants';
 import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer } from './taxCalculations';
 
 // ─── Per-person income aggregator ────────────────────────────────────────────
@@ -197,62 +197,133 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     let p2IsaD = 0, p2GiaD = 0, p2GiaCG = 0, p2CashD = 0, p2DcD = 0;
     let jointGiaD = 0, jointGiaCG = 0;
 
+    // Taxable fixed income per person — determines personal allowance headroom.
+    const p1TaxableFixed = p1Inc.sp + p1Inc.db + p1Inc.ptw + p1Inc.other + p1Inc.rent;
+    const p2TaxableFixed = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
+
     if (remaining > 0) {
-      // P1 ISA — completely tax-free
-      if (p1Isa > 0) {
+      // ── Step 1: DC pension (UFPLS) up to personal allowance headroom ──────
+      // Before drawing tax-free ISA, use any unused personal allowance capacity.
+      // Each UFPLS withdrawal is 75% taxable; drawing up to the headroom keeps
+      // effective income tax at 0% and leaves the pension growing tax-free for longer.
+      // Only draws what is actually needed to cover spending (remaining).
+      if (p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
+        const p1Headroom = Math.max(0, INCOME_TAX.PERSONAL_ALLOWANCE - p1TaxableFixed);
+        const maxWithinAllowance = p1Headroom / (1 - PENSION_RULES.UFPLS_TAX_FREE_FRACTION);
+        const d = Math.min(maxWithinAllowance, p1Dc, remaining);
+        if (d > 0) {
+          p1DcD += d; p1Dc -= d; remaining -= d;
+          const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
+          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
+          p1DcTaxFree += tf; p1LifetimePcls += tf;
+        }
+      }
+      if (mode === 'couple' && remaining > 0 && p2Age !== null && p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
+        const p2Headroom = Math.max(0, INCOME_TAX.PERSONAL_ALLOWANCE - p2TaxableFixed);
+        const maxWithinAllowance = p2Headroom / (1 - PENSION_RULES.UFPLS_TAX_FREE_FRACTION);
+        const d = Math.min(maxWithinAllowance, p2Dc, remaining);
+        if (d > 0) {
+          p2DcD += d; p2Dc -= d; remaining -= d;
+          const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
+          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
+          p2DcTaxFree += tf; p2LifetimePcls += tf;
+        }
+      }
+
+      // ── Step 2: GIA up to annual CGT exempt amount ────────────────────────
+      // Crystallising gains within the CGT allowance (£3,000/person) is tax-free
+      // and steps up the base cost — always worth doing when cash is needed.
+      if (remaining > 0 && p1GiaV > 0) {
+        const gainFrac = p1GiaV > p1GiaBC ? (p1GiaV - p1GiaBC) / p1GiaV : 0;
+        const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p1GiaV;
+        const d = Math.min(maxForCgt, p1GiaV, remaining);
+        if (d > 0) {
+          const r = drawFromGIA(p1GiaV, p1GiaBC, d);
+          p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
+          p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
+          remaining -= r.drawn;
+        }
+      }
+      if (remaining > 0 && p2GiaV > 0) {
+        const gainFrac = p2GiaV > p2GiaBC ? (p2GiaV - p2GiaBC) / p2GiaV : 0;
+        const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p2GiaV;
+        const d = Math.min(maxForCgt, p2GiaV, remaining);
+        if (d > 0) {
+          const r = drawFromGIA(p2GiaV, p2GiaBC, d);
+          p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
+          p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
+          remaining -= r.drawn;
+        }
+      }
+      if (remaining > 0 && jointGiaV > 0) {
+        // Joint GIA gains are split 50/50, so effective CGT capacity is 2× the individual allowance
+        const effectiveCgt = mode === 'couple' ? CGT.ANNUAL_EXEMPT * 2 : CGT.ANNUAL_EXEMPT;
+        const gainFrac = jointGiaV > jointGiaBC ? (jointGiaV - jointGiaBC) / jointGiaV : 0;
+        const maxForCgt = gainFrac > 0 ? effectiveCgt / gainFrac : jointGiaV;
+        const d = Math.min(maxForCgt, jointGiaV, remaining);
+        if (d > 0) {
+          const r = drawFromGIA(jointGiaV, jointGiaBC, d);
+          jointGiaD += r.drawn; jointGiaCG += r.capitalGain;
+          jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
+          remaining -= r.drawn;
+        }
+      }
+
+      // ── Step 3: ISA ───────────────────────────────────────────────────────
+      if (remaining > 0 && p1Isa > 0) {
         const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
       }
-      // P2 ISA
       if (remaining > 0 && p2Isa > 0) {
         const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
       }
-      // P1 GIA — proportional CGT
+
+      // ── Step 4: Remaining GIA (gains above CGT allowance, now taxable) ────
       if (remaining > 0 && p1GiaV > 0) {
         const r = drawFromGIA(p1GiaV, p1GiaBC, remaining);
-        p1GiaD = r.drawn; p1GiaCG = r.capitalGain;
+        p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
         p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
-      // P2 GIA (individual)
       if (remaining > 0 && p2GiaV > 0) {
         const r = drawFromGIA(p2GiaV, p2GiaBC, remaining);
-        p2GiaD = r.drawn; p2GiaCG = r.capitalGain;
+        p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
         p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
-      // Joint GIA — gains split 50/50 between both persons' CGT allowances
       if (remaining > 0 && jointGiaV > 0) {
         const r = drawFromGIA(jointGiaV, jointGiaBC, remaining);
-        jointGiaD = r.drawn; jointGiaCG = r.capitalGain;
+        jointGiaD += r.drawn; jointGiaCG += r.capitalGain;
         jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
         remaining -= r.drawn;
       }
-      // P1 Cash
+
+      // ── Step 5: Cash ──────────────────────────────────────────────────────
       if (remaining > 0 && p1Cash > 0) {
         const d = Math.min(p1Cash, remaining); p1CashD = d; p1Cash -= d; remaining -= d;
       }
-      // P2 Cash
       if (remaining > 0 && p2Cash > 0) {
         const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
       }
-      // P1 DC Pension — UFPLS: 25% of each withdrawal is tax-free (tracked against LSA)
+
+      // ── Step 6: DC pension — remaining gap (above personal allowance) ─────
+      // This portion is taxable at marginal rate (20%+). Only reached when all
+      // other sources are exhausted or the gap exceeds the personal allowance.
       if (remaining > 0 && p1Dc > 0 && dc1.enabled && p1Age >= fiAge) {
-        const d = Math.min(p1Dc, remaining); p1DcD = d; p1Dc -= d; remaining -= d;
+        const d = Math.min(p1Dc, remaining); p1DcD += d; p1Dc -= d; remaining -= d;
         const p1RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p1LifetimePcls);
-        p1DcTaxFree = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
-        p1LifetimePcls += p1DcTaxFree;
+        const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p1RemainingLsa);
+        p1DcTaxFree += tf; p1LifetimePcls += tf;
       }
-      // P2 DC Pension — UFPLS
       if (remaining > 0 && mode === 'couple' && p2Age !== null) {
         if (p2Dc > 0 && dc2.enabled && p2Age >= fiAge) {
-          const d = Math.min(p2Dc, remaining); p2DcD = d; p2Dc -= d; remaining -= d;
+          const d = Math.min(p2Dc, remaining); p2DcD += d; p2Dc -= d; remaining -= d;
           const p2RemainingLsa = Math.max(0, PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE - p2LifetimePcls);
-          p2DcTaxFree = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
-          p2LifetimePcls += p2DcTaxFree;
+          const tf = Math.min(d * PENSION_RULES.UFPLS_TAX_FREE_FRACTION, p2RemainingLsa);
+          p2DcTaxFree += tf; p2LifetimePcls += tf;
         }
       }
     } else {
-      // Surplus: park in P1 cash
+      // Surplus (fixed income already exceeds spending) — park in P1 cash
       p1Cash += Math.abs(remaining);
     }
 

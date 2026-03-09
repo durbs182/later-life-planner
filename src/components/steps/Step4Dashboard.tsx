@@ -132,7 +132,7 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
     <div className="game-card">
       <h3 className="section-heading">Tax-efficient income strategy</h3>
       <p className="text-xs text-slate-500 mb-4">
-        Prioritised withdrawal order: personal allowance → CGT allowance → ISA → GIA → cash → pension (UFPLS).
+        Each year draws only what is needed for spending — in the most tax-efficient order possible.
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
@@ -162,11 +162,11 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
 
       <div className="space-y-2">
         {[
-          { n: 1, icon: '🏛️', label: 'Personal allowance first', desc: 'State Pension, DB and annuities fill £12,570 personal allowance — tax-free up to threshold.', color: 'bg-sky-50 border-sky-100' },
-          { n: 2, icon: '📊', label: 'CGT allowance — GIA', desc: 'Use £3,000 annual exempt amount. Gains above taxed at 10% (basic) / 20% (higher).', color: 'bg-amber-50 border-amber-100' },
-          { n: 3, icon: '✅', label: 'ISA withdrawals', desc: 'Completely tax-free. No income tax, no CGT, no personal allowance impact.', color: 'bg-emerald-50 border-emerald-100' },
-          { n: 4, icon: '📊', label: 'GIA & cash', desc: 'GIA gains taxed via CGT at 10%/20%. Cash withdrawals are tax-free. Both drawn before pension to preserve tax-sheltered growth.', color: 'bg-amber-50 border-amber-100' },
-          { n: 5, icon: '🏦', label: 'Pension via UFPLS', desc: 'Each withdrawal is 25% tax-free + 75% taxable income. Before State Pension starts, the 75% taxable portion is often absorbed by the personal allowance — making draws highly tax-efficient. The full pot stays invested and growing until drawn.', color: 'bg-violet-50 border-violet-100' },
+          { n: 1, icon: '🏦', label: 'Pension (UFPLS) — within personal allowance', desc: 'Unused personal allowance (£12,570) is filled first by UFPLS pension draws. The 75% taxable portion sits within the allowance → 0% income tax. Prioritised over ISA so pension keeps growing tax-free for longer.', color: 'bg-violet-50 border-violet-100' },
+          { n: 2, icon: '📊', label: 'GIA — within CGT exempt amount', desc: 'Gains up to £3,000/person crystallised tax-free, stepping up the base cost. Only drawn when needed for spending.', color: 'bg-amber-50 border-amber-100' },
+          { n: 3, icon: '✅', label: 'ISA', desc: 'Completely tax-free. Used after personal allowance and CGT allowance have been maximised.', color: 'bg-emerald-50 border-emerald-100' },
+          { n: 4, icon: '💰', label: 'Remaining GIA & cash', desc: 'GIA gains above the exempt amount taxed at 10% (basic) / 20% (higher rate). Cash withdrawals are always tax-free.', color: 'bg-sky-50 border-sky-100' },
+          { n: 5, icon: '💼', label: 'Pension — above personal allowance', desc: 'Remaining gap covered by pension drawdown. The 75% taxable portion now attracts income tax at marginal rate. Only reached when other sources are exhausted or the spending gap is large.', color: 'bg-slate-50 border-slate-100' },
         ].map(({ n, icon, label, desc, color }) => (
           <div key={n} className={clsx('flex gap-3 p-3 rounded-2xl border', color)}>
             <div className="w-6 h-6 rounded-full bg-white shadow-sm flex items-center justify-center font-black text-xs flex-shrink-0 text-slate-700">

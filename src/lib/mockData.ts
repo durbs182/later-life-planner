@@ -189,7 +189,8 @@ export function createMockDemoState(): PlannerState {
     mode: 'couple',
     fiAge: 65,
     lifeStages: buildDefaultLifeStages(65, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
-    rlssStandard: 'comfortable',
+    rlssStandard: 'moderate',
+    spendingCategories: buildCategoriesForRlss('moderate', 'couple'),
     person1: {
       name: 'Alex',
       dateOfBirth: dobFromAge(57),

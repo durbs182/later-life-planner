@@ -145,15 +145,16 @@ An optional earmarked capital reserve for potential late-life care costs — sep
   - Cash savings: owner, balance
 
 ### Step 5 — Tax-Efficient Income Strategy
-- Withdrawal order:
-  1. Personal allowance (guaranteed income fills this first)
-  2. CGT allowance (GIA disposals)
-  3. ISA withdrawals (fully tax-free)
-  4. GIA & cash (CGT on gains; cash is tax-free)
-  5. Pension via UFPLS (25% tax-free + 75% taxable per withdrawal — last to preserve tax-sheltered growth)
-- Before State Pension starts, UFPLS taxable portion is often within the personal allowance — zero income tax.
-- Optimised for couples: use both personal allowances and CGT allowances before taxable income
-- Allowances sourced from configuration, not hardcoded
+- Withdrawal order (tax-optimised):
+  1. **DC pension via UFPLS up to personal allowance headroom** — the 75% taxable UFPLS portion fills any unused personal allowance before touching the ISA. This is the highest-priority draw when allowance capacity exists, because it costs 0% effective tax and preserves the ISA for later.
+  2. **GIA up to annual CGT exempt amount** (£3,000/person) — crystallises gains tax-free and steps up the base cost. Only draws what is needed.
+  3. **ISA** — fully tax-free.
+  4. **Remaining GIA** — gains above the CGT allowance are now taxable.
+  5. **Cash savings** — tax-free on withdrawal.
+  6. **DC pension (remaining gap)** — any amount above the personal allowance is taxable at marginal rate.
+- No more is drawn than required to cover the year's spending — no surplus drawdowns.
+- Optimised for couples: both personal allowances and CGT allowances used before taxable income.
+- All allowances sourced from `/config/financialConstants.ts`, not hardcoded.
 
 ### Step 6 — Dashboard / Lifetime Timeline
 - Visualisation of income sources, spending, assets by age
