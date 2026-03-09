@@ -300,8 +300,8 @@ export default function Step4Dashboard({ onBack }: Props) {
         <StatCard icon="💰" label="Annual spending" value={formatCurrency(annualSpend, true)}
           sub={rlssStandard ? `${RLSS_STANDARDS[mode][rlssStandard].label} lifestyle` : "today's £"}
           accent="slate" />
-        <StatCard icon="📥" label={`Income at ${fiAge}`} value={formatCurrency(firstYear?.netIncome ?? 0, true)}
-          sub="after tax — year 1"
+        <StatCard icon="📥" label={`Income at ${fiAge}`} value={formatCurrency(firstYear?.totalIncome ?? 0, true)}
+          sub={firstYear && firstYear.totalTaxPaid > 0 ? `${formatCurrency(firstYear.totalTaxPaid, true)} tax — year 1` : 'year 1'}
           accent="sky" />
         <StatCard icon="🏦" label={`Assets at ${fiAge}`} value={formatCurrency(firstYear?.totalAssets ?? 0, true)}
           sub={unrealisedGain > 0 ? `${formatCurrency(unrealisedGain, true)} unrealised gain` : 'across all accounts'}
