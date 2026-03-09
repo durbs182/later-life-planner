@@ -188,7 +188,10 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
 
 // ─── Projection table ──────────────────────────────────────────────────────────
 
-function ProjectionTable({ projections }: { projections: YearlyProjection[] }) {
+function ProjectionTable({ projections, lifeStages }: {
+  projections: YearlyProjection[];
+  lifeStages: { label: string; color: string }[];
+}) {
   const [showAll, setShowAll] = useState(false);
   const rows = showAll ? projections : projections.filter((_, i) => i % 5 === 0);
   return (
@@ -200,21 +203,20 @@ function ProjectionTable({ projections }: { projections: YearlyProjection[] }) {
           <thead>
             <tr className="border-b border-slate-100 text-right">
               {['Age', 'Stage', 'Spending', 'Income', 'Tax', 'Net', 'Assets'].map((h, i) => (
-                <th key={h} className={clsx('pb-2 pr-3 last:pr-0 font-bold text-slate-500', i === 0 && 'text-left')}>{h}</th>
+                <th key={h} className={clsx('pb-2 pr-3 last:pr-0 font-bold text-slate-500', i <= 1 && 'text-left')}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map(p => {
-              const stageColor = STAGE_COLORS[p.lifeStage as keyof typeof STAGE_COLORS] ?? '#94a3b8';
+              const stageColor = lifeStages.find(s => s.label === p.lifeStage)?.color ?? '#94a3b8';
               return (
                 <tr key={p.p1Age} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                   <td className="py-2 pr-3 font-black text-slate-800">
                     {p.p1Age}{p.p2Age !== null && <span className="text-slate-400 font-normal text-xs">/{p.p2Age}</span>}
                   </td>
-                  <td className="py-2 pr-3">
-                    <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: stageColor }} />
-                    <span className="text-xs text-slate-400">{p.lifeStage}</span>
+                  <td className="py-2 pr-3 whitespace-nowrap">
+                    <span className="text-xs font-semibold" style={{ color: stageColor }}>{p.lifeStage}</span>
                   </td>
                   <td className="py-2 pr-3 text-right text-slate-600">{formatCurrency(p.spending, true)}</td>
                   <td className="py-2 pr-3 text-right font-semibold text-slate-800">{formatCurrency(p.totalIncome, true)}</td>
@@ -457,7 +459,7 @@ export default function Step4Dashboard({ onBack }: Props) {
       <TaxOverview projections={displayProjections} />
 
       {/* Projection table */}
-      <ProjectionTable projections={displayProjections} />
+      <ProjectionTable projections={displayProjections} lifeStages={lifeStages} />
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 justify-between pt-2 no-print">
