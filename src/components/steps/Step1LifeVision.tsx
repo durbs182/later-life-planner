@@ -30,28 +30,34 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
     assumptions, updateAssumptions,
   } = usePlannerStore();
 
-  // Each non-last stage must leave at least 1 year for every stage that follows it.
-  // e.g. with 3 stages and lifeExpectancy 95:
-  //   Go-Go  max endAge = 95 - 2 = 93  (leaves 1yr for Slo-Go, 1yr for No-Go)
-  //   Slo-Go max endAge = 95 - 1 = 94  (leaves 1yr for No-Go)
+  // Max endAge for a non-last stage: must leave 1 year for every stage that follows.
   function maxEndAge(stageIndex: number): number {
-    const stagesAfter = lifeStages.length - 1 - stageIndex;
-    return assumptions.lifeExpectancy - stagesAfter;
+    return assumptions.lifeExpectancy - (lifeStages.length - 1 - stageIndex);
   }
 
   function handleEndAge(stageIndex: number, newEndAge: number) {
     const stage = lifeStages[stageIndex];
     if (newEndAge <= stage.startAge) return;
     if (newEndAge > maxEndAge(stageIndex)) return;
+
+    // Apply the change and cascade through every downstream stage so all
+    // startAge/endAge values stay consistent with each other.
     updateLifeStage(stage.id, { endAge: newEndAge });
-    const next = lifeStages[stageIndex + 1];
-    const newNextStart = newEndAge + 1;
-    updateLifeStage(next.id, { startAge: newNextStart });
-    // If the next stage's start has been pushed past its end, pull its end up too
-    // (capped at its own max so it doesn't steal space from stages further down)
-    if (newNextStart > next.endAge) {
-      const newNextEnd = Math.min(newNextStart, maxEndAge(stageIndex + 1));
-      updateLifeStage(next.id, { endAge: newNextEnd });
+
+    let prevEnd = newEndAge;
+    for (let j = stageIndex + 1; j < lifeStages.length; j++) {
+      const s = lifeStages[j];
+      const newStart = prevEnd + 1;
+      const isLast = j === lifeStages.length - 1;
+      if (isLast) {
+        // Last stage: endAge is fixed (= lifeExpectancy); only startAge moves.
+        updateLifeStage(s.id, { startAge: newStart });
+      } else {
+        // Non-last: if the push compresses this stage, extend its end (capped at its max).
+        const newEnd = Math.max(s.endAge, Math.min(newStart, maxEndAge(j)));
+        updateLifeStage(s.id, { startAge: newStart, endAge: newEnd });
+        prevEnd = newEnd;
+      }
     }
   }
 
@@ -109,38 +115,44 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
           {lifeStages.map((stage, i) => {
             const isLast = i === lifeStages.length - 1;
             return (
-              <div key={stage.id} className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                <div className="w-3 h-10 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
-                <input
-                  type="text"
-                  value={stage.label}
-                  onChange={(e) => updateLifeStage(stage.id, { label: e.target.value })}
-                  className="flex-1 font-semibold text-slate-800 bg-transparent border-0 border-b border-dashed border-slate-300 focus:outline-none focus:border-orange-400 text-sm"
-                />
-                <div className="flex items-center gap-1.5 text-sm flex-shrink-0">
-                  <span className="font-bold text-slate-800">{stage.startAge}</span>
-                  <span className="text-slate-400">–</span>
-                  {!isLast ? (
-                    <div className="flex items-center gap-1">
+              <div key={stage.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                {/* Label row */}
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                  <input
+                    type="text"
+                    value={stage.label}
+                    onChange={(e) => updateLifeStage(stage.id, { label: e.target.value })}
+                    className="flex-1 font-semibold text-slate-800 bg-transparent border-0 border-b border-dashed border-slate-300 focus:outline-none focus:border-orange-400 text-sm"
+                  />
+                  <span className="text-xs text-slate-400 flex-shrink-0">
+                    {stage.endAge - stage.startAge + 1}yr
+                  </span>
+                </div>
+                {/* Age controls row */}
+                <div className="flex items-center justify-between pl-6">
+                  <span className="text-sm text-slate-500">
+                    Ages <span className="font-bold text-slate-700">{stage.startAge}</span> – <span className="font-bold text-slate-700">{stage.endAge}</span>
+                  </span>
+                  {!isLast && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">End at</span>
                       <button
+                        type="button"
                         onClick={() => handleEndAge(i, stage.endAge - 1)}
                         disabled={stage.endAge <= stage.startAge + 1}
-                        className="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-base leading-none flex items-center justify-center transition-colors"
+                        className="w-9 h-9 rounded-xl bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg leading-none flex items-center justify-center transition-colors select-none"
                       >−</button>
-                      <span className="w-9 text-center font-black text-slate-800 tabular-nums">{stage.endAge}</span>
+                      <span className="w-8 text-center font-black text-slate-800 tabular-nums">{stage.endAge}</span>
                       <button
+                        type="button"
                         onClick={() => handleEndAge(i, stage.endAge + 1)}
                         disabled={stage.endAge >= maxEndAge(i)}
-                        className="w-7 h-7 rounded-lg bg-slate-200 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-base leading-none flex items-center justify-center transition-colors"
+                        className="w-9 h-9 rounded-xl bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg leading-none flex items-center justify-center transition-colors select-none"
                       >+</button>
                     </div>
-                  ) : (
-                    <span className="font-bold text-slate-800">{stage.endAge}</span>
                   )}
                 </div>
-                <span className="text-xs text-slate-400 hidden sm:block">
-                  {stage.endAge - stage.startAge + 1}yr
-                </span>
               </div>
             );
           })}
