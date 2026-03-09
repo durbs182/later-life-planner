@@ -55,7 +55,10 @@ export const usePlannerStore = create<PlannerState & Actions>()(
         currentStep: step,
         maxVisitedStep: Math.max(s.maxVisitedStep, step),
       })),
-      setMode: (mode) => set({ mode }),
+      setMode: (mode) => set((s) => ({
+        mode,
+        spendingCategories: buildCategoriesForRlss(s.rlssStandard ?? 'minimum', mode),
+      })),
 
       // FI age setter — rebuilds life stages anchored to new FI age
       setFiAge: (fiAge) =>
