@@ -11,7 +11,7 @@ interface Props { onNext: () => void; onBack: () => void }
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
-function FieldRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function FieldRow({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-100 last:border-0">
       <div>
@@ -30,8 +30,27 @@ function AgeInput({ value, onChange, min = 50, max = 90, label = 'Age' }: {
     <div className="flex items-center gap-2">
       <span className="text-sm text-slate-500">{label}</span>
       <input type="number" min={min} max={max} value={value}
-        onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) onChange(v); }}
+        onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v))); }}
         className="w-20 input-base text-center py-1.5 text-sm" />
+    </div>
+  );
+}
+
+function AgeStepper({ value, onChange, min, max, label }: {
+  value: number; onChange: (v: number) => void; min: number; max: number; label?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {label && <span className="text-sm text-slate-500">{label}</span>}
+      <button type="button" onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        className="w-9 h-9 rounded-xl bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg leading-none flex items-center justify-center transition-colors select-none"
+      >−</button>
+      <span className="w-10 text-center font-black text-slate-800 tabular-nums text-sm">{value}</span>
+      <button type="button" onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        className="w-9 h-9 rounded-xl bg-slate-200 hover:bg-slate-300 active:bg-slate-400 disabled:opacity-30 disabled:cursor-not-allowed font-bold text-lg leading-none flex items-center justify-center transition-colors select-none"
+      >+</button>
     </div>
   );
 }
@@ -131,9 +150,10 @@ function PriorityGroup({ number, title, subtitle, badge, badgeClass, children }:
 
 // ─── Income section ───────────────────────────────────────────────────────────
 
-function IncomeSection({ currentAge, fiAge, src, assets, set }: {
+function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: {
   currentAge: number;
   fiAge: number;
+  lifeExpectancy: number;
   src: PersonIncomeSources;
   assets: PersonAssets;
   set: (key: keyof PersonIncomeSources, u: Record<string, unknown>) => void;
@@ -160,7 +180,7 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
         </SourceCard>
 
         <SourceCard icon="📜" title="Annuity"
-          desc="Purchased annuity — guaranteed income for life or a fixed term"
+          desc="Purchased annuity — guaranteed income for life (fixed-term annuities coming soon)"
           enabled={annuity.enabled} onToggle={(v) => set('annuity', { enabled: v })}
         >
           <FieldRow label="Annual income">
@@ -178,7 +198,7 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
           desc="UK new State Pension — up to £221.20/week (2024/25)"
           enabled={src.statePension.enabled} onToggle={(v) => set('statePension', { enabled: v })}
         >
-          <FieldRow label="Weekly amount" hint="Check your forecast at gov.uk/check-state-pension">
+          <FieldRow label="Weekly amount" hint={<>Check your forecast at{' '}<a href="https://www.gov.uk/check-state-pension" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">gov.uk/check-state-pension</a></>}>
             <CurrencyInput value={src.statePension.weeklyAmount} onChange={(v) => set('statePension', { weeklyAmount: v })} max={300} step={1} />
           </FieldRow>
           <FieldRow label="Start age" hint="Currently 66, rising to 67 by 2028">
@@ -236,7 +256,7 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
             <span className="text-sm font-bold text-orange-600">Age {fiAge} <span className="font-normal text-slate-400">(your financial independence age)</span></span>
           </FieldRow>
           <div className="py-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3">
-            Each withdrawal is 25% tax-free and 75% taxable income. The full pot stays invested until needed. Before State Pension starts, the taxable portion is often absorbed by the personal allowance — making early draws highly tax-efficient.
+            Each withdrawal is 25% tax-free and 75% taxable income. The full pot stays invested until needed. Before State Pension starts, the taxable portion is often absorbed by the personal allowance — making early withdrawals highly tax-efficient.
           </div>
         </SourceCard>
 
@@ -265,10 +285,43 @@ function IncomeSection({ currentAge, fiAge, src, assets, set }: {
             <CurrencyInput value={src.otherIncome.annualAmount} onChange={(v) => set('otherIncome', { annualAmount: v })} max={200000} step={500} />
           </FieldRow>
           <FieldRow label="From age">
-            <AgeInput value={src.otherIncome.startAge} onChange={(v) => set('otherIncome', { startAge: v })} min={currentAge} max={90} />
+            <AgeStepper
+              value={src.otherIncome.startAge}
+              onChange={(v) => {
+                const newStart = v;
+                const updates: Record<string, unknown> = { startAge: newStart };
+                // If stopAge is set and now <= newStart, push it forward
+                if (src.otherIncome.stopAge > 0 && src.otherIncome.stopAge <= newStart) {
+                  updates.stopAge = Math.min(newStart + 1, lifeExpectancy);
+                }
+                set('otherIncome', updates);
+              }}
+              min={currentAge}
+              max={lifeExpectancy - 1}
+            />
           </FieldRow>
-          <FieldRow label="Stop at age" hint="0 = indefinite">
-            <AgeInput value={src.otherIncome.stopAge} onChange={(v) => set('otherIncome', { stopAge: v })} min={0} max={110} />
+          <FieldRow label="To age">
+            <div className="flex items-center gap-3">
+              {src.otherIncome.stopAge > 0 ? (
+                <AgeStepper
+                  value={src.otherIncome.stopAge}
+                  onChange={(v) => set('otherIncome', { stopAge: v })}
+                  min={src.otherIncome.startAge + 1}
+                  max={lifeExpectancy}
+                />
+              ) : (
+                <span className="text-sm text-slate-500 italic">Indefinite</span>
+              )}
+              <button
+                type="button"
+                onClick={() => set('otherIncome', {
+                  stopAge: src.otherIncome.stopAge > 0 ? 0 : Math.min(src.otherIncome.startAge + 5, lifeExpectancy),
+                })}
+                className="text-xs text-slate-400 hover:text-orange-500 underline transition-colors"
+              >
+                {src.otherIncome.stopAge > 0 ? 'Set indefinite' : 'Set end age'}
+              </button>
+            </div>
           </FieldRow>
         </SourceCard>
       </PriorityGroup>
@@ -383,7 +436,7 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label, sharedGia, onShare
           <FieldRow label="Duration (years from now)">
             <div className="flex items-center gap-2">
               <input type="number" min={1} max={50} value={property.durationYears}
-                onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) set('property', { durationYears: v }); }}
+                onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) set('property', { durationYears: Math.min(50, Math.max(1, v)) }); }}
                 className="w-20 input-base text-center py-1.5 text-sm" />
               <span className="text-sm text-slate-500">years</span>
             </div>
@@ -470,7 +523,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
 
       {/* Content */}
       {activeTab === 'income' ? (
-        <IncomeSection currentAge={person.currentAge} fiAge={fiAge} src={person.incomeSources} assets={person.assets} set={setIncome} />
+        <IncomeSection currentAge={person.currentAge} fiAge={fiAge} lifeExpectancy={assumptions.lifeExpectancy} src={person.incomeSources} assets={person.assets} set={setIncome} />
       ) : (
         <AssetsSection
           assets={person.assets} set={setAsset} mode={mode}
