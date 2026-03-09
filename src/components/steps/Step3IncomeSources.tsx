@@ -23,19 +23,6 @@ function FieldRow({ label, hint, children }: { label: string; hint?: React.React
   );
 }
 
-function AgeInput({ value, onChange, min = 50, max = 90, label = 'Age' }: {
-  value: number; onChange: (v: number) => void; min?: number; max?: number; label?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm text-slate-500">{label}</span>
-      <input type="number" min={min} max={max} value={value}
-        onChange={(e) => { const v = parseInt(e.target.value); if (!isNaN(v)) onChange(Math.min(max, Math.max(min, v))); }}
-        className="w-20 input-base text-center py-1.5 text-sm" />
-    </div>
-  );
-}
-
 function AgeStepper({ value, onChange, min, max, label }: {
   value: number; onChange: (v: number) => void; min: number; max: number; label?: string;
 }) {
@@ -55,10 +42,10 @@ function AgeStepper({ value, onChange, min, max, label }: {
   );
 }
 
-function PctInput({ value, onChange, label = 'Growth' }: { value: number; onChange: (v: number) => void; label?: string }) {
+function PctInput({ value, onChange, label }: { value: number; onChange: (v: number) => void; label?: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-slate-500">{label}</span>
+      {label && <span className="text-sm text-slate-500">{label}</span>}
       <div className="relative">
         <input type="number" min={0} max={15} step={0.5} value={value}
           onChange={(e) => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(v); }}
@@ -175,7 +162,7 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
             <CurrencyInput value={src.dbPension.annualIncome} onChange={(v) => set('dbPension', { annualIncome: v })} max={100000} step={100} />
           </FieldRow>
           <FieldRow label="Start age">
-            <AgeInput value={src.dbPension.startAge} onChange={(v) => set('dbPension', { startAge: v })} min={55} max={75} />
+            <AgeStepper value={src.dbPension.startAge} onChange={(v) => set('dbPension', { startAge: v })} min={55} max={75} />
           </FieldRow>
         </SourceCard>
 
@@ -187,7 +174,7 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
             <CurrencyInput value={annuity.annualIncome} onChange={(v) => set('annuity', { annualIncome: v })} max={100000} step={100} />
           </FieldRow>
           <FieldRow label="Starts at age">
-            <AgeInput value={annuity.startAge} onChange={(v) => set('annuity', { startAge: v })} min={55} max={85} />
+            <AgeStepper value={annuity.startAge} onChange={(v) => set('annuity', { startAge: v })} min={55} max={85} />
           </FieldRow>
           <div className="py-2 text-xs text-sky-700 bg-sky-50 rounded-xl px-3">
             Annuity income is taxable — modelled alongside DB pension and State Pension.
@@ -202,7 +189,7 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
             <CurrencyInput value={src.statePension.weeklyAmount} onChange={(v) => set('statePension', { weeklyAmount: v })} max={300} step={1} />
           </FieldRow>
           <FieldRow label="Start age" hint="Currently 66, rising to 67 by 2028">
-            <AgeInput value={src.statePension.startAge} onChange={(v) => set('statePension', { startAge: v })} min={60} max={75} />
+            <AgeStepper value={src.statePension.startAge} onChange={(v) => set('statePension', { startAge: v })} min={60} max={75} />
           </FieldRow>
           <div className="py-2 text-xs text-sky-700 bg-sky-50 rounded-xl px-3">
             Annual: <strong>£{(src.statePension.weeklyAmount * 52).toLocaleString('en-GB')}</strong> · Indexed to inflation
@@ -268,7 +255,7 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
             <CurrencyInput value={src.partTimeWork.annualIncome} onChange={(v) => set('partTimeWork', { annualIncome: v })} max={150000} step={500} />
           </FieldRow>
           <FieldRow label="Work optional from age">
-            <AgeInput value={src.partTimeWork.stopAge} onChange={(v) => set('partTimeWork', { stopAge: v })} min={currentAge + 1} max={80} />
+            <AgeStepper value={src.partTimeWork.stopAge} onChange={(v) => set('partTimeWork', { stopAge: v })} min={currentAge + 1} max={80} />
           </FieldRow>
         </SourceCard>
 
