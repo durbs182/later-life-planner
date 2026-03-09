@@ -189,8 +189,16 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     let p1DcTaxFree = 0;
     let p2DcTaxFree = 0;
 
-    // ── Drawdown to cover gap ─────────────────────────────────────────────
-    // Priority: P1 ISA → P2 ISA → P1 GIA → P2 GIA → P1 Cash → P2 Cash → P1 DC → P2 DC
+    // ── Drawdown to cover gap (FI age onwards only) ───────────────────────
+    // All asset drawdown is deferred until FI age. Pre-FI spending is assumed
+    // to be covered by working income; entering part-time work income models
+    // the transition. Post-FI priority:
+    //   1. DC pension within personal allowance  (UFPLS, 0% effective tax)
+    //   2. GIA within annual CGT exempt amount   (steps up base cost, tax-free)
+    //   3. ISA                                   (always tax-free)
+    //   4. Remaining GIA                         (CGT taxable above exempt)
+    //   5. Cash                                  (tax-free withdrawal)
+    //   6. DC pension above personal allowance   (income tax at marginal rate)
     let remaining = spending - fixedIncome;
 
     let p1IsaD = 0, p1GiaD = 0, p1GiaCG = 0, p1CashD = 0, p1DcD = 0;
@@ -272,10 +280,12 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       }
 
       // ── Step 3: ISA ───────────────────────────────────────────────────────
-      if (remaining > 0 && p1Isa > 0) {
+      // Deferred until FI age — pre-FI spending is assumed covered by working
+      // income, preserving the ISA wrapper for tax-efficient retirement drawdown.
+      if (remaining > 0 && p1Isa > 0 && p1Age >= fiAge) {
         const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
       }
-      if (remaining > 0 && p2Isa > 0) {
+      if (remaining > 0 && p2Isa > 0 && p2Age !== null && p2Age >= fiAge) {
         const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
       }
 
@@ -300,10 +310,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       }
 
       // ── Step 5: Cash ──────────────────────────────────────────────────────
-      if (remaining > 0 && p1Cash > 0) {
+      if (remaining > 0 && p1Cash > 0 && p1Age >= fiAge) {
         const d = Math.min(p1Cash, remaining); p1CashD = d; p1Cash -= d; remaining -= d;
       }
-      if (remaining > 0 && p2Cash > 0) {
+      if (remaining > 0 && p2Cash > 0 && p2Age !== null && p2Age >= fiAge) {
         const d = Math.min(p2Cash, remaining); p2CashD = d; p2Cash -= d; remaining -= d;
       }
 
