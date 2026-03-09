@@ -213,8 +213,8 @@ function ProjectionTable({ projections, lifeStages }: {
               const stageColor = lifeStages.find(s => s.label === p.lifeStage)?.color ?? '#94a3b8';
               return (
                 <tr key={p.p1Age} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                  <td className="py-2 pr-3 font-black text-slate-800">
-                    {p.p1Age}{p.p2Age !== null && <span className="text-slate-400 font-normal text-xs">/{p.p2Age}</span>}
+                  <td className="py-2 pr-3 text-sm text-slate-700">
+                    {p.p1Age}{p.p2Age !== null && <span>/{p.p2Age}</span>}
                   </td>
                   <td className="py-2 pr-3 whitespace-nowrap">
                     <span className="text-xs font-semibold" style={{ color: stageColor }}>{p.lifeStage}</span>
