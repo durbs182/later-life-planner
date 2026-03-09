@@ -1,39 +1,72 @@
 'use client';
 
+import { useState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+
+type PendingAction = 'reset' | 'demo' | null;
 
 export default function Header() {
   const { loadDemo, resetPlan } = usePlannerStore();
+  const [pending, setPending] = useState<PendingAction>(null);
+
+  function handleConfirm() {
+    if (pending === 'reset') resetPlan();
+    if (pending === 'demo') loadDemo();
+    setPending(null);
+  }
 
   return (
-    <header className="bg-white/80 backdrop-blur-sm border-b border-orange-100/60 no-print sticky top-0 z-20">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-hero rounded-2xl flex items-center justify-center shadow-sm">
-            <span className="text-lg">🌅</span>
+    <>
+      <header className="bg-white/80 backdrop-blur-sm border-b border-orange-100/60 no-print sticky top-0 z-20">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-gradient-hero rounded-2xl flex items-center justify-center shadow-sm">
+              <span className="text-lg">🌅</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">LifePlan</h1>
+              <p className="text-xs text-slate-400 leading-tight hidden sm:block">Design the life you want</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">LifePlan</h1>
-            <p className="text-xs text-slate-400 leading-tight hidden sm:block">Design the life you want</p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={loadDemo}
-            className="btn-ghost text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-            title="Load a sample scenario to explore"
-          >
-            ✨ Demo
-          </button>
-          <button
-            onClick={() => { if (confirm('Reset your plan and start fresh?')) resetPlan(); }}
-            className="btn-ghost text-slate-400 hover:text-rose-500"
-          >
-            Reset
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPending('demo')}
+              className="btn-ghost text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+              title="Load a sample scenario to explore"
+            >
+              ✨ Demo
+            </button>
+            <button
+              onClick={() => setPending('reset')}
+              className="btn-ghost text-slate-400 hover:text-rose-500"
+            >
+              Reset
+            </button>
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {pending === 'reset' && (
+        <ConfirmModal
+          title="Reset your plan?"
+          message="This will clear all your data and start fresh. This cannot be undone."
+          confirmLabel="Reset plan"
+          onConfirm={handleConfirm}
+          onCancel={() => setPending(null)}
+        />
+      )}
+
+      {pending === 'demo' && (
+        <ConfirmModal
+          title="Load the demo scenario?"
+          message="This will replace your current plan with sample data. Any data you've entered will be lost."
+          confirmLabel="Load demo"
+          onConfirm={handleConfirm}
+          onCancel={() => setPending(null)}
+        />
+      )}
+    </>
   );
 }
