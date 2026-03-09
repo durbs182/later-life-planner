@@ -7,16 +7,17 @@ interface Step { label: string; description: string }
 interface Props {
   steps: Step[];
   currentStep: number;
+  maxVisitedStep: number;
   onStepClick: (i: number) => void;
 }
 
-export default function StepIndicator({ steps, currentStep, onStepClick }: Props) {
+export default function StepIndicator({ steps, currentStep, maxVisitedStep, onStepClick }: Props) {
   return (
     <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
       {steps.map((step, i) => {
         const done   = i < currentStep;
         const active = i === currentStep;
-        const locked = i > currentStep;
+        const locked = i > maxVisitedStep;
         return (
           <button
             key={i}

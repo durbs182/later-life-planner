@@ -22,7 +22,7 @@ const STEPS = [
 ];
 
 export default function Home() {
-  const { currentStep, setCurrentStep } = usePlannerStore();
+  const { currentStep, maxVisitedStep, setCurrentStep } = usePlannerStore();
   const goNext = () => setCurrentStep(Math.min(currentStep + 1, STEPS.length - 1));
   const goBack = () => setCurrentStep(Math.max(currentStep - 1, 0));
 
@@ -37,7 +37,7 @@ export default function Home() {
       {/* Step navigation bar */}
       <div className="sticky top-[56px] z-10 bg-white/80 backdrop-blur-sm border-b border-orange-100/60 no-print">
         <div className="max-w-5xl mx-auto px-4 py-2.5">
-          <StepIndicator steps={STEPS} currentStep={currentStep} onStepClick={setCurrentStep} />
+          <StepIndicator steps={STEPS} currentStep={currentStep} maxVisitedStep={maxVisitedStep} onStepClick={setCurrentStep} />
         </div>
       </div>
 

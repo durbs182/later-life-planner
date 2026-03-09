@@ -50,7 +50,10 @@ export const usePlannerStore = create<PlannerState & Actions>()(
     (set) => ({
       ...createDefaultState(57),
 
-      setCurrentStep: (step) => set({ currentStep: step }),
+      setCurrentStep: (step) => set((s) => ({
+        currentStep: step,
+        maxVisitedStep: Math.max(s.maxVisitedStep, step),
+      })),
       setMode: (mode) => set({ mode }),
 
       // FI age setter — rebuilds life stages anchored to new FI age

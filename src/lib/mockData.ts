@@ -166,6 +166,7 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
   const fiAge = Math.max(primaryAge + 1, DEFAULT_ASSUMPTIONS.FI_AGE);
   return {
     currentStep: 0,
+    maxVisitedStep: 0,
     mode: 'single',
     person1: {
       name: '',

@@ -167,6 +167,7 @@ export interface Assumptions {
 
 export interface PlannerState {
   currentStep: number;
+  maxVisitedStep: number;
   mode: PlanningMode;
   person1: Person;
   person2: Person;
