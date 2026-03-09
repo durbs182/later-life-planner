@@ -411,7 +411,7 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label, sharedGia, onShare
         <FieldRow label="Purchase price / base cost" hint="For CGT planning">
           <CurrencyInput value={property.baseCost} onChange={(v) => set('property', { baseCost: v })} max={5000000} step={5000} />
         </FieldRow>
-        <FieldRow label="Annual net rental income" hint="After allowable expenses (agent fees, insurance, repairs) — exclude mortgage payments">
+        <FieldRow label="Annual net rental income" hint="After allowable expenses">
           <CurrencyInput value={property.annualRent} onChange={(v) => set('property', { annualRent: v })} max={100000} step={500} />
         </FieldRow>
         {mode === 'couple' && (
