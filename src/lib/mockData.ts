@@ -163,7 +163,9 @@ export function buildDefaultAssets(): PersonAssets {
 // ─── Default state ────────────────────────────────────────────────────────────
 
 export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFAULT_AGE): PlannerState {
-  const fiAge = Math.max(primaryAge + 1, DEFAULT_ASSUMPTIONS.FI_AGE);
+  // If the person is already at or past the default FI age, freedom starts now.
+  // Otherwise use the default FI age (65). Never force fiAge ahead of currentAge.
+  const fiAge = primaryAge >= DEFAULT_ASSUMPTIONS.FI_AGE ? primaryAge : DEFAULT_ASSUMPTIONS.FI_AGE;
   return {
     currentStep: 0,
     maxVisitedStep: 0,

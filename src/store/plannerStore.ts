@@ -67,12 +67,15 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setP1Name: (name) => set((s) => ({ person1: { ...s.person1, name } })),
 
       // DOB setter — recomputes age and rebuilds life stages (preserving endAge from lifeExpectancy)
+      // Also clamps fiAge to currentAge if the person is already at or past their freedom phase.
       setP1Dob: (dateOfBirth) =>
         set((s) => {
           const age = ageFromDOB(dateOfBirth, s.person1.currentAge);
+          const fiAge = age >= s.fiAge ? age : s.fiAge;
           return {
             person1: { ...s.person1, dateOfBirth, currentAge: age },
-            lifeStages: buildDefaultLifeStages(age, s.assumptions.lifeExpectancy).map((ns) => {
+            fiAge,
+            lifeStages: buildDefaultLifeStages(fiAge, s.assumptions.lifeExpectancy).map((ns) => {
               const ex = s.lifeStages.find((ls) => ls.id === ns.id);
               return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
             }),
@@ -81,13 +84,17 @@ export const usePlannerStore = create<PlannerState & Actions>()(
 
       // Legacy age setter (used by slider fallback)
       setP1Age: (age) =>
-        set((s) => ({
-          person1: { ...s.person1, currentAge: age },
-          lifeStages: buildDefaultLifeStages(age, s.assumptions.lifeExpectancy).map((ns) => {
-            const ex = s.lifeStages.find((ls) => ls.id === ns.id);
-            return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
-          }),
-        })),
+        set((s) => {
+          const fiAge = age >= s.fiAge ? age : s.fiAge;
+          return {
+            person1: { ...s.person1, currentAge: age },
+            fiAge,
+            lifeStages: buildDefaultLifeStages(fiAge, s.assumptions.lifeExpectancy).map((ns) => {
+              const ex = s.lifeStages.find((ls) => ls.id === ns.id);
+              return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
+            }),
+          };
+        }),
 
       setP1Income: (key, updates) =>
         set((s) => ({

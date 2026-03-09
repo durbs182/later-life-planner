@@ -151,18 +151,21 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
         </p>
         <div className="flex items-center gap-4">
           <input
-            type="range" min={person1.currentAge + 1} max={assumptions.lifeExpectancy - 1} step={1}
+            type="range" min={person1.currentAge} max={assumptions.lifeExpectancy - 1} step={1}
             value={fiAge}
             onChange={(e) => setFiAge(parseInt(e.target.value))}
             className="flex-1"
-            style={{ background: `linear-gradient(to right, #f97316 ${((fiAge - (person1.currentAge + 1)) / (assumptions.lifeExpectancy - 2 - person1.currentAge)) * 100}%, #e2e8f0 ${((fiAge - (person1.currentAge + 1)) / (assumptions.lifeExpectancy - 2 - person1.currentAge)) * 100}%)` }}
+            style={{ background: `linear-gradient(to right, #f97316 ${((fiAge - person1.currentAge) / (assumptions.lifeExpectancy - 1 - person1.currentAge)) * 100}%, #e2e8f0 ${((fiAge - person1.currentAge) / (assumptions.lifeExpectancy - 1 - person1.currentAge)) * 100}%)` }}
           />
           <div className="w-16 h-14 bg-orange-500 text-white font-black text-xl rounded-2xl flex items-center justify-center flex-shrink-0">
             {fiAge}
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-          <span>Building phase: age {person1.currentAge} → {fiAge - 1}</span>
+          {fiAge > person1.currentAge
+            ? <span>Building phase: age {person1.currentAge} → {fiAge - 1}</span>
+            : <span>Freedom phase starts now</span>
+          }
           <span>Freedom phase starts: age {fiAge}</span>
         </div>
       </div>
