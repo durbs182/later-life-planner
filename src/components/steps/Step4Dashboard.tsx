@@ -392,7 +392,6 @@ export default function Step4Dashboard({ onBack }: Props) {
       <div className="game-card">
         <div className="flex items-start justify-between mb-1">
           <h3 className="section-heading mb-0">Income vs spending — lifetime view</h3>
-          <span className="text-lg ml-2 flex-shrink-0">😊</span>
         </div>
         <p className="text-xs text-slate-500 mb-4">
           Stacked bars = income sources. Dashed line = <strong>Spending Smile</strong> — spending is higher in active early years and naturally declines over time, giving your plan long-term resilience.
