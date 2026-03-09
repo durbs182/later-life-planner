@@ -109,13 +109,30 @@ export function buildCategoriesForRlss(
   const target       = RLSS[mode][standard].annual;
   const scale        = defaultTotal > 0 ? target / defaultTotal : 1;
 
-  return defaults.map(cat => {
+  const result = defaults.map(cat => {
     const newAmounts: Record<string, number> = {};
     for (const [stageId, amount] of Object.entries(cat.amounts)) {
       newAmounts[stageId] = Math.round((amount * scale) / 100) * 100;
     }
     return { ...cat, amounts: newAmounts };
   });
+
+  // Correct rounding drift so the Go-Go total always exactly matches the PLSA target.
+  // Per-category rounding to £100 can accumulate to ±£200 across 18 categories.
+  // Apply the correction to housing (the largest category) so it's proportionally invisible.
+  const goGoTotal = result.reduce((s, c) => s + (c.amounts['go-go'] ?? 0), 0);
+  const drift = target - goGoTotal;
+  if (drift !== 0) {
+    const idx = result.findIndex(c => c.id === 'housing');
+    if (idx >= 0) {
+      result[idx] = {
+        ...result[idx],
+        amounts: { ...result[idx].amounts, 'go-go': (result[idx].amounts['go-go'] ?? 0) + drift },
+      };
+    }
+  }
+
+  return result;
 }
 
 // ─── Default income & assets ──────────────────────────────────────────────────
