@@ -143,7 +143,8 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
               Research consistently shows that spending follows a natural curve in later life — highest in the
               Go-Go years, gently declining through the Slo-Go years, with a possible uptick in
               later years for care needs. Your three life stages already reflect this — spend more confidently
-              in your Go-Go Years, knowing spending naturally reduces over time.
+              in your Go-Go Years, knowing spending naturally reduces over time.{' '}
+              <a href="https://www.youtube.com/watch?v=E8Y3rTJa2HI" target="_blank" rel="noopener noreferrer" className="underline text-violet-600 hover:text-violet-800">Inspired by Dan Haylett · Humans vs Retirement</a>
             </p>
           </div>
         </div>
