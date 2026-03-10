@@ -218,7 +218,7 @@ function useScrollOnAdd(count: number) {
 
 // ─── Income step screens ──────────────────────────────────────────────────────
 
-function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepSP({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const sp = draft.statePension;
   const upd = (p: Partial<typeof sp>) => onChange({ ...draft, statePension: { ...sp, ...p } });
   return (
@@ -236,12 +236,12 @@ function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
           </div>
           <button type="button" onClick={() => upd({ enabled: false })}
             className="text-xs text-slate-400 hover:text-slate-600 underline">
-            I won&apos;t have a State Pension
+            {isPartner ? "They won't have a State Pension" : "I won't have a State Pension"}
           </button>
         </>
       ) : (
         <div className="rounded-2xl border-2 border-dashed border-slate-200 p-4 text-center space-y-2">
-          <p className="text-sm text-slate-500">State Pension excluded from your plan.</p>
+          <p className="text-sm text-slate-500">State Pension excluded from {isPartner ? 'their' : 'your'} plan.</p>
           <button type="button" onClick={() => upd({ enabled: true })}
             className="text-sm text-orange-600 hover:text-orange-700 font-semibold underline">
             Add it back
@@ -252,7 +252,7 @@ function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   );
 }
 
-function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepDB({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const dbs = draft.dbPensions;
   const add = () => onChange({ ...draft, dbPensions: [...dbs, { annualIncome: 0, startAge: 65 }] });
   const remove = (i: number) => onChange({ ...draft, dbPensions: dbs.filter((_, idx) => idx !== i) });
@@ -260,7 +260,7 @@ function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   const bottomRef = useScrollOnAdd(dbs.length);
   return (
     <div className="space-y-4">
-      <YesNoToggle value={dbs.length > 0} onChange={(v) => v ? (dbs.length === 0 && add()) : onChange({ ...draft, dbPensions: [] })} yesLabel="Yes, I have one" noLabel="No" />
+      <YesNoToggle value={dbs.length > 0} onChange={(v) => v ? (dbs.length === 0 && add()) : onChange({ ...draft, dbPensions: [] })} yesLabel={isPartner ? 'Yes, they have one' : 'Yes, I have one'} noLabel="No" />
       {dbs.map((db, i) => (
         <ItemCard key={i} title={`Scheme ${i + 1}`} onRemove={dbs.length > 1 ? () => remove(i) : undefined}>
           <Field label="Annual income (today's £)">
@@ -288,12 +288,12 @@ function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   );
 }
 
-function StepAnnuity({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepAnnuity({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const a = draft.annuity;
   const upd = (p: Partial<typeof a>) => onChange({ ...draft, annuity: { ...a, ...p } });
   return (
     <div className="space-y-5">
-      <YesNoToggle value={a.enabled} onChange={(v) => upd({ enabled: v })} />
+      <YesNoToggle value={a.enabled} onChange={(v) => upd({ enabled: v })} yesLabel={isPartner ? 'Yes, they have one' : 'Yes, I have one'} noLabel="No" />
       {a.enabled && (
         <>
           <Field label="Annual income">
@@ -308,13 +308,13 @@ function StepAnnuity({ draft, onChange }: { draft: PersonDraft; onChange: (d: Pe
   );
 }
 
-function StepOther({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepOther({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const o = draft.otherIncome;
   const upd = (p: Partial<typeof o>) => onChange({ ...draft, otherIncome: { ...o, ...p } });
   return (
     <div className="space-y-5">
       <p className="text-sm text-slate-500">Trust income, a regular gift, part-time work — anything not already captured.</p>
-      <YesNoToggle value={o.enabled} onChange={(v) => upd({ enabled: v })} />
+      <YesNoToggle value={o.enabled} onChange={(v) => upd({ enabled: v })} yesLabel={isPartner ? 'Yes, they have some' : 'Yes, I have some'} noLabel="No" />
       {o.enabled && (
         <>
           <Field label="Annual amount">
@@ -331,7 +331,7 @@ function StepOther({ draft, onChange }: { draft: PersonDraft; onChange: (d: Pers
 
 // ─── Asset step screens ───────────────────────────────────────────────────────
 
-function StepDC({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepDC({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const dcs = draft.dcPensions;
   const add = () => onChange({ ...draft, dcPensions: [...dcs, { value: 0, growthRate: 4 }] });
   const remove = (i: number) => onChange({ ...draft, dcPensions: dcs.filter((_, idx) => idx !== i) });
@@ -341,7 +341,7 @@ function StepDC({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Workplace pension, SIPP, or any personal pension pot.</p>
-      <YesNoToggle value={dcs.length > 0} onChange={(v) => v ? (dcs.length === 0 && add()) : onChange({ ...draft, dcPensions: [] })} yesLabel="Yes, I have one" noLabel="No" />
+      <YesNoToggle value={dcs.length > 0} onChange={(v) => v ? (dcs.length === 0 && add()) : onChange({ ...draft, dcPensions: [] })} yesLabel={isPartner ? 'Yes, they have one' : 'Yes, I have one'} noLabel="No" />
       {dcs.map((dc, i) => (
         <ItemCard key={i} title={`Pension pot ${i + 1}`} onRemove={dcs.length > 1 ? () => remove(i) : undefined}>
           <Field label="Current value">
@@ -369,7 +369,7 @@ function StepDC({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   );
 }
 
-function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepISA({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const isas = draft.isas;
   const add = () => onChange({ ...draft, isas: [...isas, { value: 0, growthRate: 4 }] });
   const remove = (i: number) => onChange({ ...draft, isas: isas.filter((_, idx) => idx !== i) });
@@ -379,7 +379,7 @@ function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Stocks & Shares ISA or Cash ISA — withdrawals are completely tax-free.</p>
-      <YesNoToggle value={isas.length > 0} onChange={(v) => v ? (isas.length === 0 && add()) : onChange({ ...draft, isas: [] })} yesLabel="Yes, I have one" noLabel="No" />
+      <YesNoToggle value={isas.length > 0} onChange={(v) => v ? (isas.length === 0 && add()) : onChange({ ...draft, isas: [] })} yesLabel={isPartner ? 'Yes, they have one' : 'Yes, I have one'} noLabel="No" />
       {isas.map((isa, i) => (
         <ItemCard key={i} title={`ISA ${i + 1}`} onRemove={isas.length > 1 ? () => remove(i) : undefined}>
           <Field label="Current value">
@@ -407,7 +407,7 @@ function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   );
 }
 
-function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
+function StepGIA({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const gias = draft.gias;
   const add = () => onChange({ ...draft, gias: [...gias, { value: 0, baseCost: 0, growthRate: 4 }] });
   const remove = (i: number) => onChange({ ...draft, gias: gias.filter((_, idx) => idx !== i) });
@@ -416,8 +416,8 @@ function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   const bottomRef = useScrollOnAdd(gias.length);
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-500">Shares, funds or bonds held in your own name — outside an ISA or pension.</p>
-      <YesNoToggle value={gias.length > 0} onChange={(v) => v ? (gias.length === 0 && add()) : onChange({ ...draft, gias: [] })} yesLabel="Yes, I have one" noLabel="No" />
+      <p className="text-sm text-slate-500">Shares, funds or bonds held {isPartner ? 'in their name' : 'in your own name'} — outside an ISA or pension.</p>
+      <YesNoToggle value={gias.length > 0} onChange={(v) => v ? (gias.length === 0 && add()) : onChange({ ...draft, gias: [] })} yesLabel={isPartner ? 'Yes, they have one' : 'Yes, I have one'} noLabel="No" />
       {gias.map((gia, i) => (
         <ItemCard key={i} title={`Account ${i + 1}`} onRemove={gias.length > 1 ? () => remove(i) : undefined}>
           <Field label="Current market value">
@@ -651,14 +651,15 @@ export default function GuidedSetupWizard({ onDone }: Props) {
     if (current.kind === 'person') {
       const draft    = current.person === 'p1' ? p1 : p2;
       const setDraft = current.person === 'p1' ? setP1 : setP2;
+      const isPartner = current.person === 'p2';
       switch (current.stepId) {
-        case 'sp':       return <StepSP       draft={draft} onChange={setDraft} />;
-        case 'db':       return <StepDB       draft={draft} onChange={setDraft} />;
-        case 'annuity':  return <StepAnnuity  draft={draft} onChange={setDraft} />;
-        case 'other':    return <StepOther    draft={draft} onChange={setDraft} />;
-        case 'dc':       return <StepDC       draft={draft} onChange={setDraft} />;
-        case 'isa':      return <StepISA      draft={draft} onChange={setDraft} />;
-        case 'gia':      return <StepGIA      draft={draft} onChange={setDraft} />;
+        case 'sp':       return <StepSP       draft={draft} onChange={setDraft} isPartner={isPartner} />;
+        case 'db':       return <StepDB       draft={draft} onChange={setDraft} isPartner={isPartner} />;
+        case 'annuity':  return <StepAnnuity  draft={draft} onChange={setDraft} isPartner={isPartner} />;
+        case 'other':    return <StepOther    draft={draft} onChange={setDraft} isPartner={isPartner} />;
+        case 'dc':       return <StepDC       draft={draft} onChange={setDraft} isPartner={isPartner} />;
+        case 'isa':      return <StepISA      draft={draft} onChange={setDraft} isPartner={isPartner} />;
+        case 'gia':      return <StepGIA      draft={draft} onChange={setDraft} isPartner={isPartner} />;
         case 'cash':     return <StepCash     draft={draft} onChange={setDraft} />;
         case 'property': return <StepProperty draft={draft} onChange={setDraft} mode={mode} p1Label={p1Label} p2Label={p2Label} />;
       }
