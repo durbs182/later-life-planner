@@ -22,21 +22,37 @@ const STEPS = [
   { label: 'Dashboard',     description: 'See your lifetime plan' },
 ];
 
+const DISCLAIMER_KEY = 'llp-disclaimer-accepted';
+
 export default function Home() {
-  const { currentStep, maxVisitedStep, setCurrentStep } = usePlannerStore();
-  const [accepted, setAccepted] = useState(false);
+  const { currentStep, maxVisitedStep, setCurrentStep, resetPlan } = usePlannerStore();
+  const [accepted, setAccepted] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(DISCLAIMER_KEY) === '1';
+  });
   const goNext = () => setCurrentStep(Math.min(currentStep + 1, STEPS.length - 1));
   const goBack = () => setCurrentStep(Math.max(currentStep - 1, 0));
+
+  function handleAccept() {
+    localStorage.setItem(DISCLAIMER_KEY, '1');
+    setAccepted(true);
+  }
+
+  function handleReset() {
+    localStorage.removeItem(DISCLAIMER_KEY);
+    resetPlan();
+    setAccepted(false);
+  }
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [currentStep]);
 
-  if (!accepted) return <DisclaimerGate onAccept={() => setAccepted(true)} />;
+  if (!accepted) return <DisclaimerGate onAccept={handleAccept} />;
 
   return (
     <div className="min-h-screen flex flex-col bg-cream-100">
-      <Header />
+      <Header onReset={handleReset} />
 
       {/* Step navigation bar */}
       <div className="sticky top-[56px] z-10 bg-white/80 backdrop-blur-sm border-b border-orange-100/60 no-print">

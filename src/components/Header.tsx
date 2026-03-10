@@ -6,12 +6,14 @@ import ConfirmModal from '@/components/ui/ConfirmModal';
 
 type PendingAction = 'reset' | 'demo' | null;
 
-export default function Header() {
-  const { loadDemo, resetPlan } = usePlannerStore();
+interface Props { onReset: () => void }
+
+export default function Header({ onReset }: Props) {
+  const { loadDemo } = usePlannerStore();
   const [pending, setPending] = useState<PendingAction>(null);
 
   function handleConfirm() {
-    if (pending === 'reset') resetPlan();
+    if (pending === 'reset') onReset();
     if (pending === 'demo') loadDemo();
     setPending(null);
   }
