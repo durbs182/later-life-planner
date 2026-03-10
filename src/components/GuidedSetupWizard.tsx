@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
 import CurrencyInput from '@/components/ui/CurrencyInput';
 import clsx from 'clsx';
@@ -202,6 +202,20 @@ function PropertyForm({ draft, onChange, showOwner, p1Label, p2Label }: {
   );
 }
 
+// ─── Auto-scroll hook ─────────────────────────────────────────────────────────
+
+function useScrollOnAdd(count: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const prev = useRef(count);
+  useEffect(() => {
+    if (count > prev.current) {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    prev.current = count;
+  }, [count]);
+  return ref;
+}
+
 // ─── Income step screens ──────────────────────────────────────────────────────
 
 function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
@@ -243,6 +257,7 @@ function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   const add = () => onChange({ ...draft, dbPensions: [...dbs, { annualIncome: 0, startAge: 65 }] });
   const remove = (i: number) => onChange({ ...draft, dbPensions: dbs.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<DbEntry>) => onChange({ ...draft, dbPensions: dbs.map((e, idx) => idx === i ? { ...e, ...p } : e) });
+  const bottomRef = useScrollOnAdd(dbs.length);
   return (
     <div className="space-y-4">
       <YesNoToggle value={dbs.length > 0} onChange={(v) => v ? (dbs.length === 0 && add()) : onChange({ ...draft, dbPensions: [] })} yesLabel="Yes, I have one" noLabel="No" />
@@ -266,6 +281,7 @@ function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
               Combined annual income: <strong>£{dbs.reduce((s, e) => s + e.annualIncome, 0).toLocaleString('en-GB')}</strong>
             </div>
           )}
+          <div ref={bottomRef} />
         </>
       )}
     </div>
@@ -321,6 +337,7 @@ function StepDC({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   const remove = (i: number) => onChange({ ...draft, dcPensions: dcs.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<DcEntry>) => onChange({ ...draft, dcPensions: dcs.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = dcs.reduce((s, e) => s + e.value, 0);
+  const bottomRef = useScrollOnAdd(dcs.length);
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Workplace pension, SIPP, or any personal pension pot.</p>
@@ -345,6 +362,7 @@ function StepDC({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
               Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
             </div>
           )}
+          <div ref={bottomRef} />
         </>
       )}
     </div>
@@ -357,6 +375,7 @@ function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   const remove = (i: number) => onChange({ ...draft, isas: isas.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<IsaEntry>) => onChange({ ...draft, isas: isas.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = isas.reduce((s, e) => s + e.value, 0);
+  const bottomRef = useScrollOnAdd(isas.length);
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Stocks & Shares ISA or Cash ISA — withdrawals are completely tax-free.</p>
@@ -381,6 +400,7 @@ function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
               Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
             </div>
           )}
+          <div ref={bottomRef} />
         </>
       )}
     </div>
@@ -393,6 +413,7 @@ function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   const remove = (i: number) => onChange({ ...draft, gias: gias.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<GiaEntry>) => onChange({ ...draft, gias: gias.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = gias.reduce((s, e) => s + e.value, 0);
+  const bottomRef = useScrollOnAdd(gias.length);
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Shares, funds or bonds held in your own name — outside an ISA or pension.</p>
@@ -420,6 +441,7 @@ function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
               Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
             </div>
           )}
+          <div ref={bottomRef} />
         </>
       )}
     </div>
