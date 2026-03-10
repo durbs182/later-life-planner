@@ -7,10 +7,21 @@ import clsx from 'clsx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+type AssetOwner = 'p1' | 'p2' | 'joint';
+
 type DbEntry  = { annualIncome: number; startAge: number };
 type DcEntry  = { value: number; growthRate: number };
 type IsaEntry = { value: number; growthRate: number };
 type GiaEntry = { value: number; baseCost: number; growthRate: number };
+
+type PropertyDraft = {
+  enabled: boolean;
+  propertyValue: number;
+  baseCost: number;
+  annualRent: number;
+  durationYears: number;
+  owner: AssetOwner;
+};
 
 type PersonDraft = {
   statePension: { enabled: boolean; weeklyAmount: number; startAge: number };
@@ -21,6 +32,12 @@ type PersonDraft = {
   isas:         IsaEntry[];
   gias:         GiaEntry[];
   cashSavings:  number;
+  property:     PropertyDraft;
+};
+
+type JointDraft = {
+  gia:      { enabled: boolean; totalValue: number; baseCost: number; growthRate: number };
+  property: PropertyDraft;
 };
 
 function emptyDraft(): PersonDraft {
@@ -33,30 +50,42 @@ function emptyDraft(): PersonDraft {
     isas:         [],
     gias:         [],
     cashSavings:  0,
+    property:     { enabled: false, propertyValue: 0, baseCost: 0, annualRent: 0, durationYears: 20, owner: 'p1' },
+  };
+}
+
+function emptyJoint(): JointDraft {
+  return {
+    gia:      { enabled: false, totalValue: 0, baseCost: 0, growthRate: 4 },
+    property: { enabled: false, propertyValue: 0, baseCost: 0, annualRent: 0, durationYears: 20, owner: 'joint' },
   };
 }
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
 
-type StepId =
-  | 'sp' | 'db' | 'annuity' | 'other'
-  | 'dc' | 'isa' | 'gia' | 'cash';
+type PersonStepId = 'sp' | 'db' | 'annuity' | 'other' | 'dc' | 'isa' | 'gia' | 'cash' | 'property';
+type JointStepId  = 'joint-gia' | 'joint-property';
+type StepId = PersonStepId | JointStepId;
 
-const INCOME_STEPS: StepId[] = ['sp', 'db', 'annuity', 'other'];
-const ASSET_STEPS:  StepId[] = ['dc', 'isa', 'gia', 'cash'];
+const INCOME_STEPS: PersonStepId[] = ['sp', 'db', 'annuity', 'other'];
+const ASSET_STEPS:  PersonStepId[] = ['dc', 'isa', 'gia', 'cash', 'property'];
+const JOINT_STEPS:  JointStepId[]  = ['joint-gia', 'joint-property'];
 
-const STEP_META: Record<StepId, { icon: string; title: string; desc: string }> = {
-  sp:      { icon: '🏛️', title: 'State Pension',                   desc: 'UK new State Pension' },
-  db:      { icon: '🏢', title: 'Defined Benefit pension',          desc: 'Final salary / employer scheme' },
-  annuity: { icon: '📜', title: 'Annuity',                          desc: 'Guaranteed income for life' },
-  other:   { icon: '💸', title: 'Other regular income',             desc: 'Trust, gift, or other stream' },
-  dc:      { icon: '💼', title: 'DC / Personal pension pot(s)',      desc: 'Workplace pension, SIPP' },
-  isa:     { icon: '📈', title: 'ISA(s)',                            desc: 'Stocks & Shares or Cash ISA' },
-  gia:     { icon: '📊', title: 'General investment account(s)',     desc: 'Shares or funds outside an ISA' },
-  cash:    { icon: '💵', title: 'Cash savings',                      desc: 'Savings accounts, Premium Bonds' },
+const STEP_META: Record<StepId, { icon: string; title: string; desc: string; section: string }> = {
+  sp:             { icon: '🏛️', title: 'State Pension',                  desc: 'UK new State Pension',                     section: 'Income' },
+  db:             { icon: '🏢', title: 'DB / Final salary pension',       desc: 'Guaranteed employer scheme',               section: 'Income' },
+  annuity:        { icon: '📜', title: 'Annuity',                         desc: 'Guaranteed income for life',               section: 'Income' },
+  other:          { icon: '💸', title: 'Other regular income',            desc: 'Trust, gift, or other stream',             section: 'Income' },
+  dc:             { icon: '💼', title: 'DC / Personal pension pot(s)',     desc: 'Workplace pension, SIPP',                  section: 'Savings & Investments' },
+  isa:            { icon: '📈', title: 'ISA(s)',                           desc: 'Stocks & Shares or Cash ISA',              section: 'Savings & Investments' },
+  gia:            { icon: '📊', title: 'General investment account(s)',    desc: 'Shares or funds outside an ISA',           section: 'Savings & Investments' },
+  cash:           { icon: '💵', title: 'Cash savings',                    desc: 'Savings accounts, Premium Bonds',          section: 'Savings & Investments' },
+  property:       { icon: '🏘️', title: 'Rental property',                 desc: 'Property value & rental income',           section: 'Savings & Investments' },
+  'joint-gia':    { icon: '🤝', title: 'Joint investment account',        desc: 'GIA held in both names',                   section: 'Joint' },
+  'joint-property': { icon: '🏠', title: 'Joint property',               desc: 'Property held in both names',              section: 'Joint' },
 };
 
-// ─── Small helpers ────────────────────────────────────────────────────────────
+// ─── Primitives ───────────────────────────────────────────────────────────────
 
 function AgeStepper({ value, onChange, min = 55, max = 85 }: {
   value: number; onChange: (v: number) => void; min?: number; max?: number;
@@ -99,35 +128,91 @@ function ItemCard({ children, onRemove, title }: { children: React.ReactNode; on
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-bold text-slate-600">{title}</span>
-        {onRemove && (
-          <button onClick={onRemove} className="text-xs text-rose-400 hover:text-rose-600 font-semibold">Remove</button>
-        )}
+        {onRemove && <button onClick={onRemove} className="text-xs text-rose-400 hover:text-rose-600 font-semibold">Remove</button>}
       </div>
       {children}
     </div>
   );
 }
 
-// ─── Individual step screens ──────────────────────────────────────────────────
+function YesNoToggle({ value, onChange, yesLabel = 'Yes', noLabel = 'No' }: {
+  value: boolean; onChange: (v: boolean) => void; yesLabel?: string; noLabel?: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      {[true, false].map((v) => (
+        <button key={String(v)} type="button" onClick={() => onChange(v)}
+          className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
+            value === v ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
+          )}>
+          {v ? yesLabel : noLabel}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Property form (reused for individual + joint) ────────────────────────────
+
+function PropertyForm({ draft, onChange, showOwner, p1Label, p2Label }: {
+  draft: PropertyDraft;
+  onChange: (d: PropertyDraft) => void;
+  showOwner: boolean;
+  p1Label: string;
+  p2Label: string;
+}) {
+  const upd = (p: Partial<PropertyDraft>) => onChange({ ...draft, ...p });
+  const ownerOpts: { v: AssetOwner; label: string }[] = [
+    { v: 'p1', label: p1Label },
+    { v: 'p2', label: p2Label },
+    { v: 'joint', label: 'Joint' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <Field label="Current property value">
+        <CurrencyInput value={draft.propertyValue} onChange={(v) => upd({ propertyValue: v })} max={5000000} step={5000} />
+      </Field>
+      <Field label="Purchase price / base cost" hint="Original cost — used for capital gains tax calculation">
+        <CurrencyInput value={draft.baseCost} onChange={(v) => upd({ baseCost: v })} max={5000000} step={5000} />
+      </Field>
+      <Field label="Annual net rental income" hint="Leave at £0 if not rented out">
+        <CurrencyInput value={draft.annualRent} onChange={(v) => upd({ annualRent: v })} max={100000} step={500} />
+      </Field>
+      {draft.annualRent > 0 && (
+        <Field label="How many years will you keep renting it out?">
+          <AgeStepper value={draft.durationYears} onChange={(v) => upd({ durationYears: v })} min={1} max={50} />
+        </Field>
+      )}
+      {showOwner && (
+        <Field label="Ownership">
+          <div className="flex gap-2">
+            {ownerOpts.map((o) => (
+              <button key={o.v} type="button" onClick={() => upd({ owner: o.v })}
+                className={clsx('flex-1 py-2 rounded-xl border-2 text-xs font-bold transition-all',
+                  draft.owner === o.v ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
+                )}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </Field>
+      )}
+    </div>
+  );
+}
+
+// ─── Income step screens ──────────────────────────────────────────────────────
 
 function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
   const sp = draft.statePension;
   const upd = (p: Partial<typeof sp>) => onChange({ ...draft, statePension: { ...sp, ...p } });
   return (
-    <div className="space-y-6">
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => upd({ enabled: v })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              sp.enabled === v ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes, I have one' : "No / Not sure"}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-5">
+      <YesNoToggle value={sp.enabled} onChange={(v) => upd({ enabled: v })} yesLabel="Yes, I have one" noLabel="No / Not sure" />
       {sp.enabled && (
         <>
-          <Field label="Weekly amount" hint="Check your forecast at gov.uk/check-state-pension — full amount is £221.20/week (2024/25)">
+          <Field label="Weekly amount" hint="Check your forecast at gov.uk/check-state-pension · Full amount is £221.20/week (2024/25)">
             <CurrencyInput value={sp.weeklyAmount} onChange={(v) => upd({ weeklyAmount: v })} max={300} step={1} />
           </Field>
           <Field label="Expected start age">
@@ -147,19 +232,9 @@ function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   const add = () => onChange({ ...draft, dbPensions: [...dbs, { annualIncome: 0, startAge: 65 }] });
   const remove = (i: number) => onChange({ ...draft, dbPensions: dbs.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<DbEntry>) => onChange({ ...draft, dbPensions: dbs.map((e, idx) => idx === i ? { ...e, ...p } : e) });
-
   return (
     <div className="space-y-4">
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => v ? (dbs.length === 0 && add()) : onChange({ ...draft, dbPensions: [] })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              (v ? dbs.length > 0 : dbs.length === 0) ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes, I have one' : 'No'}
-          </button>
-        ))}
-      </div>
+      <YesNoToggle value={dbs.length > 0} onChange={(v) => v ? (dbs.length === 0 && add()) : onChange({ ...draft, dbPensions: [] })} yesLabel="Yes, I have one" noLabel="No" />
       {dbs.map((db, i) => (
         <ItemCard key={i} title={`Scheme ${i + 1}`} onRemove={dbs.length > 1 ? () => remove(i) : undefined}>
           <Field label="Annual income (today's £)">
@@ -171,14 +246,16 @@ function StepDB({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
         </ItemCard>
       ))}
       {dbs.length > 0 && (
-        <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
-          + Add another DB scheme
-        </button>
-      )}
-      {dbs.length > 1 && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
-          Combined annual income: <strong>£{dbs.reduce((s, e) => s + e.annualIncome, 0).toLocaleString('en-GB')}</strong>
-        </div>
+        <>
+          <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
+            + Add another DB scheme
+          </button>
+          {dbs.length > 1 && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
+              Combined annual income: <strong>£{dbs.reduce((s, e) => s + e.annualIncome, 0).toLocaleString('en-GB')}</strong>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -188,17 +265,8 @@ function StepAnnuity({ draft, onChange }: { draft: PersonDraft; onChange: (d: Pe
   const a = draft.annuity;
   const upd = (p: Partial<typeof a>) => onChange({ ...draft, annuity: { ...a, ...p } });
   return (
-    <div className="space-y-6">
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => upd({ enabled: v })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              a.enabled === v ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes' : 'No'}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-5">
+      <YesNoToggle value={a.enabled} onChange={(v) => upd({ enabled: v })} />
       {a.enabled && (
         <>
           <Field label="Annual income">
@@ -217,18 +285,9 @@ function StepOther({ draft, onChange }: { draft: PersonDraft; onChange: (d: Pers
   const o = draft.otherIncome;
   const upd = (p: Partial<typeof o>) => onChange({ ...draft, otherIncome: { ...o, ...p } });
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <p className="text-sm text-slate-500">Trust income, a regular gift, part-time work — anything not already captured.</p>
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => upd({ enabled: v })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              o.enabled === v ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes' : 'No'}
-          </button>
-        ))}
-      </div>
+      <YesNoToggle value={o.enabled} onChange={(v) => upd({ enabled: v })} />
       {o.enabled && (
         <>
           <Field label="Annual amount">
@@ -243,45 +302,39 @@ function StepOther({ draft, onChange }: { draft: PersonDraft; onChange: (d: Pers
   );
 }
 
+// ─── Asset step screens ───────────────────────────────────────────────────────
+
 function StepDC({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
   const dcs = draft.dcPensions;
   const add = () => onChange({ ...draft, dcPensions: [...dcs, { value: 0, growthRate: 4 }] });
   const remove = (i: number) => onChange({ ...draft, dcPensions: dcs.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<DcEntry>) => onChange({ ...draft, dcPensions: dcs.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = dcs.reduce((s, e) => s + e.value, 0);
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Workplace pension, SIPP, or any personal pension pot.</p>
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => v ? (dcs.length === 0 && add()) : onChange({ ...draft, dcPensions: [] })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              (v ? dcs.length > 0 : dcs.length === 0) ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes, I have one' : 'No'}
-          </button>
-        ))}
-      </div>
+      <YesNoToggle value={dcs.length > 0} onChange={(v) => v ? (dcs.length === 0 && add()) : onChange({ ...draft, dcPensions: [] })} yesLabel="Yes, I have one" noLabel="No" />
       {dcs.map((dc, i) => (
         <ItemCard key={i} title={`Pension pot ${i + 1}`} onRemove={dcs.length > 1 ? () => remove(i) : undefined}>
           <Field label="Current value">
             <CurrencyInput value={dc.value} onChange={(v) => upd(i, { value: v })} max={2000000} step={1000} />
           </Field>
-          <Field label="Expected annual growth" hint="A typical balanced portfolio returns 4–6% before charges">
+          <Field label="Expected annual growth" hint="A balanced portfolio typically returns 4–6% before charges">
             <GrowthStepper value={dc.growthRate} onChange={(v) => upd(i, { growthRate: v })} />
           </Field>
         </ItemCard>
       ))}
       {dcs.length > 0 && (
-        <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
-          + Add another pension pot
-        </button>
-      )}
-      {dcs.length > 1 && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
-          Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
-        </div>
+        <>
+          <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
+            + Add another pension pot
+          </button>
+          {dcs.length > 1 && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
+              Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -293,20 +346,10 @@ function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   const remove = (i: number) => onChange({ ...draft, isas: isas.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<IsaEntry>) => onChange({ ...draft, isas: isas.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = isas.reduce((s, e) => s + e.value, 0);
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Stocks & Shares ISA or Cash ISA — withdrawals are completely tax-free.</p>
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => v ? (isas.length === 0 && add()) : onChange({ ...draft, isas: [] })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              (v ? isas.length > 0 : isas.length === 0) ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes, I have one' : 'No'}
-          </button>
-        ))}
-      </div>
+      <YesNoToggle value={isas.length > 0} onChange={(v) => v ? (isas.length === 0 && add()) : onChange({ ...draft, isas: [] })} yesLabel="Yes, I have one" noLabel="No" />
       {isas.map((isa, i) => (
         <ItemCard key={i} title={`ISA ${i + 1}`} onRemove={isas.length > 1 ? () => remove(i) : undefined}>
           <Field label="Current value">
@@ -318,14 +361,16 @@ function StepISA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
         </ItemCard>
       ))}
       {isas.length > 0 && (
-        <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
-          + Add another ISA
-        </button>
-      )}
-      {isas.length > 1 && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
-          Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
-        </div>
+        <>
+          <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
+            + Add another ISA
+          </button>
+          {isas.length > 1 && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
+              Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -337,26 +382,16 @@ function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
   const remove = (i: number) => onChange({ ...draft, gias: gias.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<GiaEntry>) => onChange({ ...draft, gias: gias.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = gias.reduce((s, e) => s + e.value, 0);
-
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-500">Shares, funds or bonds held in your own name — outside an ISA or pension.</p>
-      <div className="flex gap-3">
-        {[true, false].map((v) => (
-          <button key={String(v)} onClick={() => v ? (gias.length === 0 && add()) : onChange({ ...draft, gias: [] })}
-            className={clsx('flex-1 py-3 rounded-2xl border-2 font-bold text-sm transition-all',
-              (v ? gias.length > 0 : gias.length === 0) ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 bg-white text-slate-500 hover:border-orange-200'
-            )}>
-            {v ? 'Yes, I have one' : 'No'}
-          </button>
-        ))}
-      </div>
+      <YesNoToggle value={gias.length > 0} onChange={(v) => v ? (gias.length === 0 && add()) : onChange({ ...draft, gias: [] })} yesLabel="Yes, I have one" noLabel="No" />
       {gias.map((gia, i) => (
         <ItemCard key={i} title={`Account ${i + 1}`} onRemove={gias.length > 1 ? () => remove(i) : undefined}>
           <Field label="Current market value">
             <CurrencyInput value={gia.value} onChange={(v) => upd(i, { value: v })} max={2000000} step={1000} />
           </Field>
-          <Field label="Purchase price / base cost" hint="Original cost — used for capital gains tax calculation">
+          <Field label="Purchase price / base cost" hint="Original cost — used for capital gains tax">
             <CurrencyInput value={gia.baseCost} onChange={(v) => upd(i, { baseCost: v })} max={2000000} step={1000} />
           </Field>
           <Field label="Expected annual growth">
@@ -365,14 +400,16 @@ function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
         </ItemCard>
       ))}
       {gias.length > 0 && (
-        <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
-          + Add another account
-        </button>
-      )}
-      {gias.length > 1 && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
-          Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
-        </div>
+        <>
+          <button onClick={add} className="w-full py-2.5 rounded-2xl border-2 border-dashed border-orange-200 text-orange-600 hover:bg-orange-50 text-sm font-semibold transition-all">
+            + Add another account
+          </button>
+          {gias.length > 1 && (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-xs text-emerald-700">
+              Combined value: <strong>£{total.toLocaleString('en-GB')}</strong>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -380,11 +417,82 @@ function StepGIA({ draft, onChange }: { draft: PersonDraft; onChange: (d: Person
 
 function StepCash({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonDraft) => void }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <p className="text-sm text-slate-500">Current accounts, savings accounts, Premium Bonds — enter the combined total.</p>
       <Field label="Total cash savings">
         <CurrencyInput value={draft.cashSavings} onChange={(v) => onChange({ ...draft, cashSavings: v })} max={500000} step={1000} />
       </Field>
+    </div>
+  );
+}
+
+function StepProperty({ draft, onChange, mode, p1Label, p2Label }: {
+  draft: PersonDraft; onChange: (d: PersonDraft) => void;
+  mode: 'single' | 'couple'; p1Label: string; p2Label: string;
+}) {
+  const p = draft.property;
+  const upd = (partial: Partial<PropertyDraft>) => onChange({ ...draft, property: { ...p, ...partial } });
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">A buy-to-let or second property held in your name.</p>
+      <YesNoToggle value={p.enabled} onChange={(v) => upd({ enabled: v })} />
+      {p.enabled && (
+        <PropertyForm
+          draft={p}
+          onChange={(d) => onChange({ ...draft, property: d })}
+          showOwner={mode === 'couple'}
+          p1Label={p1Label}
+          p2Label={p2Label}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Joint step screens ───────────────────────────────────────────────────────
+
+function StepJointGIA({ draft, onChange }: { draft: JointDraft; onChange: (d: JointDraft) => void }) {
+  const g = draft.gia;
+  const upd = (p: Partial<typeof g>) => onChange({ ...draft, gia: { ...g, ...p } });
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-slate-500">Shares or funds held in both names — gains are split 50/50 for CGT purposes.</p>
+      <YesNoToggle value={g.enabled} onChange={(v) => upd({ enabled: v })} />
+      {g.enabled && (
+        <>
+          <Field label="Current market value">
+            <CurrencyInput value={g.totalValue} onChange={(v) => upd({ totalValue: v })} max={2000000} step={1000} />
+          </Field>
+          <Field label="Purchase price / base cost" hint="Original cost — split equally across both CGT allowances">
+            <CurrencyInput value={g.baseCost} onChange={(v) => upd({ baseCost: v })} max={2000000} step={1000} />
+          </Field>
+          <Field label="Expected annual growth">
+            <GrowthStepper value={g.growthRate} onChange={(v) => upd({ growthRate: v })} />
+          </Field>
+        </>
+      )}
+    </div>
+  );
+}
+
+function StepJointProperty({ draft, onChange, p1Label, p2Label }: {
+  draft: JointDraft; onChange: (d: JointDraft) => void;
+  p1Label: string; p2Label: string;
+}) {
+  const p = draft.property;
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">A property held jointly in both names.</p>
+      <YesNoToggle value={p.enabled} onChange={(v) => onChange({ ...draft, property: { ...p, enabled: v } })} />
+      {p.enabled && (
+        <PropertyForm
+          draft={p}
+          onChange={(d) => onChange({ ...draft, property: d })}
+          showOwner={false}
+          p1Label={p1Label}
+          p2Label={p2Label}
+        />
+      )}
     </div>
   );
 }
@@ -397,8 +505,9 @@ function weightedAvgGrowth(items: { value: number; growthRate: number }[]): numb
   return Math.round((items.reduce((s, e) => s + e.growthRate * e.value, 0) / total) * 10) / 10;
 }
 
-function applyDraft(
+function applyPersonDraft(
   draft: PersonDraft,
+  owner: 'p1' | 'p2',
   setIncome: (k: string, u: Record<string, unknown>) => void,
   setAsset:  (k: string, u: Record<string, unknown>) => void,
 ) {
@@ -420,80 +529,136 @@ function applyDraft(
   setAsset('generalInvestments', { enabled: giaTotal > 0, totalValue: giaTotal, baseCost: draft.gias.reduce((s, e) => s + e.baseCost, 0), growthRate: weightedAvgGrowth(draft.gias) });
 
   setAsset('cashSavings', { enabled: draft.cashSavings > 0, totalValue: draft.cashSavings });
+
+  setAsset('property', {
+    enabled:       draft.property.enabled,
+    propertyValue: draft.property.propertyValue,
+    baseCost:      draft.property.baseCost,
+    annualRent:    draft.property.annualRent,
+    durationYears: draft.property.durationYears,
+    owner:         draft.property.owner !== 'joint' ? owner : 'joint',
+  });
 }
 
-// ─── Wizard modal ─────────────────────────────────────────────────────────────
+// ─── Main wizard ──────────────────────────────────────────────────────────────
 
 interface Props { onDone: () => void }
 
 export default function GuidedSetupWizard({ onDone }: Props) {
-  const { mode, person1, person2, setP1Income, setP1Asset, setP2Income, setP2Asset } = usePlannerStore();
+  const { mode, person1, person2, setP1Income, setP1Asset, setP2Income, setP2Asset, setJointGia } = usePlannerStore();
 
   const p1Label = person1.name || 'You';
   const p2Label = person2.name || 'Partner';
 
-  // Build flat list of steps: [p1 income steps..., p1 asset steps..., p2 income steps..., p2 asset steps...]
-  type WizardStep = { person: 'p1' | 'p2'; stepId: StepId };
+  type WizardStep =
+    | { kind: 'person'; person: 'p1' | 'p2'; stepId: PersonStepId }
+    | { kind: 'joint';  stepId: JointStepId };
+
   const steps: WizardStep[] = [
-    ...INCOME_STEPS.map(s => ({ person: 'p1' as const, stepId: s })),
-    ...ASSET_STEPS.map(s  => ({ person: 'p1' as const, stepId: s })),
+    ...INCOME_STEPS.map(s => ({ kind: 'person' as const, person: 'p1' as const, stepId: s })),
+    ...ASSET_STEPS.map(s  => ({ kind: 'person' as const, person: 'p1' as const, stepId: s })),
     ...(mode === 'couple' ? [
-      ...INCOME_STEPS.map(s => ({ person: 'p2' as const, stepId: s })),
-      ...ASSET_STEPS.map(s  => ({ person: 'p2' as const, stepId: s })),
+      ...INCOME_STEPS.map(s => ({ kind: 'person' as const, person: 'p2' as const, stepId: s })),
+      ...ASSET_STEPS.map(s  => ({ kind: 'person' as const, person: 'p2' as const, stepId: s })),
+      ...JOINT_STEPS.map(s  => ({ kind: 'joint'  as const, stepId: s })),
     ] : []),
   ];
 
-  const [idx, setIdx]       = useState(0);
-  const [p1, setP1]         = useState<PersonDraft>(emptyDraft);
-  const [p2, setP2]         = useState<PersonDraft>(emptyDraft);
+  const [idx, setIdx]   = useState(0);
+  const [p1, setP1]     = useState<PersonDraft>(emptyDraft);
+  const [p2, setP2]     = useState<PersonDraft>(() => ({ ...emptyDraft(), property: { ...emptyDraft().property, owner: 'p2' } }));
+  const [joint, setJoint] = useState<JointDraft>(emptyJoint);
 
-  const current   = steps[idx];
-  const isLast    = idx === steps.length - 1;
-  const draft     = current.person === 'p1' ? p1 : p2;
-  const setDraft  = current.person === 'p1' ? setP1 : setP2;
-  const personLabel = current.person === 'p1' ? p1Label : p2Label;
-  const meta      = STEP_META[current.stepId];
+  const current = steps[idx];
+  const isLast  = idx === steps.length - 1;
+  const meta    = STEP_META[current.stepId];
 
-  // Group steps visually: income vs assets, and by person
-  const isFirstP2Step = mode === 'couple' && current.person === 'p2' && steps[idx - 1]?.person === 'p1';
-  const phase = INCOME_STEPS.includes(current.stepId) ? 'Income' : 'Savings & Investments';
+  // Transition labels
+  const prevStep = idx > 0 ? steps[idx - 1] : null;
+  const isNewPerson = current.kind === 'person' && prevStep?.kind === 'person' && current.person !== prevStep.person;
+  const isJointSection = current.kind === 'joint' && prevStep?.kind !== 'joint';
+
+  const personLabel = current.kind === 'person'
+    ? (current.person === 'p1' ? p1Label : p2Label)
+    : 'Joint';
+
+  // Section colour: p1 = orange, p2 = emerald, joint = violet
+  const sectionColor =
+    current.kind === 'joint'                              ? 'text-violet-600 bg-violet-50 border-violet-200' :
+    current.kind === 'person' && current.person === 'p2' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' :
+                                                            'text-orange-600 bg-orange-50 border-orange-200';
 
   function handleSave() {
-    applyDraft(p1, setP1Income as (k: string, u: Record<string, unknown>) => void, setP1Asset as (k: string, u: Record<string, unknown>) => void);
+    applyPersonDraft(p1, 'p1',
+      setP1Income as (k: string, u: Record<string, unknown>) => void,
+      setP1Asset  as (k: string, u: Record<string, unknown>) => void,
+    );
     if (mode === 'couple') {
-      applyDraft(p2, setP2Income as (k: string, u: Record<string, unknown>) => void, setP2Asset as (k: string, u: Record<string, unknown>) => void);
+      applyPersonDraft(p2, 'p2',
+        setP2Income as (k: string, u: Record<string, unknown>) => void,
+        setP2Asset  as (k: string, u: Record<string, unknown>) => void,
+      );
+      setJointGia({ enabled: joint.gia.enabled, totalValue: joint.gia.totalValue, baseCost: joint.gia.baseCost, growthRate: joint.gia.growthRate });
+      // Joint property → write to p1's property slot with owner='joint' if no p1 individual property
+      if (joint.property.enabled && !p1.property.enabled) {
+        (setP1Asset as (k: string, u: Record<string, unknown>) => void)('property', {
+          enabled: true, propertyValue: joint.property.propertyValue, baseCost: joint.property.baseCost,
+          annualRent: joint.property.annualRent, durationYears: joint.property.durationYears, owner: 'joint',
+        });
+      }
     }
     onDone();
   }
 
-  // Step content map
-  const stepContent: Record<StepId, React.ReactNode> = {
-    sp:      <StepSP      draft={draft} onChange={setDraft} />,
-    db:      <StepDB      draft={draft} onChange={setDraft} />,
-    annuity: <StepAnnuity draft={draft} onChange={setDraft} />,
-    other:   <StepOther   draft={draft} onChange={setDraft} />,
-    dc:      <StepDC      draft={draft} onChange={setDraft} />,
-    isa:     <StepISA     draft={draft} onChange={setDraft} />,
-    gia:     <StepGIA     draft={draft} onChange={setDraft} />,
-    cash:    <StepCash    draft={draft} onChange={setDraft} />,
-  };
+  function renderContent() {
+    if (current.kind === 'joint') {
+      if (current.stepId === 'joint-gia')      return <StepJointGIA draft={joint} onChange={setJoint} />;
+      if (current.stepId === 'joint-property') return <StepJointProperty draft={joint} onChange={setJoint} p1Label={p1Label} p2Label={p2Label} />;
+    }
+    if (current.kind === 'person') {
+      const draft    = current.person === 'p1' ? p1 : p2;
+      const setDraft = current.person === 'p1' ? setP1 : setP2;
+      switch (current.stepId) {
+        case 'sp':       return <StepSP       draft={draft} onChange={setDraft} />;
+        case 'db':       return <StepDB       draft={draft} onChange={setDraft} />;
+        case 'annuity':  return <StepAnnuity  draft={draft} onChange={setDraft} />;
+        case 'other':    return <StepOther    draft={draft} onChange={setDraft} />;
+        case 'dc':       return <StepDC       draft={draft} onChange={setDraft} />;
+        case 'isa':      return <StepISA      draft={draft} onChange={setDraft} />;
+        case 'gia':      return <StepGIA      draft={draft} onChange={setDraft} />;
+        case 'cash':     return <StepCash     draft={draft} onChange={setDraft} />;
+        case 'property': return <StepProperty draft={draft} onChange={setDraft} mode={mode} p1Label={p1Label} p2Label={p2Label} />;
+      }
+    }
+    return null;
+  }
 
   return (
-    // Full-screen overlay
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[85vh]">
 
         {/* Header */}
-        <div className="flex-shrink-0 px-6 pt-6 pb-4 border-b border-slate-100">
+        <div className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-slate-100">
+          {/* Transition banners */}
+          {(isNewPerson || isJointSection) && (
+            <div className={clsx('rounded-xl border px-3 py-2 text-xs font-bold mb-3', sectionColor)}>
+              {isNewPerson    && `Now setting up ${personLabel}`}
+              {isJointSection && '🤝 Joint assets'}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">{meta.icon}</span>
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">{meta.icon}</span>
               <div>
-                <p className="font-black text-slate-800 text-base leading-tight">{meta.title}</p>
-                <p className="text-xs text-slate-400">{personLabel} · {phase}</p>
+                <p className="font-black text-slate-800 leading-tight">{meta.title}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{personLabel} · {meta.section}</p>
               </div>
             </div>
-            <button onClick={onDone} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-400 text-lg leading-none transition-colors">×</button>
+            <button onClick={onDone}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 text-lg leading-none transition-colors flex-shrink-0 ml-3">
+              ×
+            </button>
           </div>
 
           {/* Progress dots */}
@@ -501,38 +666,37 @@ export default function GuidedSetupWizard({ onDone }: Props) {
             {steps.map((s, i) => {
               const isCurrent = i === idx;
               const isDone    = i < idx;
-              const isP2Start = mode === 'couple' && s.person === 'p2' && (i === 0 || steps[i - 1].person === 'p1');
+              const color     =
+                s.kind === 'joint'                               ? (isCurrent ? 'bg-violet-500' : isDone ? 'bg-violet-300' : 'bg-slate-200') :
+                s.kind === 'person' && s.person === 'p2'         ? (isCurrent ? 'bg-emerald-500' : isDone ? 'bg-emerald-300' : 'bg-slate-200') :
+                                                                    (isCurrent ? 'bg-orange-500'  : isDone ? 'bg-orange-300'  : 'bg-slate-200');
+              // Divider before p2 and joint sections
+              const showDivider = i > 0 && (
+                (s.kind === 'person' && s.person === 'p2' && steps[i - 1].kind === 'person' && (steps[i - 1] as { person: string }).person === 'p1') ||
+                (s.kind === 'joint' && steps[i - 1].kind !== 'joint')
+              );
               return (
                 <div key={i} className="flex items-center gap-1">
-                  {isP2Start && <div className="w-px h-3 bg-slate-200 mx-0.5" />}
-                  <div className={clsx('rounded-full transition-all', isCurrent ? 'w-5 h-2 bg-orange-500' : isDone ? 'w-2 h-2 bg-orange-300' : 'w-2 h-2 bg-slate-200')} />
+                  {showDivider && <div className="w-px h-3 bg-slate-300 mx-1" />}
+                  <div className={clsx('rounded-full transition-all', isCurrent ? 'w-5 h-2' : 'w-2 h-2', color)} />
                 </div>
               );
             })}
           </div>
-          {isFirstP2Step && (
-            <p className="text-xs font-bold text-emerald-600 mt-2">Now setting up {p2Label}</p>
-          )}
         </div>
 
-        {/* Scrollable content */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-5">
-          {stepContent[current.stepId]}
+          {renderContent()}
         </div>
 
         {/* Footer */}
         <div className="flex-shrink-0 border-t border-slate-100 px-6 py-4 flex items-center justify-between bg-slate-50/50 sm:rounded-b-3xl">
-          <button
-            onClick={() => idx > 0 ? setIdx(i => i - 1) : onDone()}
-            className="btn-secondary text-sm"
-          >
+          <button onClick={() => idx > 0 ? setIdx(i => i - 1) : onDone()} className="btn-secondary text-sm">
             {idx > 0 ? '← Back' : 'Cancel'}
           </button>
-          <div className="text-xs text-slate-400">{idx + 1} / {steps.length}</div>
-          <button
-            onClick={isLast ? handleSave : () => setIdx(i => i + 1)}
-            className="btn-primary px-8 text-sm"
-          >
+          <span className="text-xs text-slate-400">{idx + 1} / {steps.length}</span>
+          <button onClick={isLast ? handleSave : () => setIdx(i => i + 1)} className="btn-primary px-8 text-sm">
             {isLast ? 'Save →' : 'Next →'}
           </button>
         </div>
