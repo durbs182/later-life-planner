@@ -516,22 +516,30 @@ export function getSustainableRlssLevel(
 /**
  * Calculate gamification metrics for dashboard display.
  *
- * incomeStabilityScore:  % of Year 1 spending covered by guaranteed income (SP + DB + annuity).
+ * incomeStabilityScore:  average % of spending covered by guaranteed income across the full
+ *                        post-FI projection. Using the average avoids a misleading 0% when
+ *                        state pension or DB pension starts after the FI age.
  * spendingConfidenceScore: % of years in the projection where the plan is fully funded.
  * fundedGoalsCount: number of aspirational/lifestyle spending categories with non-zero amounts.
  */
 export function calculateGamificationMetrics(state: PlannerState): GamificationMetrics {
   const projections = calculateProjections(state);
-  // Use the FI age year as "year 1" — income and spending are only meaningful from FI age onwards.
-  const firstYear = projections.find(p => p.p1Age >= state.fiAge) ?? projections[0];
   const firstStageId = state.lifeStages[0]?.id ?? 'go-go';
 
-  // Income stability: guaranteed income / spending in year 1
-  const guaranteedIncome = (firstYear?.p1StatePension ?? 0) + (firstYear?.p1DbPension ?? 0)
-                         + (firstYear?.p2StatePension ?? 0) + (firstYear?.p2DbPension ?? 0)
-                         + (firstYear?.p1OtherIncome  ?? 0) + (firstYear?.p2OtherIncome  ?? 0);
-  const yearOneSpending  = firstYear?.spending ?? 1;
-  const incomeStabilityScore = Math.min(100, Math.round((guaranteedIncome / yearOneSpending) * 100));
+  // Restrict to post-FI years only
+  const postFiYears = projections.filter(p => p.p1Age >= state.fiAge);
+  const planYears = postFiYears.length > 0 ? postFiYears : projections;
+
+  // Income stability: average guaranteed income / average spending across all post-FI years.
+  // This correctly reflects state pension and DB pension even when they start after FI age.
+  const totalGuaranteed = planYears.reduce((sum, p) =>
+    sum + (p.p1StatePension ?? 0) + (p.p1DbPension ?? 0)
+        + (p.p2StatePension ?? 0) + (p.p2DbPension ?? 0)
+        + (p.p1OtherIncome  ?? 0) + (p.p2OtherIncome  ?? 0), 0);
+  const totalSpending = planYears.reduce((sum, p) => sum + (p.spending ?? 0), 0);
+  const incomeStabilityScore = totalSpending > 0
+    ? Math.min(100, Math.round((totalGuaranteed / totalSpending) * 100))
+    : 0;
 
   // Spending confidence: funded years / total years
   const fundedYears = projections.filter(p => p.totalAssets > 0).length;
