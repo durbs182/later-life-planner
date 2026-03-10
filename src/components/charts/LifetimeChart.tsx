@@ -92,7 +92,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const gap = netSpendable - (spendingEntry?.value ?? 0);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm min-w-[200px]">
+    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm min-w-[260px]">
       <p className="font-bold text-slate-800 mb-2">Age {label}{p2 != null ? ` / ${p2}` : ''}</p>
 
       {incomeBars.map((p: any) => (
@@ -121,12 +121,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           </div>
         )}
 
-        <div className="flex justify-between text-slate-600">
+        <div className="flex justify-between gap-4 text-slate-600">
           <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-700 inline-block" />
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-700 inline-block flex-shrink-0" />
             Spending target
           </span>
-          <span className="font-semibold">{formatCurrency(spendingEntry?.value ?? 0)}</span>
+          <span className="font-semibold flex-shrink-0">{formatCurrency(spendingEntry?.value ?? 0)}</span>
         </div>
 
         {shortfall > 0 ? (
