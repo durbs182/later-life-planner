@@ -1,5 +1,6 @@
 'use client';
 
+import { useState as useLocalState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
 import type { AspirationTag } from '@/models/types';
 import clsx from 'clsx';
@@ -29,6 +30,34 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
     lifeStages, updateLifeStage,
     assumptions, updateAssumptions,
   } = usePlannerStore();
+
+  const [isGenerating, setIsGenerating] = useLocalState(false);
+
+  async function handleGenerateVision() {
+    setIsGenerating(true);
+    setLifeVision('');
+    try {
+      const res = await fetch('/api/generate-vision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ aspirations, mode, existingVision: lifeVision }),
+      });
+      if (!res.ok || !res.body) throw new Error('Request failed');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        setLifeVision(text);
+      }
+    } catch {
+      // silently fail — user can just type manually
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   // Max endAge for a non-last stage: must leave 1 year for every stage that follows.
   function maxEndAge(stageIndex: number): number {
@@ -187,9 +216,30 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
 
       {/* Life vision text */}
       <div className="game-card">
-        <h3 className="section-heading">
-          {mode === 'couple' ? '💬 Your shared life vision' : '💬 Your life vision'}
-        </h3>
+        <div className="flex items-start justify-between mb-1">
+          <h3 className="section-heading mb-0">
+            {mode === 'couple' ? '💬 Your shared life vision' : '💬 Your life vision'}
+          </h3>
+          <button
+            onClick={handleGenerateVision}
+            disabled={isGenerating}
+            className={clsx(
+              'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all flex-shrink-0 ml-3',
+              isGenerating
+                ? 'bg-violet-100 text-violet-400 cursor-not-allowed'
+                : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+            )}
+          >
+            {isGenerating ? (
+              <>
+                <span className="animate-spin inline-block w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full" />
+                Writing…
+              </>
+            ) : (
+              <>✨ Help me write this</>
+            )}
+          </button>
+        </div>
         <p className="section-subheading">
           In your own words — what does a great week, month or year look like?
         </p>
