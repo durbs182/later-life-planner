@@ -8,66 +8,114 @@ Built with Next.js 14, TypeScript, TailwindCSS, and Recharts. Deployable to Verc
 
 ## What it does
 
-A four-step wizard that takes you from life vision to a full lifetime financial dashboard:
+A five-step wizard that takes you from life vision to a full lifetime financial dashboard:
 
-**Step 1 — Life Vision**
-Define your aspirations, life stages (Active / Gradual / Later), and planning horizon. Works for individuals or couples, with each person's details captured separately.
+**Step 1 — Household Setup**
+Choose individual or couple mode. Capture names, current ages, and financial independence (FI) age — the age from which work becomes optional.
 
-**Step 2 — Spending Goals**
-Set your target annual spending in today's £. Choose a starting point from UK Retirement Living Standards (PLSA 2024), then refine by category:
+**Step 2 — Life Vision**
+Set your retirement aspirations and define up to three life stages (Go-Go Years, Slo-Go Years, No-Go Years) with age boundaries and spending multipliers for each stage.
+
+**Step 3 — Spending Goals**
+Set target annual spending in today's £. Choose a starting point from UK Retirement Living Standards (PLSA 2024), then refine by category:
 
 | Household | Minimum | Moderate | Comfortable |
 |-----------|---------|----------|-------------|
-| Single | £13,400 | £31,700 | £43,900 |
-| Couple | £21,600 | £43,900 | £60,600 |
+| Single    | £13,400 | £31,700  | £43,900     |
+| Couple    | £21,600 | £43,900  | £60,600     |
 
 21 spending categories across four tiers: Essential, Enjoyment, Aspirational, and Life-Stage/Variable.
 
-**Step 3 — Income & Assets**
-Capture all income streams and assets individually per person, grouped by priority:
+**Step 4 — Income & Assets**
+Capture all income streams and assets per person. A guided setup wizard is available for first-time users. Income sources:
 
-1. **Guaranteed income** — DB pension, annuity, State Pension (fills personal allowance first)
-2. **Property income** — rental income, property value and base cost for CGT
-3. **Flexible sources** — DC pension, part-time work, other income
+- State Pension (weekly forecast amount, start age)
+- DB pension (annual income, start age)
+- Annuity (annual income, start age)
+- DC pension (pot value, growth rate)
+- Part-time work (annual income, stop age)
+- Other income (trusts, gifts, fixed-term income)
 
-Assets include Cash, ISA, General Investments (GIA with base cost for CGT), and Property.
+Assets per person: Cash savings, ISA, General Investments / GIA (value + base cost for CGT), Property (value, rental income, base cost). Plus a joint GIA (couple mode only) and an optional Care Reserve earmarked for late-life costs.
 
-**Step 4 — Lifetime Dashboard**
-A full projection from today to age 95 showing:
-- Income vs spending chart (stacked bars + spending line)
+**Step 5 — Lifetime Dashboard**
+A full projection from FI age to life expectancy showing:
+- Income vs spending chart (stacked bars by source + spending line)
 - Asset balance trajectory
-- Year-by-year projection table with income tax and CGT columns
-- CGT summary (lifetime total, peak year, per-year breakdown)
-- Tax-efficient withdrawal strategy panel
+- Key metrics: total assets at FI, projected surplus/depletion age, lifetime tax, tax-free years, effective tax rate
+- Simplified tax-efficient withdrawal strategy panel
+- Year-by-year projection table (income, tax, net income, total assets)
 
 ---
 
 ## Tax modelling
 
-- **Income tax** — UK 2024/25 rates; personal allowance £12,570; basic rate 20% to £50,270; higher rate 40% above. Modelled per person.
-- **CGT** — proportional disposal method on GIA drawdowns; £3,000 annual exempt amount; 10%/20% rates. Base cost tracked and reduced proportionally on each withdrawal.
-- **DC pension** — UFPLS model: 25% of each drawdown is tax-free, 75% taxed as income.
-- **Property CGT** — base cost captured for future planning; not modelled on sale in Phase 1.
+All tax is modelled per person. UK 2024/25 rates throughout.
 
-**Withdrawal order (tax-efficient):**
-1. Personal allowance — guaranteed income fills this first
-2. CGT allowance — GIA disposals up to £3,000 exempt
-3. PCLS — 25% tax-free pension commencement lump sum
-4. ISA — completely tax-free
-5. Taxable pension income — 75% of DC drawdown
+### Income Tax
+
+- Personal allowance: £12,570
+- Basic rate: 20% on income £12,571–£50,270
+- Higher rate: 40% on income above £50,270
+
+### Capital Gains Tax
+
+- Annual exempt amount: £3,000 per person (2024/25)
+- Basic-rate taxpayers: 18% on gains above the exempt amount
+- Higher-rate taxpayers: 24% on gains above the exempt amount
+- Proportional disposal method: gains calculated as `drawn × (value − baseCost) / value`; base cost reduced proportionally on each withdrawal
+
+### DC Pension — UFPLS strategy
+
+Each drawdown uses the Uncrystallised Funds Pension Lump Sum (UFPLS) method:
+- 25% of each withdrawal is tax-free
+- 75% is taxable as income in the year of withdrawal
+- The 25% tax-free portion accumulates against the Lump Sum Allowance (LSA: £268,275 per person lifetime cap). Once exhausted, DC withdrawals become fully taxable.
+
+UFPLS is preferred over a one-off PCLS lump sum because it leaves the full pot invested and tax-sheltered for longer, and the 75% taxable portion can be absorbed within the personal allowance in pre-State-Pension years.
+
+### Drawdown waterfall
+
+The engine applies this order each year to fund the spending gap after fixed income:
+
+1. **DC within personal allowance** — UFPLS up to the point where the 75% taxable portion fills remaining personal allowance headroom (accounts for DB, other income, and State Pension already using the allowance). Effective tax rate: 0%.
+2. **GIA within per-person CGT budget** — individual GIA drawn first, then joint GIA, capped so each person's total capital gain stays within their £3,000 annual exempt. The CGT exempt is use-it-or-lose-it: drawing GIA here steps up the base cost at zero tax cost each year.
+3. **ISA** — fully tax-free, drawn after the GIA CGT-free slice to ensure the annual exempt is always utilised while GIA gains exist.
+4. **Remaining GIA** — any further GIA needed; gains above the CGT exempt are taxable.
+5. **Cash savings** — tax-free withdrawal.
+6. **DC above personal allowance** — further DC if all other sources are exhausted; taxed at marginal income tax rate.
+
+### Per-person CGT budget coordination (joint GIA)
+
+For couples with a joint GIA, capital gains are split 50/50. Individual GIAs are drawn first, reducing each person's remaining CGT budget. The joint GIA is then capped by `min(p1RemainingBudget, p2RemainingBudget) × 2`, ensuring neither person inadvertently exceeds their £3,000 exempt amount from the combination of individual and joint GIA draws.
+
+### Gross-up iteration
+
+Tax is not known until the gross withdrawal amount is known, which depends on the tax. The engine converges this with up to four iterations:
+
+```
+grossTarget₀ = spending
+grossTargetₙ₊₁ = spending + taxFromIterationₙ
+```
+
+Converges in 2–3 passes. When ISA or Cash cover the extra tax draw, convergence is exact in a single extra iteration.
+
+### State Pension sole-income exemption
+
+Per UK government policy, State Pension is not taxed when it is the person's only income source in a year (configurable via `statePensionSoleIncomeExempt` assumption).
 
 ---
 
 ## Tech stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 14 (App Router) |
-| Language | TypeScript |
-| Styling | TailwindCSS |
-| Charts | Recharts |
-| State | Zustand with localStorage persistence |
-| Deployment | Vercel |
+| Layer       | Technology                          |
+|-------------|-------------------------------------|
+| Framework   | Next.js 14 (App Router)             |
+| Language    | TypeScript                          |
+| Styling     | TailwindCSS                         |
+| Charts      | Recharts                            |
+| State       | Zustand with localStorage persistence |
+| Deployment  | Vercel                              |
 
 ---
 
@@ -90,27 +138,33 @@ npm run build   # production build
 
 ```
 src/
-  app/                  # Next.js app router (layout, page, globals.css)
+  app/                        # Next.js App Router (layout, page, globals.css)
   components/
-    steps/              # Step1–Step4 wizard screens
-    charts/             # LifetimeChart, AssetChart (Recharts)
-    ui/                 # Card, Toggle, CurrencyInput, SliderInput
+    steps/                    # Step1HouseholdSetup, Step1LifeVision, Step2SpendingGoals,
+    │                         #   Step3IncomeSources, Step4Dashboard
+    charts/                   # LifetimeChart, AssetChart (Recharts)
+    ui/                       # Card, Toggle, CurrencyInput, SliderInput, ConfirmModal
+    GuidedSetupWizard.tsx     # First-time setup wizard for income & assets
     Header.tsx
     StepIndicator.tsx
-    SummaryBar.tsx      # Sticky bottom bar with live spend/income/gap
-  lib/
-    types.ts            # All TypeScript interfaces
-    calculations.ts     # Projection engine, tax calculations, CGT
-    mockData.ts         # Default state, RLSS standards, demo data
+    SummaryBar.tsx            # Sticky bottom bar with live spend/income/gap
+    DisclaimerGate.tsx
+  config/
+    financialConstants.ts     # All UK tax rates, RLSS standards, pension rules, defaults
+  financialEngine/
+    projectionEngine.ts       # Core year-by-year projection loop and drawdown waterfall
+    taxCalculations.ts        # Income tax, CGT, UFPLS helpers
+  models/
+    types.ts                  # All TypeScript interfaces (PlannerState, YearlyProjection, …)
   store/
-    plannerStore.ts     # Zustand store with persist middleware
+    plannerStore.ts           # Zustand store with persist middleware
 ```
 
 ---
 
-## Demo
+## Financial constants
 
-Click **Load demo** in the header to populate a realistic couple scenario: Alex (57) and Sam (55) with a mix of DC pensions, ISA, GIA investments, DB pension, and part-time work.
+All UK-specific values (tax rates, allowances, pension rules, RLSS standards) are centralised in `src/config/financialConstants.ts`. Update this file annually when HMRC/DWP figures change — no other file needs editing for tax-year updates.
 
 ---
 
@@ -122,4 +176,10 @@ Deploy to Vercel in one step:
 npx vercel
 ```
 
-No environment variables or database setup required.
+No environment variables or database setup required. Investment return, inflation, and life expectancy defaults can be overridden via environment variables:
+
+```
+NEXT_PUBLIC_INVESTMENT_RETURN=4
+NEXT_PUBLIC_DEFAULT_INFLATION=2.5
+NEXT_PUBLIC_DEFAULT_LIFE_EXPECTANCY=95
+```
