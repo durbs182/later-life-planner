@@ -167,8 +167,8 @@ export const CARE_RESERVE = {
 
 export const WITHDRAWAL_ORDER = [
   'personal_allowance', // Guaranteed income fills personal allowance first
-  'cgt_allowance',      // Use CGT exempt amount on GIA disposals
-  'isa',                // ISA — fully tax-free at any time
+  'isa',                // ISA — fully tax-free; drawn before GIA to avoid unnecessary CGT
+  'cgt_allowance',      // GIA within per-person CGT budget (individual + joint share ≤ £3,000 each)
   'gia',                // GIA — CGT on gains above annual exempt
   'cash',               // Cash savings — no tax on withdrawal
   'ufpls',              // DC pension via UFPLS — 25% tax-free per withdrawal, 75% taxable income

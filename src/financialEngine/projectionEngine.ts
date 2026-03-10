@@ -222,8 +222,9 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     // tax is unchanged and convergence is exact in a single extra iteration.
     // Post-FI priority:
     //   1. DC within personal allowance  (UFPLS, 0% effective tax)
-    //   2. GIA within CGT exempt amount  (steps up base cost, tax-free)
-    //   3. ISA                           (always tax-free)
+    //   2. ISA                           (always tax-free; drawn before GIA to avoid CGT)
+    //   3. GIA within per-person CGT budget (individual then joint; budgets coordinated
+    //                                        so each person's total gain ≤ £3,000)
     //   4. Remaining GIA                 (CGT taxable above exempt)
     //   5. Cash                          (tax-free withdrawal)
     //   6. DC above personal allowance   (income tax at marginal rate)
@@ -273,38 +274,57 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
           }
         }
 
-        // ── Step 2: GIA up to annual CGT exempt amount ──────────────────────
-        // Crystallising gains within the CGT allowance (£3,000/person) is tax-free
-        // and steps up the base cost — always worth doing when cash is needed.
-        // GIA drawdown is deferred until FI age to preserve the tax-efficient
-        // retirement waterfall — ISA/cash cover any pre-FI spending gap instead.
+        // ── Step 2: ISA ─────────────────────────────────────────────────────
+        // Drawn before GIA: ISA withdrawals are always tax-free and don't consume
+        // the annual CGT exempt amount. Using ISA first avoids triggering any CGT
+        // while ISA funds remain available. GIA draws (step 3) are reserved for
+        // when ISA is exhausted, at which point the CGT exempt amount can be used
+        // to crystallise gains and step up base cost at zero tax cost.
+        if (remaining > 0 && p1Isa > 0 && p1Age >= fiAge) {
+          const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
+        }
+        if (remaining > 0 && p2Isa > 0 && p2Age !== null && p2Age >= fiAge) {
+          const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
+        }
+
+        // ── Step 3: GIA within per-person CGT budget ────────────────────────
+        // Only reached once ISA is exhausted. Crystallises gains up to each person's
+        // annual CGT exempt amount (£3,000), stepping up base cost at zero tax cost.
+        // Per-person budgets are tracked so that joint GIA gains (split 50/50) don't
+        // push either person above their exempt amount — individual GIA is drawn first,
+        // then the joint GIA is capped by whichever person has less budget remaining.
+        let p1CgBudget = CGT.ANNUAL_EXEMPT;
+        let p2CgBudget = mode === 'couple' ? CGT.ANNUAL_EXEMPT : 0;
         if (remaining > 0 && p1GiaV > 0 && p1Age >= fiAge) {
           const gainFrac = p1GiaV > p1GiaBC ? (p1GiaV - p1GiaBC) / p1GiaV : 0;
-          const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p1GiaV;
+          const maxForCgt = gainFrac > 0 ? p1CgBudget / gainFrac : p1GiaV;
           const d = Math.min(maxForCgt, p1GiaV, remaining);
           if (d > 0) {
             const r = drawFromGIA(p1GiaV, p1GiaBC, d);
             p1GiaD += r.drawn; p1GiaCG += r.capitalGain;
             p1GiaV = r.newValue; p1GiaBC = r.newBaseCost;
             remaining -= r.drawn;
+            p1CgBudget -= r.capitalGain;
           }
         }
         if (remaining > 0 && p2GiaV > 0 && p2Age !== null && p2Age >= fiAge) {
           const gainFrac = p2GiaV > p2GiaBC ? (p2GiaV - p2GiaBC) / p2GiaV : 0;
-          const maxForCgt = gainFrac > 0 ? CGT.ANNUAL_EXEMPT / gainFrac : p2GiaV;
+          const maxForCgt = gainFrac > 0 ? p2CgBudget / gainFrac : p2GiaV;
           const d = Math.min(maxForCgt, p2GiaV, remaining);
           if (d > 0) {
             const r = drawFromGIA(p2GiaV, p2GiaBC, d);
             p2GiaD += r.drawn; p2GiaCG += r.capitalGain;
             p2GiaV = r.newValue; p2GiaBC = r.newBaseCost;
             remaining -= r.drawn;
+            p2CgBudget -= r.capitalGain;
           }
         }
         if (remaining > 0 && jointGiaV > 0 && p1Age >= fiAge) {
-          // Joint GIA gains are split 50/50, so effective CGT capacity is 2× the individual allowance
-          const effectiveCgt = mode === 'couple' ? CGT.ANNUAL_EXEMPT * 2 : CGT.ANNUAL_EXEMPT;
+          // Joint GIA gains split 50/50 — cap by whichever person has less CGT budget remaining,
+          // so neither person exceeds their £3,000 annual exempt amount.
           const gainFrac = jointGiaV > jointGiaBC ? (jointGiaV - jointGiaBC) / jointGiaV : 0;
-          const maxForCgt = gainFrac > 0 ? effectiveCgt / gainFrac : jointGiaV;
+          const effectiveBudget = mode === 'couple' ? Math.min(p1CgBudget, p2CgBudget) * 2 : p1CgBudget;
+          const maxForCgt = gainFrac > 0 ? effectiveBudget / gainFrac : jointGiaV;
           const d = Math.min(maxForCgt, jointGiaV, remaining);
           if (d > 0) {
             const r = drawFromGIA(jointGiaV, jointGiaBC, d);
@@ -312,16 +332,6 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
             jointGiaV = r.newValue; jointGiaBC = r.newBaseCost;
             remaining -= r.drawn;
           }
-        }
-
-        // ── Step 3: ISA ─────────────────────────────────────────────────────
-        // Deferred until FI age — pre-FI spending is assumed covered by working
-        // income, preserving the ISA wrapper for tax-efficient retirement drawdown.
-        if (remaining > 0 && p1Isa > 0 && p1Age >= fiAge) {
-          const d = Math.min(p1Isa, remaining); p1IsaD = d; p1Isa -= d; remaining -= d;
-        }
-        if (remaining > 0 && p2Isa > 0 && p2Age !== null && p2Age >= fiAge) {
-          const d = Math.min(p2Isa, remaining); p2IsaD = d; p2Isa -= d; remaining -= d;
         }
 
         // ── Step 4: Remaining GIA (gains above CGT allowance, now taxable) ──
