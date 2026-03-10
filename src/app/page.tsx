@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { usePlannerStore } from '@/store/plannerStore';
 import Header from '@/components/Header';
 import StepIndicator from '@/components/StepIndicator';
 import SummaryBar from '@/components/SummaryBar';
+import DisclaimerGate from '@/components/DisclaimerGate';
 import Step1HouseholdSetup from '@/components/steps/Step1HouseholdSetup';
 import Step1LifeVision from '@/components/steps/Step1LifeVision';
 import Step2SpendingGoals from '@/components/steps/Step2SpendingGoals';
@@ -23,12 +24,15 @@ const STEPS = [
 
 export default function Home() {
   const { currentStep, maxVisitedStep, setCurrentStep } = usePlannerStore();
+  const [accepted, setAccepted] = useState(false);
   const goNext = () => setCurrentStep(Math.min(currentStep + 1, STEPS.length - 1));
   const goBack = () => setCurrentStep(Math.max(currentStep - 1, 0));
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [currentStep]);
+
+  if (!accepted) return <DisclaimerGate onAccept={() => setAccepted(true)} />;
 
   return (
     <div className="min-h-screen flex flex-col bg-cream-100">
