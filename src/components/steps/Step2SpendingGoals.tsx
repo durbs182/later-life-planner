@@ -69,7 +69,7 @@ export default function Step2SpendingGoals({ onNext, onBack }: Props) {
       <div className="game-card bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100">
         <h3 className="section-heading">Choose your lifestyle</h3>
         <p className="text-xs text-slate-500 mb-4">
-          UK Retirement Living Standards (PLSA 2024) · <strong>{mode === 'couple' ? 'Two-person' : 'One-person'}</strong> household
+          UK Retirement Living Standards (PLSA 2024) · <strong>{mode === 'couple' ? 'Two-person' : 'One-person'}</strong> household · <a href="https://www.retirementlivingstandards.org.uk/" target="_blank" rel="noopener noreferrer" className="underline text-orange-600 hover:text-orange-800">More info</a>
         </p>
 
         <div className="grid grid-cols-3 gap-2 mb-3">
