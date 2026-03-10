@@ -15,6 +15,7 @@ const ASPIRATIONS: { tag: AspirationTag; label: string; icon: string }[] = [
   { tag: 'property',     label: 'Home & Garden', icon: '🏡'  },
   { tag: 'health',       label: 'Wellbeing',     icon: '💚'  },
   { tag: 'fitness',      label: 'Fitness',       icon: '🏃'  },
+  { tag: 'social',       label: 'Friends & Social', icon: '🥂' },
 ];
 
 const STAGE_COLORS = { 'go-go': '#f97316', 'slo-go': '#10b981', 'no-go': '#8b5cf6' } as const;

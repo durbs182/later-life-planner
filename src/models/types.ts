@@ -2,7 +2,7 @@
 
 export type AspirationTag =
   | 'travel' | 'hobbies' | 'learning' | 'family'
-  | 'volunteering' | 'property' | 'health' | 'fitness' | 'giving';
+  | 'volunteering' | 'property' | 'health' | 'fitness' | 'giving' | 'social';
 
 /**
  * Spending tiers map to the product prompt's four category groups:
