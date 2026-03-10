@@ -492,7 +492,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
             </div>
           </div>
           <button onClick={() => setShowGuided(true)} className="btn-primary text-sm flex-shrink-0 whitespace-nowrap">
-            Start guided →
+            Get started →
           </button>
         </div>
       ) : (
