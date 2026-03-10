@@ -89,7 +89,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     (p: any) => !['spending', 'shortfall', 'tax'].includes(p.dataKey) && p.value > 0,
   );
   const netSpendable = incomeBars.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
-  const gap = netSpendable - (spendingEntry?.value ?? 0);
+  const gap = netSpendable - (spendingEntry?.value ?? 0); // used for surplus display
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-sm min-w-[260px]">
@@ -106,11 +106,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       ))}
 
       <div className="border-t border-slate-200 mt-2 pt-2 space-y-1">
-        <div className="flex justify-between text-slate-700">
-          <span className="font-semibold">Net spendable</span>
-          <span className="font-semibold">{formatCurrency(netSpendable)}</span>
-        </div>
-
         {taxAmount > 0 && (
           <div className="flex justify-between text-slate-500">
             <span className="flex items-center gap-1.5">
