@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
 import Toggle from '@/components/ui/Toggle';
 import CurrencyInput from '@/components/ui/CurrencyInput';
+import GuidedSetupWizard from '@/components/GuidedSetupWizard';
 import type { PersonIncomeSources, PersonAssets, AssetOwner } from '@/lib/types';
 import clsx from 'clsx';
 
@@ -452,6 +453,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
 
   const [activePerson, setActivePerson] = useState<'person1' | 'person2'>('person1');
   const [activeTab, setActiveTab]       = useState<'income' | 'assets'>('income');
+  const [showGuided, setShowGuided]     = useState(false);
 
   const p1Label = person1.name || 'You';
   const p2Label = person2.name || 'Partner';
@@ -475,6 +477,32 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
         </h2>
         <p className="text-slate-500">Capture all income streams and assets. Guaranteed sources first.</p>
       </div>
+
+      {/* Guided setup entry point */}
+      {!showGuided ? (
+        <div className="rounded-2xl border-2 border-dashed border-orange-200 bg-orange-50/50 p-4 flex items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl flex-shrink-0">✨</span>
+            <div>
+              <p className="font-bold text-slate-800 text-sm">First time here?</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Use our guided setup to add your pensions, ISAs and savings step by step.
+                {mode === 'couple' && ' We\'ll go through each person in turn.'}
+              </p>
+            </div>
+          </div>
+          <button onClick={() => setShowGuided(true)} className="btn-primary text-sm flex-shrink-0 whitespace-nowrap">
+            Start guided →
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <GuidedSetupWizard onDone={() => setShowGuided(false)} />
+          <button onClick={() => setShowGuided(false)} className="text-xs text-slate-400 hover:text-slate-600 w-full text-center">
+            Cancel and enter manually instead
+          </button>
+        </div>
+      )}
 
       {/* Person selector (couple only) */}
       {mode === 'couple' && (
