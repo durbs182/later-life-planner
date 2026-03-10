@@ -40,7 +40,7 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
       const res = await fetch('/api/generate-vision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aspirations, mode, existingVision: lifeVision }),
+        body: JSON.stringify({ aspirations, mode }),
       });
       if (!res.ok || !res.body) throw new Error('Request failed');
       const reader = res.body.getReader();
@@ -250,7 +250,7 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
             ? 'e.g. We want to travel widely while we have the energy, spend time with grandchildren, pursue photography and sailing…'
             : 'e.g. I want to winter in Southeast Asia, spend summers in my garden, help my grandchildren with their education…'}
           rows={4}
-          className="input-base resize-none leading-relaxed text-base"
+          className="input-base resize-none leading-relaxed text-base whitespace-pre-wrap"
         />
         <p className="text-xs text-slate-400 mt-2 text-right">
           {lifeVision.length > 0 ? `${lifeVision.length} characters` : 'Optional — but powerful for clarity'}

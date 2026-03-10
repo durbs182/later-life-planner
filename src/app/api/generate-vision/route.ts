@@ -3,16 +3,24 @@ import { NextRequest } from 'next/server';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-export async function POST(req: NextRequest) {
-  const { aspirations, mode, existingVision } = await req.json();
+const SYSTEM_PROMPT = `You write short, plain-English retirement vision statements.
+Rules:
+- Use everyday words. Never use words like "envision", "curate", "tapestry", "rootedness", "embark", "journey", "intentional", "meaningful", or similar abstract filler.
+- Write like a real person talking to a friend — warm and direct, not like a brochure.
+- Short sentences. No jargon.
+- Split the response into 2–3 short paragraphs, each on a new line.
+- No bullet points, no headings, no sign-off.`;
 
-  const aspirationList = aspirations.length > 0
-    ? aspirations.join(', ')
-    : 'general enjoyment of later life';
+export async function POST(req: NextRequest) {
+  const { aspirations, mode } = await req.json();
+
+  const aspirationList = (aspirations as string[]).length > 0
+    ? (aspirations as string[]).join(', ')
+    : 'enjoying later life';
 
   const prompt = mode === 'couple'
-    ? `Write a warm, personal 2–3 sentence life vision statement for a couple planning their retirement. Their chosen priorities are: ${aspirationList}.${existingVision ? ` They've started with: "${existingVision}".` : ''} Make it feel personal and inspiring, using "we" language. Do not use bullet points or headings — just flowing sentences.`
-    : `Write a warm, personal 2–3 sentence life vision statement for someone planning their retirement. Their chosen priorities are: ${aspirationList}.${existingVision ? ` They've started with: "${existingVision}".` : ''} Make it feel personal and inspiring. Do not use bullet points or headings — just flowing sentences.`;
+    ? `Write a life vision statement for a couple planning retirement. Their priorities are: ${aspirationList}. Use "we" and "us". Keep it real and personal — 2 to 3 short paragraphs.`
+    : `Write a life vision statement for someone planning retirement. Their priorities are: ${aspirationList}. Keep it real and personal — 2 to 3 short paragraphs.`;
 
   const encoder = new TextEncoder();
 
@@ -20,7 +28,8 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       const anthropicStream = client.messages.stream({
         model: 'claude-haiku-4-5',
-        max_tokens: 200,
+        max_tokens: 250,
+        system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: prompt }],
       });
 
