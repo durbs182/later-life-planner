@@ -42,7 +42,7 @@ type JointDraft = {
 
 function emptyDraft(): PersonDraft {
   return {
-    statePension: { enabled: false, weeklyAmount: 221, startAge: 67 },
+    statePension: { enabled: true, weeklyAmount: 221, startAge: 67 },
     dbPensions:   [],
     annuity:      { enabled: false, annualIncome: 0, startAge: 65 },
     otherIncome:  { enabled: false, annualAmount: 0, startAge: 65 },
@@ -209,8 +209,7 @@ function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
   const upd = (p: Partial<typeof sp>) => onChange({ ...draft, statePension: { ...sp, ...p } });
   return (
     <div className="space-y-5">
-      <YesNoToggle value={sp.enabled} onChange={(v) => upd({ enabled: v })} yesLabel="Yes, I have one" noLabel="No / Not sure" />
-      {sp.enabled && (
+      {sp.enabled ? (
         <>
           <Field label="Weekly amount" hint="Check your forecast at gov.uk/check-state-pension · Full amount is £221.20/week (2024/25)">
             <CurrencyInput value={sp.weeklyAmount} onChange={(v) => upd({ weeklyAmount: v })} max={300} step={1} />
@@ -221,7 +220,19 @@ function StepSP({ draft, onChange }: { draft: PersonDraft; onChange: (d: PersonD
           <div className="rounded-xl bg-sky-50 border border-sky-100 p-3 text-xs text-sky-700">
             Annual value: <strong>£{(sp.weeklyAmount * 52).toLocaleString('en-GB')}</strong> · Increases with inflation each year
           </div>
+          <button type="button" onClick={() => upd({ enabled: false })}
+            className="text-xs text-slate-400 hover:text-slate-600 underline">
+            I won&apos;t have a State Pension
+          </button>
         </>
+      ) : (
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-4 text-center space-y-2">
+          <p className="text-sm text-slate-500">State Pension excluded from your plan.</p>
+          <button type="button" onClick={() => upd({ enabled: true })}
+            className="text-sm text-orange-600 hover:text-orange-700 font-semibold underline">
+            Add it back
+          </button>
+        </div>
       )}
     </div>
   );
