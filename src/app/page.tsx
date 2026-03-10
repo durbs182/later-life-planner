@@ -26,10 +26,10 @@ const DISCLAIMER_KEY = 'llp-disclaimer-accepted';
 
 export default function Home() {
   const { currentStep, maxVisitedStep, setCurrentStep, resetPlan } = usePlannerStore();
-  const [accepted, setAccepted] = useState(false);
+  const [accepted, setAccepted] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (localStorage.getItem(DISCLAIMER_KEY) === '1') setAccepted(true);
+    setAccepted(localStorage.getItem(DISCLAIMER_KEY) === '1');
   }, []);
   const goNext = () => setCurrentStep(Math.min(currentStep + 1, STEPS.length - 1));
   const goBack = () => setCurrentStep(Math.max(currentStep - 1, 0));
@@ -49,6 +49,7 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [currentStep]);
 
+  if (accepted === null) return null;
   if (!accepted) return <DisclaimerGate onAccept={handleAccept} />;
 
   return (
