@@ -81,7 +81,7 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
   const lifetimeCGT       = projections.reduce((s, p) => s + p.totalCgtPaid, 0);
   const lifetimeTotalTax  = lifetimeIncomeTax + lifetimeCGT;
   const lifetimeIncome    = projections.reduce((s, p) => s + p.totalIncome, 0);
-  const taxFreeYears      = projections.filter(p => p.totalTaxPaid === 0).length;
+  const taxFreeYears      = projections.filter(p => Math.round(p.totalTaxPaid) === 0).length;
   const effectiveRate     = lifetimeIncome > 0 ? (lifetimeTotalTax / lifetimeIncome) * 100 : 0;
 
   return (
