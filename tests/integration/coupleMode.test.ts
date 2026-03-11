@@ -275,3 +275,37 @@ describe('Paul & Lisa — couple mode invariants', () => {
     }
   });
 });
+
+// ─── Joint GIA lifetime CGT efficiency ───────────────────────────────────────
+// Migrated from the legacy tests/financialEngine.test.ts (the rest of that file
+// was superseded by the new test suite or referenced non-existent fields).
+
+describe('Joint GIA — lifetime CGT efficiency', () => {
+  test('joint GIA produces equal or lower lifetime CGT than the same asset held by one person', () => {
+    const base = bareCoupleState(60, 60);
+    const spending = 20_000;
+
+    // Joint: asset in top-level jointGia — gains split 50/50 between two CGT allowances
+    const stateJoint: PlannerState = {
+      ...withSpending(base, spending),
+      jointGia: { enabled: true, totalValue: 50_000, baseCost: 20_000, growthRate: 0 },
+    };
+
+    // P1 only: same asset as person1 individual GIA — all gains taxed against one person's £3,000 exempt
+    const stateP1: PlannerState = {
+      ...withSpending(base, spending),
+      person1: {
+        ...base.person1,
+        assets: {
+          ...base.person1.assets,
+          generalInvestments: { enabled: true, totalValue: 50_000, baseCost: 20_000, growthRate: 0 },
+        },
+      },
+    };
+
+    const cgtJoint = calculateProjections(stateJoint).reduce((s, p) => s + p.totalCgtPaid, 0);
+    const cgtP1    = calculateProjections(stateP1).reduce((s, p) => s + p.totalCgtPaid, 0);
+    // Splitting gains across two CGT allowances should never increase lifetime CGT
+    expect(cgtJoint).toBeLessThanOrEqual(cgtP1 + 0.01);
+  });
+});
