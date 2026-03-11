@@ -48,17 +48,25 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
 
   useEffect(() => {
     if (!captchaEnabled || !showCaptcha || !scriptReady || !captchaRef.current) return;
-    if (widgetIdRef.current) return;
-    widgetIdRef.current = window.turnstile.render(captchaRef.current, {
-      sitekey: siteKey!,
-      callback: (token: string) => {
-        setCaptchaToken(token);
-        setCaptchaError(null);
-      },
-      'error-callback': () => setCaptchaError('Captcha failed. Please try again.'),
-      'expired-callback': () => setCaptchaToken(null),
-      theme: 'light',
-    });
+    setCaptchaError(null);
+    if (widgetIdRef.current) {
+      try { window.turnstile.reset(widgetIdRef.current); } catch {}
+      return;
+    }
+    try {
+      widgetIdRef.current = window.turnstile.render(captchaRef.current, {
+        sitekey: siteKey!,
+        callback: (token: string) => {
+          setCaptchaToken(token);
+          setCaptchaError(null);
+        },
+        'error-callback': () => setCaptchaError('Captcha failed. Please try again.'),
+        'expired-callback': () => setCaptchaToken(null),
+        theme: 'light',
+      });
+    } catch {
+      setCaptchaError('Captcha failed to load. Please try again.');
+    }
   }, [captchaEnabled, showCaptcha, scriptReady, siteKey, setCaptchaError, setCaptchaToken]);
 
   useEffect(() => {
@@ -67,15 +75,11 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
     textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 360)}px`;
   }, [lifeVision]);
 
-  const resetCaptcha = useCallback((clearWidget: boolean = false) => {
+  const resetCaptcha = useCallback(() => {
     setCaptchaToken(null);
     setCaptchaError(null);
-    if (widgetIdRef.current) {
+    if (widgetIdRef.current && window.turnstile?.reset) {
       window.turnstile.reset(widgetIdRef.current);
-    }
-    if (clearWidget && captchaRef.current) {
-      captchaRef.current.innerHTML = '';
-      widgetIdRef.current = null;
     }
   }, [setCaptchaError, setCaptchaToken]);
 
@@ -107,7 +111,7 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
       setIsGenerating(false);
       setPendingGenerate(false);
       if (captchaEnabled) {
-        resetCaptcha(true);
+        resetCaptcha();
         setShowCaptcha(false);
       }
     }
@@ -313,8 +317,8 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
                 <>✨ Help me write this</>
               )}
             </button>
-            {captchaEnabled && showCaptcha && (
-              <div className="text-left sm:text-right">
+            {captchaEnabled && (
+              <div className={clsx('text-left sm:text-right', !showCaptcha && 'hidden')}>
                 <p className="text-xs text-slate-500 mb-2">Quick check before we generate your vision:</p>
                 <div ref={captchaRef} />
                 {captchaError && <p className="text-xs text-rose-600 mt-2">{captchaError}</p>}
@@ -340,8 +344,9 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
         </p>
       </div>
 
-      {captchaEnabled && showCaptcha && (
+      {captchaEnabled && (
         <Script
+          id="turnstile-script"
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
           strategy="afterInteractive"
           onLoad={() => setScriptReady(true)}

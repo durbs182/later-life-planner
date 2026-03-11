@@ -43,6 +43,8 @@ export default function Home() {
     localStorage.removeItem(DISCLAIMER_KEY);
     resetPlan();
     setAccepted(false);
+    // Hard reload to fully reset embedded widgets (e.g., Turnstile)
+    window.location.reload();
   }
 
   useEffect(() => {

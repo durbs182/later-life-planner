@@ -9,6 +9,8 @@ declare global {
         theme?: 'light' | 'dark' | 'auto';
       }) => string;
       reset: (widgetId?: string) => void;
+      remove: (widgetId: string) => void;
+      ready: (cb: () => void) => void;
     };
   }
 }
