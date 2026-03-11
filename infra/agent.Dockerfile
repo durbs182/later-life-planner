@@ -28,11 +28,17 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 RUN curl -fsSL https://aka.ms/InstallAzureCLIDeb | bash \
     && rm -rf /var/lib/apt/lists/*
 
+# ── Agent user (config.sh refuses to run as root) ────────────────────────────
+RUN useradd -m -s /bin/bash agentuser
+
 # ── Agent directory (populated at startup by agent-start.sh) ─────────────────
+RUN mkdir -p /agent && chown agentuser:agentuser /agent
 WORKDIR /agent
 
 COPY agent-start.sh ./start.sh
 # Strip Windows CRLF line endings and ensure executable
-RUN sed -i 's/\r$//' ./start.sh && chmod +x ./start.sh
+RUN sed -i 's/\r$//' ./start.sh && chmod +x ./start.sh && chown agentuser:agentuser ./start.sh
+
+USER agentuser
 
 ENTRYPOINT ["/agent/start.sh"]
