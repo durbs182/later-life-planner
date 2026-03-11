@@ -33,6 +33,7 @@ RUN curl -fsSL https://aka.ms/InstallAzureCLIDeb | bash \
 WORKDIR /agent
 
 COPY agent-start.sh ./start.sh
-RUN chmod +x ./start.sh
+# Strip Windows CRLF line endings and ensure executable
+RUN sed -i 's/\r$//' ./start.sh && chmod +x ./start.sh
 
 ENTRYPOINT ["/agent/start.sh"]
