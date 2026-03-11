@@ -1,6 +1,7 @@
 'use client';
 
-import { useState as useLocalState } from 'react';
+import { useCallback, useEffect, useRef, useState as useLocalState } from 'react';
+import Script from 'next/script';
 import { usePlannerStore } from '@/store/plannerStore';
 import type { AspirationTag } from '@/models/types';
 import clsx from 'clsx';
@@ -33,17 +34,64 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
   } = usePlannerStore();
 
   const [isGenerating, setIsGenerating] = useLocalState(false);
+  const [showCaptcha, setShowCaptcha] = useLocalState(false);
+  const [captchaToken, setCaptchaToken] = useLocalState<string | null>(null);
+  const [captchaError, setCaptchaError] = useLocalState<string | null>(null);
+  const [scriptReady, setScriptReady] = useLocalState(false);
+  const [pendingGenerate, setPendingGenerate] = useLocalState(false);
+  const captchaRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  async function handleGenerateVision() {
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const captchaEnabled = Boolean(siteKey);
+
+  useEffect(() => {
+    if (!captchaEnabled || !showCaptcha || !scriptReady || !captchaRef.current) return;
+    if (widgetIdRef.current) return;
+    widgetIdRef.current = window.turnstile.render(captchaRef.current, {
+      sitekey: siteKey!,
+      callback: (token: string) => {
+        setCaptchaToken(token);
+        setCaptchaError(null);
+      },
+      'error-callback': () => setCaptchaError('Captcha failed. Please try again.'),
+      'expired-callback': () => setCaptchaToken(null),
+      theme: 'light',
+    });
+  }, [captchaEnabled, showCaptcha, scriptReady, siteKey, setCaptchaError, setCaptchaToken]);
+
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = 'auto';
+    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 360)}px`;
+  }, [lifeVision]);
+
+  const resetCaptcha = useCallback((clearWidget: boolean = false) => {
+    setCaptchaToken(null);
+    setCaptchaError(null);
+    if (widgetIdRef.current) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+    if (clearWidget && captchaRef.current) {
+      captchaRef.current.innerHTML = '';
+      widgetIdRef.current = null;
+    }
+  }, [setCaptchaError, setCaptchaToken]);
+
+  const startGenerate = useCallback(async (token: string | null) => {
     setIsGenerating(true);
-    setLifeVision('');
     try {
       const res = await fetch('/api/generate-vision', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aspirations, mode }),
+        body: JSON.stringify({ aspirations, mode, turnstileToken: token }),
       });
-      if (!res.ok || !res.body) throw new Error('Request failed');
+      if (!res.ok || !res.body) {
+        resetCaptcha();
+        throw new Error('Request failed');
+      }
+      setLifeVision('');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let text = '';
@@ -57,8 +105,30 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
       // silently fail — user can just type manually
     } finally {
       setIsGenerating(false);
+      setPendingGenerate(false);
+      if (captchaEnabled) {
+        resetCaptcha(true);
+        setShowCaptcha(false);
+      }
     }
+  }, [aspirations, mode, setLifeVision, setIsGenerating, setPendingGenerate, resetCaptcha, captchaEnabled, setShowCaptcha]);
+
+  async function handleGenerateVision() {
+    if (captchaEnabled && !captchaToken) {
+      setShowCaptcha(true);
+      setCaptchaError(null);
+      setPendingGenerate(true);
+      return;
+    }
+    await startGenerate(captchaToken);
   }
+
+  useEffect(() => {
+    if (!captchaEnabled) return;
+    if (!pendingGenerate) return;
+    if (!captchaToken) return;
+    startGenerate(captchaToken);
+  }, [captchaEnabled, pendingGenerate, captchaToken, startGenerate]);
 
   // Max endAge for a non-last stage: must leave 1 year for every stage that follows.
   function maxEndAge(stageIndex: number): number {
@@ -217,46 +287,66 @@ export default function Step2LifeVision({ onNext, onBack }: Props) {
 
       {/* Life vision text */}
       <div className="game-card">
-        <div className="flex items-start justify-between mb-1">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-1">
           <h3 className="section-heading mb-0">
             {mode === 'couple' ? '💬 Your shared life vision' : '💬 Your life vision'}
           </h3>
-          <button
-            onClick={handleGenerateVision}
-            disabled={isGenerating}
-            className={clsx(
-              'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all flex-shrink-0 ml-3',
-              isGenerating
-                ? 'bg-violet-100 text-violet-400 cursor-not-allowed'
-                : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+          <div className="flex flex-col sm:items-end gap-2">
+            <button
+              onClick={handleGenerateVision}
+              disabled={isGenerating}
+              className={clsx(
+                'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all flex-shrink-0',
+                isGenerating
+                  ? 'bg-violet-100 text-violet-400 cursor-not-allowed'
+                  : 'bg-violet-100 text-violet-700 hover:bg-violet-200'
+              )}
+            >
+              {isGenerating ? (
+                <>
+                  <span className="animate-spin inline-block w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full" />
+                  Writing…
+                </>
+              ) : captchaEnabled && showCaptcha && !captchaToken ? (
+                <>🧩 Complete check to continue</>
+              ) : (
+                <>✨ Help me write this</>
+              )}
+            </button>
+            {captchaEnabled && showCaptcha && (
+              <div className="text-left sm:text-right">
+                <p className="text-xs text-slate-500 mb-2">Quick check before we generate your vision:</p>
+                <div ref={captchaRef} />
+                {captchaError && <p className="text-xs text-rose-600 mt-2">{captchaError}</p>}
+              </div>
             )}
-          >
-            {isGenerating ? (
-              <>
-                <span className="animate-spin inline-block w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full" />
-                Writing…
-              </>
-            ) : (
-              <>✨ Help me write this</>
-            )}
-          </button>
+          </div>
         </div>
         <p className="section-subheading">
           In your own words — what does a great week, month or year look like?
         </p>
         <textarea
+          ref={textareaRef}
           value={lifeVision}
           onChange={(e) => setLifeVision(e.target.value)}
           placeholder={mode === 'couple'
             ? 'e.g. We want to travel widely while we have the energy, spend time with grandchildren, pursue photography and sailing…'
             : 'e.g. I want to winter in Southeast Asia, spend summers in my garden, help my grandchildren with their education…'}
-          rows={4}
-          className="input-base resize-none leading-relaxed text-base whitespace-pre-wrap"
+          rows={6}
+          className="input-base resize-none leading-relaxed text-base whitespace-pre-wrap overflow-hidden"
         />
         <p className="text-xs text-slate-400 mt-2 text-right">
           {lifeVision.length > 0 ? `${lifeVision.length} characters` : 'Optional — but powerful for clarity'}
         </p>
       </div>
+
+      {captchaEnabled && showCaptcha && (
+        <Script
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+          strategy="afterInteractive"
+          onLoad={() => setScriptReady(true)}
+        />
+      )}
 
       <div className="flex justify-between pt-2">
         <button onClick={onBack} className="btn-secondary">← Back</button>

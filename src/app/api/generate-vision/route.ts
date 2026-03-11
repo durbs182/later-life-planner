@@ -8,6 +8,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const BodySchema = z.object({
   aspirations: z.array(z.string().max(32)).max(10).optional().default([]),
   mode: z.enum(['single', 'couple']),
+  turnstileToken: z.string().optional(),
 });
 
 const MAX_TOTAL_ASPIRATION_CHARS = 200;
@@ -41,10 +42,28 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return new Response('Invalid request payload.', { status: 400 });
   }
-  const { aspirations, mode } = parsed.data;
+  const { aspirations, mode, turnstileToken } = parsed.data;
   const totalChars = aspirations.reduce((s, a) => s + a.length, 0);
   if (totalChars > MAX_TOTAL_ASPIRATION_CHARS) {
     return new Response('Aspiration list is too long.', { status: 400 });
+  }
+
+  if (process.env.TURNSTILE_SECRET_KEY) {
+    if (!turnstileToken) {
+      return new Response('Captcha required.', { status: 400 });
+    }
+    const form = new FormData();
+    form.append('secret', process.env.TURNSTILE_SECRET_KEY);
+    form.append('response', turnstileToken);
+    form.append('remoteip', ip);
+    const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      body: form,
+    });
+    const verify = await verifyRes.json().catch(() => null);
+    if (!verify?.success) {
+      return new Response('Captcha verification failed.', { status: 400 });
+    }
   }
 
   const aspirationList = (aspirations as string[]).length > 0
