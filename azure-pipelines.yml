@@ -72,14 +72,15 @@ stages:
               inlineScript: |
                 ACR_SERVER="$(acrName).azurecr.io"
                 ACR_PASS=$(az acr credential show --name $(acrName) --query passwords[0].value -o tsv)
-                buildah login --username "$(acrName)" --password "$ACR_PASS" "$ACR_SERVER"
-                buildah bud \
+                buildah --storage-driver vfs login --username "$(acrName)" --password "$ACR_PASS" "$ACR_SERVER"
+                buildah --storage-driver vfs bud \
+                  --isolation chroot \
                   --tag "$ACR_SERVER/$(imageName):$(Build.BuildId)" \
                   --tag "$ACR_SERVER/$(imageName):latest" \
                   --file Dockerfile \
                   .
-                buildah push "$ACR_SERVER/$(imageName):$(Build.BuildId)"
-                buildah push "$ACR_SERVER/$(imageName):latest"
+                buildah --storage-driver vfs push "$ACR_SERVER/$(imageName):$(Build.BuildId)"
+                buildah --storage-driver vfs push "$ACR_SERVER/$(imageName):latest"
 
   # ── Stage 3: Deploy to Azure Container Apps ──────────────────────────────────
   - stage: Deploy
