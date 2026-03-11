@@ -30,7 +30,7 @@
     "@vitejs/plugin-react": "^5.1.4",
     "@vitest/runner": "^1.6.0",
     "autoprefixer": "^10.0.1",
-    "eslint": "^9.39.4",
+    "eslint": "^8.57.1",
     "eslint-config-next": "^16.1.6",
     "jsdom": "^28.1.0",
     "postcss": "^8",
