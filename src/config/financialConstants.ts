@@ -24,6 +24,11 @@ export const INCOME_TAX = {
   ADDITIONAL_RATE_THRESHOLD: 125_140,
   /** Additional-rate tax rate. */
   ADDITIONAL_RATE: 0.45,
+  /**
+   * Income above this threshold tapers the personal allowance by £1 for every £2,
+   * reducing it to £0 at ADDITIONAL_RATE_THRESHOLD (£125,140).
+   */
+  PA_TAPER_THRESHOLD: 100_000,
 } as const;
 
 // ─── Capital Gains Tax ────────────────────────────────────────────────────────

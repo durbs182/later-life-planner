@@ -547,7 +547,13 @@ function applyPersonDraft(
   setIncome('statePension', { enabled: draft.statePension.enabled, weeklyAmount: draft.statePension.weeklyAmount, startAge: draft.statePension.startAge });
 
   const dbTotal = draft.dbPensions.reduce((s, e) => s + e.annualIncome, 0);
-  setIncome('dbPension', { enabled: dbTotal > 0, annualIncome: dbTotal, startAge: draft.dbPensions.length > 0 ? Math.min(...draft.dbPensions.map(e => e.startAge)) : 65 });
+  // Use income-weighted average start age so a large pension starting later isn't
+  // pulled forward by a small pension starting earlier (which would overstate income).
+  const dbStartAge = draft.dbPensions.length === 0 ? 65
+    : dbTotal === 0
+      ? Math.round(draft.dbPensions.reduce((s, e) => s + e.startAge, 0) / draft.dbPensions.length)
+      : Math.round(draft.dbPensions.reduce((s, e) => s + e.startAge * e.annualIncome, 0) / dbTotal);
+  setIncome('dbPension', { enabled: dbTotal > 0, annualIncome: dbTotal, startAge: dbStartAge });
 
   setIncome('annuity', { enabled: draft.annuity.enabled, annualIncome: draft.annuity.annualIncome, startAge: draft.annuity.startAge });
   setIncome('otherIncome', { enabled: draft.otherIncome.enabled, annualAmount: draft.otherIncome.annualAmount, startAge: draft.otherIncome.startAge, stopAge: 0, description: 'Other income' });

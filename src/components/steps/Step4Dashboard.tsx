@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { usePlannerStore } from '@/store/plannerStore';
 import {
@@ -195,9 +195,10 @@ function ProjectionTable({ projections, lifeStages }: {
 
 export default function Step4Dashboard({ onBack }: Props) {
   const state = usePlannerStore();
+  const deferredState = useDeferredValue(state);
   const { mode, person1, person2, lifeStages, rlssStandard, spendingCategories, fiAge } = state;
 
-  const projections   = useMemo(() => calculateProjections(state), [state]);
+  const projections   = useMemo(() => calculateProjections(deferredState), [deferredState]);
   // Income and spending only starts at FI age — filter for display, but keep full
   // projections for asset depletion checks (assets grow from current age).
   const displayProjections = useMemo(
@@ -211,7 +212,7 @@ export default function Step4Dashboard({ onBack }: Props) {
   const lastPositive  = [...projections].reverse().find(p => p.totalAssets > 0);
   const surplus       = depletionAge === null;
   const unrealisedGain  = getTotalUnrealisedGain(state);
-  const gamification    = useMemo(() => calculateGamificationMetrics(state), [state]);
+  const gamification    = useMemo(() => calculateGamificationMetrics(state, projections), [state, projections]);
 
   const p1Name = person1.name || (mode === 'couple' ? 'Partner 1' : 'You');
   const p2Name = person2.name || 'Partner 2';
