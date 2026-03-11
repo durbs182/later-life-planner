@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     lsb-release \
     libssl3 \
     unzip \
+    buildah \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Node.js 20 ────────────────────────────────────────────────────────────────

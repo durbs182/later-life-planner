@@ -59,23 +59,27 @@ stages:
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     jobs:
       - job: DockerBuild
-        displayName: Build image via ACR Tasks (no local Docker needed)
+        displayName: Build and push image via buildah
         steps:
           - checkout: self
 
           - task: AzureCLI@2
-            displayName: Build and push via ACR Tasks
+            displayName: Build and push via buildah
             inputs:
               azureSubscription: azure-service-connection
               scriptType: bash
               scriptLocation: inlineScript
               inlineScript: |
-                az acr build \
-                  --registry $(acrName) \
-                  --image $(imageName):$(Build.BuildId) \
-                  --image $(imageName):latest \
+                ACR_SERVER="$(acrName).azurecr.io"
+                ACR_PASS=$(az acr credential show --name $(acrName) --query passwords[0].value -o tsv)
+                buildah login --username "$(acrName)" --password "$ACR_PASS" "$ACR_SERVER"
+                buildah bud \
+                  --tag "$ACR_SERVER/$(imageName):$(Build.BuildId)" \
+                  --tag "$ACR_SERVER/$(imageName):latest" \
                   --file Dockerfile \
                   .
+                buildah push "$ACR_SERVER/$(imageName):$(Build.BuildId)"
+                buildah push "$ACR_SERVER/$(imageName):latest"
 
   # ── Stage 3: Deploy to Azure Container Apps ──────────────────────────────────
   - stage: Deploy
