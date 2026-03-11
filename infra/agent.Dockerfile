@@ -34,7 +34,7 @@ WORKDIR /agent
 RUN AGENT_VERSION=$(curl -fsSL https://api.github.com/repos/microsoft/azure-pipelines-agent/releases/latest \
         | jq -r '.tag_name' | sed 's/^v//') \
     && curl -fsSL \
-        "https://vstsagentpackage.azureedge.net/agent/${AGENT_VERSION}/vsts-agent-linux-x64-${AGENT_VERSION}.tar.gz" \
+        "https://github.com/microsoft/azure-pipelines-agent/releases/download/v${AGENT_VERSION}/vsts-agent-linux-x64-${AGENT_VERSION}.tar.gz" \
         -o agent.tar.gz \
     && tar -xzf agent.tar.gz \
     && rm agent.tar.gz \
