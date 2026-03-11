@@ -1,0 +1,8 @@
+- [ ] Add auth or rate limiting to `/api/generate-vision`
+- [ ] Add request validation and input size caps to `/api/generate-vision`
+- [ ] Add persisted state versioning and migration logic in `plannerStore`
+- [ ] Reduce projection recomputation frequency (memoize/selector/debounce)
+- [ ] Update README to document `ANTHROPIC_API_KEY`
+- [ ] Add tests for AI route validation and error handling
+- [ ] Add E2E wizard flow test
+- [ ] Add tests for store persistence/migrations

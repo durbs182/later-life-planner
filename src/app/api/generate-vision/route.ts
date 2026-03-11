@@ -1,7 +1,16 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest } from 'next/server';
+import { z } from 'zod';
+import { rateLimit } from '@/lib/rateLimit';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const BodySchema = z.object({
+  aspirations: z.array(z.string().max(32)).max(10).optional().default([]),
+  mode: z.enum(['single', 'couple']),
+});
+
+const MAX_TOTAL_ASPIRATION_CHARS = 200;
 
 const SYSTEM_PROMPT = `You write short, plain-English retirement vision statements.
 Rules:
@@ -12,7 +21,31 @@ Rules:
 - No bullet points, no headings, no sign-off.`;
 
 export async function POST(req: NextRequest) {
-  const { aspirations, mode } = await req.json();
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? req.ip
+    ?? 'unknown';
+  const rl = rateLimit(`vision:${ip}`, { windowMs: 60_000, max: 10 });
+  if (!rl.ok) {
+    return new Response('Too many requests. Please try again shortly.', {
+      status: 429,
+      headers: { 'Retry-After': Math.ceil(rl.resetInMs / 1000).toString() },
+    });
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response('AI features are not configured.', { status: 503 });
+  }
+
+  const body = await req.json().catch(() => null);
+  const parsed = BodySchema.safeParse(body);
+  if (!parsed.success) {
+    return new Response('Invalid request payload.', { status: 400 });
+  }
+  const { aspirations, mode } = parsed.data;
+  const totalChars = aspirations.reduce((s, a) => s + a.length, 0);
+  if (totalChars > MAX_TOTAL_ASPIRATION_CHARS) {
+    return new Response('Aspiration list is too long.', { status: 400 });
+  }
 
   const aspirationList = (aspirations as string[]).length > 0
     ? (aspirations as string[]).join(', ')
