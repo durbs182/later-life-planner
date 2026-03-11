@@ -17,7 +17,7 @@ set -euo pipefail
 # ── Configuration ─────────────────────────────────────────────────────────────
 SUBSCRIPTION_ID="81c7ddc0-db49-4fb3-809c-776e3756f2ea"
 RESOURCE_GROUP="rg-later-life-planner"
-LOCATION="australiaeast"          # Change if preferred, e.g. eastus, westeurope
+LOCATION="uksouth"                # UK South (London)
 ACR_NAME="acrblackdog69llp"       # Must be globally unique & alphanumeric
 PREFIX="llp"
 ADO_ORG_URL="https://dev.azure.com/blackdog69"
