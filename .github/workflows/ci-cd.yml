@@ -1,0 +1,79 @@
+# CI/CD for later-life-planner
+# Test on every push/PR; build + deploy on pushes to master only
+name: CI/CD
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Login to ACR
+        run: az acr login --name acrblackdog69llp
+
+      - name: Build and push image
+        run: |
+          IMAGE="acrblackdog69llp.azurecr.io/later-life-planner"
+          docker build \
+            -t "$IMAGE:${{ github.run_number }}" \
+            -t "$IMAGE:latest" \
+            -f Dockerfile \
+            .
+          docker push "$IMAGE:${{ github.run_number }}"
+          docker push "$IMAGE:latest"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Container App
+        run: |
+          az containerapp update \
+            --name ca-later-life-planner \
+            --resource-group rg-later-life-planner \
+            --image acrblackdog69llp.azurecr.io/later-life-planner:${{ github.run_number }}
+
+      - name: Show app URL
+        run: |
+          fqdn=$(az containerapp show \
+            --name ca-later-life-planner \
+            --resource-group rg-later-life-planner \
+            --query properties.configuration.ingress.fqdn -o tsv)
+          echo "Deployed to: https://$fqdn"
