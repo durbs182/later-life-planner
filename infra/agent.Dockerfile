@@ -30,8 +30,8 @@ RUN curl -fsSL https://aka.ms/InstallAzureCLIDeb | bash \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Buildah config: disable user namespaces (ACA containers lack CAP_SYS_ADMIN) ──
-RUN mkdir -p /etc/containers && \
-    printf '[storage]\ndriver = "vfs"\n' > /etc/containers/storage.conf && \
+RUN mkdir -p /etc/containers /var/lib/containers/storage /run/containers/storage && \
+    printf '[storage]\ndriver = "vfs"\ngraphRoot = "/var/lib/containers/storage"\nrunRoot = "/run/containers/storage"\n' > /etc/containers/storage.conf && \
     printf '[containers]\nuserns = "host"\n\n[engine]\nisolation = "chroot"\n' > /etc/containers/containers.conf
 
 ENV BUILDAH_ISOLATION=chroot
