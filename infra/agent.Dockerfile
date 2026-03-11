@@ -3,7 +3,7 @@
 # Agent binary is downloaded at startup via ADO API (avoids build-time CDN issues)
 # Uses --once mode: registers, runs one pipeline job, then exits
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -15,7 +15,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     gnupg \
     lsb-release \
-    libicu70 \
     libssl3 \
     unzip \
     && rm -rf /var/lib/apt/lists/*
