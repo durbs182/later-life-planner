@@ -53,34 +53,64 @@ stages:
               ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
 
   # ── Stage 2: Build & push Docker image ──────────────────────────────────────
+  # ACA containers cannot build Docker images (no user namespaces, ACR Tasks blocked).
+  # Instead, we trigger a GitHub Actions workflow (ubuntu-latest has Docker daemon).
   - stage: Build
     displayName: Build & Push Image
     dependsOn: Test
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))
     jobs:
       - job: DockerBuild
-        displayName: Build and push image via buildah
+        displayName: Trigger GitHub Actions Docker build and wait
         steps:
-          - checkout: self
+          - script: |
+              set -euo pipefail
+              REPO="durbs182/later-life-planner"
+              WORKFLOW="build-and-push.yml"
+              IMAGE_TAG="$(Build.BuildId)"
 
-          - task: AzureCLI@2
-            displayName: Build and push via buildah
-            inputs:
-              azureSubscription: azure-service-connection
-              scriptType: bash
-              scriptLocation: inlineScript
-              inlineScript: |
-                ACR_SERVER="$(acrName).azurecr.io"
-                ACR_PASS=$(az acr credential show --name $(acrName) --query passwords[0].value -o tsv)
-                buildah --storage-driver vfs login --username "$(acrName)" --password "$ACR_PASS" "$ACR_SERVER"
-                buildah --storage-driver vfs bud \
-                  --isolation chroot \
-                  --tag "$ACR_SERVER/$(imageName):$(Build.BuildId)" \
-                  --tag "$ACR_SERVER/$(imageName):latest" \
-                  --file Dockerfile \
-                  .
-                buildah --storage-driver vfs push "$ACR_SERVER/$(imageName):$(Build.BuildId)"
-                buildah --storage-driver vfs push "$ACR_SERVER/$(imageName):latest"
+              echo "Triggering GitHub Actions workflow: $WORKFLOW with image_tag=$IMAGE_TAG"
+              curl -fsSL -X POST \
+                -H "Authorization: token $(GITHUB_PAT)" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW/dispatches" \
+                -d "{\"ref\":\"master\",\"inputs\":{\"image_tag\":\"$IMAGE_TAG\"}}"
+
+              echo "Waiting for workflow to start..."
+              sleep 10
+
+              # Find the run we just triggered (most recent run of this workflow)
+              RUN_ID=$(curl -fsSL \
+                -H "Authorization: token $(GITHUB_PAT)" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/$REPO/actions/workflows/$WORKFLOW/runs?per_page=1" \
+                | jq -r '.workflow_runs[0].id')
+              echo "Workflow run ID: $RUN_ID"
+
+              # Poll until complete
+              for i in $(seq 1 40); do
+                STATUS=$(curl -fsSL \
+                  -H "Authorization: token $(GITHUB_PAT)" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID" \
+                  | jq -r '"\(.status) \(.conclusion // "pending")"')
+                echo "[$i] $STATUS"
+                if echo "$STATUS" | grep -q "^completed"; then
+                  if echo "$STATUS" | grep -q "success"; then
+                    echo "Build succeeded!"
+                    exit 0
+                  else
+                    echo "Build failed!"
+                    exit 1
+                  fi
+                fi
+                sleep 30
+              done
+              echo "Timeout waiting for GitHub Actions workflow"
+              exit 1
+            displayName: Trigger and await GitHub Actions Docker build
+            env:
+              GITHUB_PAT: $(GITHUB_PAT)
 
   # ── Stage 3: Deploy to Azure Container Apps ──────────────────────────────────
   - stage: Deploy
