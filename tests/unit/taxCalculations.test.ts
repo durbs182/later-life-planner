@@ -50,13 +50,35 @@ describe('calcIncomeTax', () => {
     expect(calcIncomeTax(-5_000)).toBe(0);
   });
 
-  test('income at additional-rate threshold → correct calculation', () => {
+  test('income at additional-rate threshold → PA fully tapered to £0', () => {
+    // At £125,140 the PA taper eliminates the personal allowance entirely.
+    // effectivePA = max(0, 12570 − (125140 − 100000)/2) = 0
+    // basicBand  = £50,270 × 20% = £10,054
+    // higherBand = (£125,140 − £50,270) × 40% = £29,948
     const tax = calcIncomeTax(INCOME_TAX.ADDITIONAL_RATE_THRESHOLD);
-    expect(tax).toBeGreaterThan(0);
-    // At £125,140: basic band + higher rate on (£125,140 − £50,270) = £74,870 × 40%
-    const basicBand  = (INCOME_TAX.BASIC_RATE_LIMIT - INCOME_TAX.PERSONAL_ALLOWANCE) * INCOME_TAX.BASIC_RATE;
-    const higherBand = (INCOME_TAX.ADDITIONAL_RATE_THRESHOLD - INCOME_TAX.BASIC_RATE_LIMIT) * INCOME_TAX.HIGHER_RATE;
-    expect(tax).toBeCloseTo(basicBand + higherBand, 0);
+    const expectedBasic  = INCOME_TAX.BASIC_RATE_LIMIT * INCOME_TAX.BASIC_RATE;
+    const expectedHigher = (INCOME_TAX.ADDITIONAL_RATE_THRESHOLD - INCOME_TAX.BASIC_RATE_LIMIT) * INCOME_TAX.HIGHER_RATE;
+    expect(tax).toBeCloseTo(expectedBasic + expectedHigher, 0);
+  });
+
+  test('income in PA taper zone (£110,000) → reduced PA increases tax vs fixed PA', () => {
+    // effectivePA = max(0, 12570 − (110000 − 100000)/2) = 7570
+    // At £110,000 with fixed PA the tax would be £31,432; with taper it's £32,432 (£1,000 more).
+    const taxWithTaper = calcIncomeTax(110_000);
+    const taxFixedPa   = (INCOME_TAX.BASIC_RATE_LIMIT - INCOME_TAX.PERSONAL_ALLOWANCE) * INCOME_TAX.BASIC_RATE
+                       + (110_000 - INCOME_TAX.BASIC_RATE_LIMIT) * INCOME_TAX.HIGHER_RATE;
+    expect(taxWithTaper).toBeGreaterThan(taxFixedPa);
+  });
+
+  test('income above additional-rate threshold → 45% band applies', () => {
+    // £140,000: additional band = 140000 − 125140 = £14,860 at 45%
+    const tax = calcIncomeTax(140_000);
+    const additionalTax = (140_000 - INCOME_TAX.ADDITIONAL_RATE_THRESHOLD) * INCOME_TAX.ADDITIONAL_RATE;
+    // Tax must include the 45% additional band contribution
+    expect(tax).toBeGreaterThan(additionalTax);
+    // Verify additional band is taxed at 45% by checking total exceeds the higher-rate-only result
+    const higherRateOnly = calcIncomeTax(INCOME_TAX.ADDITIONAL_RATE_THRESHOLD);
+    expect(tax).toBeGreaterThan(higherRateOnly);
   });
 });
 

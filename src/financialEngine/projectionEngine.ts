@@ -507,20 +507,30 @@ export function getTotalUnrealisedGain(state: PlannerState): number {
 /**
  * Determine the highest RLSS standard the household can sustain to life expectancy.
  * "Sustain" = assets never depleted across the full projection.
+ *
+ * Income is deflated back to today's money before averaging so it can be compared
+ * directly against the real-money RLSS thresholds. Without deflation, later years'
+ * inflated nominal figures would systematically overstate the achievable standard.
  */
 export function getSustainableRlssLevel(
   projections: YearlyProjection[],
   mode: 'single' | 'couple',
+  inflation = 2.5,
 ): import('@/models/types').RlssStandard | null {
   const lastTotal = projections[projections.length - 1]?.totalAssets ?? 0;
   if (lastTotal <= 0) return null;
 
-  const avgAnnualIncome = projections.reduce((s, p) => s + p.netIncome, 0) / projections.length;
+  // Deflate each year's nominal net income to today's money, then average.
+  const realAvgIncome = projections.reduce((s, p) => {
+    const inflFactor = Math.pow(1 + inflation / 100, p.yearIndex);
+    return s + p.netIncome / inflFactor;
+  }, 0) / projections.length;
+
   const standards = RLSS[mode];
 
-  if (avgAnnualIncome >= standards.comfortable.annual) return 'comfortable';
-  if (avgAnnualIncome >= standards.moderate.annual)    return 'moderate';
-  if (avgAnnualIncome >= standards.minimum.annual)     return 'minimum';
+  if (realAvgIncome >= standards.comfortable.annual) return 'comfortable';
+  if (realAvgIncome >= standards.moderate.annual)    return 'moderate';
+  if (realAvgIncome >= standards.minimum.annual)     return 'minimum';
   return null;
 }
 
@@ -533,13 +543,13 @@ export function getSustainableRlssLevel(
  * spendingConfidenceScore: % of years in the projection where the plan is fully funded.
  * fundedGoalsCount: number of aspirational/lifestyle spending categories with non-zero amounts.
  */
-export function calculateGamificationMetrics(state: PlannerState): GamificationMetrics {
-  const projections = calculateProjections(state);
+export function calculateGamificationMetrics(state: PlannerState, projections?: YearlyProjection[]): GamificationMetrics {
+  const resolvedProjections = projections ?? calculateProjections(state);
   const firstStageId = state.lifeStages[0]?.id ?? 'go-go';
 
   // Restrict to post-FI years only
-  const postFiYears = projections.filter(p => p.p1Age >= state.fiAge);
-  const planYears = postFiYears.length > 0 ? postFiYears : projections;
+  const postFiYears = resolvedProjections.filter(p => p.p1Age >= state.fiAge);
+  const planYears = postFiYears.length > 0 ? postFiYears : resolvedProjections;
 
   // Income stability: average guaranteed income / average spending across all post-FI years.
   // This correctly reflects state pension and DB pension even when they start after FI age.
@@ -553,8 +563,8 @@ export function calculateGamificationMetrics(state: PlannerState): GamificationM
     : 0;
 
   // Spending confidence: funded years / total years
-  const fundedYears = projections.filter(p => p.totalAssets > 0).length;
-  const spendingConfidenceScore = Math.round((fundedYears / projections.length) * 100);
+  const fundedYears = resolvedProjections.filter(p => p.totalAssets > 0).length;
+  const spendingConfidenceScore = Math.round((fundedYears / resolvedProjections.length) * 100);
 
   // Funded goals: active-stage categories with amount > 0
   const goalTiers: Array<'moderate' | 'aspirational'> = ['moderate', 'aspirational'];
@@ -584,6 +594,6 @@ export function runSimulation(state: PlannerState): SimulationResult {
     depletionAge:         getAssetDepletionAge(projections),
     lifetimeTaxPaid:      projections.reduce((s, p) => s + p.totalTaxPaid, 0),
     lifetimeCGT:          projections.reduce((s, p) => s + p.totalCgtPaid, 0),
-    sustainableRlssLevel: getSustainableRlssLevel(projections, state.mode),
+    sustainableRlssLevel: getSustainableRlssLevel(projections, state.mode, state.assumptions.inflation),
   };
 }

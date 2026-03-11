@@ -211,7 +211,7 @@ export default function Step4Dashboard({ onBack }: Props) {
   const lastPositive  = [...projections].reverse().find(p => p.totalAssets > 0);
   const surplus       = depletionAge === null;
   const unrealisedGain  = getTotalUnrealisedGain(state);
-  const gamification    = useMemo(() => calculateGamificationMetrics(state), [state]);
+  const gamification    = useMemo(() => calculateGamificationMetrics(state, projections), [state, projections]);
 
   const p1Name = person1.name || (mode === 'couple' ? 'Partner 1' : 'You');
   const p2Name = person2.name || 'Partner 2';

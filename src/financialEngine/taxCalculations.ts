@@ -11,19 +11,40 @@ import { INCOME_TAX, CGT } from '@/config/financialConstants';
  * Calculate UK income tax for a given taxable income figure.
  * Uses 2024/25 bands from financialConstants.
  *
- * @param taxableIncome - Gross taxable income (£)
+ * Handles:
+ * - Personal allowance taper: PA reduces by £1 per £2 above £100,000, reaching £0 at £125,140.
+ * - Three rate bands: basic (20%), higher (40%), additional (45% above £125,140).
+ *
+ * @param taxableIncome - Gross taxable income before personal allowance (£)
  * @returns Income tax due (£)
  */
 export function calcIncomeTax(taxableIncome: number): number {
-  if (taxableIncome <= INCOME_TAX.PERSONAL_ALLOWANCE) return 0;
+  if (taxableIncome <= 0) return 0;
 
-  const basicBand = Math.min(
-    taxableIncome - INCOME_TAX.PERSONAL_ALLOWANCE,
-    INCOME_TAX.BASIC_RATE_LIMIT - INCOME_TAX.PERSONAL_ALLOWANCE,
+  // Personal allowance tapers by £1 for every £2 above PA_TAPER_THRESHOLD (£100,000),
+  // reaching £0 at ADDITIONAL_RATE_THRESHOLD (£125,140).
+  const effectivePA = Math.max(
+    0,
+    INCOME_TAX.PERSONAL_ALLOWANCE - Math.max(0, taxableIncome - INCOME_TAX.PA_TAPER_THRESHOLD) / 2,
   );
-  const higherBand = Math.max(0, taxableIncome - INCOME_TAX.BASIC_RATE_LIMIT);
 
-  return basicBand * INCOME_TAX.BASIC_RATE + higherBand * INCOME_TAX.HIGHER_RATE;
+  if (taxableIncome <= effectivePA) return 0;
+
+  const basicBand = Math.max(0, Math.min(
+    taxableIncome - effectivePA,
+    INCOME_TAX.BASIC_RATE_LIMIT - effectivePA,
+  ));
+  const higherBand = Math.max(
+    0,
+    Math.min(taxableIncome, INCOME_TAX.ADDITIONAL_RATE_THRESHOLD) - INCOME_TAX.BASIC_RATE_LIMIT,
+  );
+  const additionalBand = Math.max(0, taxableIncome - INCOME_TAX.ADDITIONAL_RATE_THRESHOLD);
+
+  return (
+    basicBand      * INCOME_TAX.BASIC_RATE +
+    higherBand     * INCOME_TAX.HIGHER_RATE +
+    additionalBand * INCOME_TAX.ADDITIONAL_RATE
+  );
 }
 
 /**

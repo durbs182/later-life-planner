@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
 import { getStageTotalSpending, calculateProjections, formatCurrency } from '@/lib/calculations';
 import { RLSS_STANDARDS } from '@/lib/mockData';
@@ -9,7 +10,7 @@ export default function SummaryBar() {
   const { mode, person1, person2, lifeStages, rlssStandard } = state;
   const firstStage     = lifeStages[0];
   const annualSpending = getStageTotalSpending(state, firstStage?.id ?? 'active');
-  const projections    = calculateProjections(state);
+  const projections    = useMemo(() => calculateProjections(state), [state]);
   const firstYear      = projections[0];
   const totalIncome    = firstYear?.totalIncome ?? 0;
   const gap            = totalIncome - annualSpending;
