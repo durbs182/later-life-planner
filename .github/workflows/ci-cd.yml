@@ -74,6 +74,7 @@ jobs:
           docker build \
             -t "$IMAGE:${{ github.run_number }}" \
             -t "$IMAGE:latest" \
+            --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}" \
             -f Dockerfile \
             .
           docker push "$IMAGE:${{ github.run_number }}"
@@ -91,10 +92,15 @@ jobs:
 
       - name: Deploy to Container App
         run: |
+          az containerapp secret set \
+            --name ca-later-life-planner \
+            --resource-group rg-later-life-planner \
+            --secrets "turnstile-secret-key=${{ secrets.TURNSTILE_SECRET_KEY }}"
           az containerapp update \
             --name ca-later-life-planner \
             --resource-group rg-later-life-planner \
-            --image acrblackdog69llp.azurecr.io/later-life-planner:${{ github.run_number }}
+            --image acrblackdog69llp.azurecr.io/later-life-planner:${{ github.run_number }} \
+            --set-env-vars "TURNSTILE_SECRET_KEY=secretref:turnstile-secret-key"
 
       - name: Show app URL
         run: |
