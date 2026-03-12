@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 interface Props { onAccept: () => void }
 
@@ -8,23 +9,39 @@ export default function DisclaimerGate({ onAccept }: Props) {
   const [agreed, setAgreed] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-cream-100 px-4 py-12">
-      <div className="max-w-2xl w-full space-y-6">
+    <div className="min-h-screen relative overflow-hidden flex flex-col items-center justify-center bg-cream-100 px-4 py-6 sm:py-8">
+      <div className="absolute inset-x-0 top-0 h-[380px] bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.2),transparent_55%)] pointer-events-none" />
+      <div className="absolute left-1/2 top-16 h-56 w-56 -translate-x-1/2 rounded-full bg-orange-200/20 blur-3xl pointer-events-none" />
+      <div className="relative max-w-2xl w-full space-y-3 sm:space-y-4">
 
         {/* Logo / brand mark */}
-        <div className="text-center mb-2">
-          <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 text-xs font-bold px-4 py-1.5 rounded-full mb-4">
-            🌅 Later Life Planner
+        <div className="text-center">
+          <div className="flex justify-center mb-1">
+            <Image
+              src="/images/victorylap_logo.svg"
+              alt="Later Life Planner"
+              width={300}
+              height={78}
+              className="w-full max-w-[300px] h-auto"
+              priority
+            />
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-            Before you start —<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-400">
-              what this tool is (and isn&apos;t)
+          <p className="text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-slate-500/90 mb-2">
+            Later Life Planner
+          </p>
+          <h1 className="max-w-[11ch] mx-auto text-[2.8rem] sm:text-[4rem] font-black text-slate-900 tracking-[-0.04em] leading-[0.9]">
+            <span className="block">Before you</span>
+            <span className="block">start</span>
+            <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-500">
+              what this tool is
+            </span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-500">
+              (and isn&apos;t)
             </span>
           </h1>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8 space-y-5 text-sm text-slate-700 leading-relaxed">
+        <div className="bg-white/96 rounded-3xl border border-slate-100 shadow-[0_20px_60px_rgba(15,23,42,0.08)] p-6 sm:p-8 space-y-5 text-sm text-slate-700 leading-relaxed">
 
           <p>
             This planner is designed to help you think through one specific question:{' '}
