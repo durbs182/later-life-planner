@@ -8,8 +8,9 @@ import type {
 } from '@/models/types';
 import {
   createDefaultState, createMockDemoState, buildDefaultLifeStages,
-  buildCategoriesForRlss, ageFromDOB,
+  buildCategoriesForRlss, ageFromDOB, dobFromAge, normalizePlannerState,
 } from '@/lib/mockData';
+import { clampDateOfBirth, normalizePlanningBounds } from '@/lib/planningBounds';
 import { STATE_PENSION } from '@/config/financialConstants';
 
 type Actions = {
@@ -46,6 +47,31 @@ type Actions = {
   resetPlan: () => void;
 };
 
+function syncLifeStages(existingStages: LifeStage[], fiAge: number, lifeExpectancy: number) {
+  return buildDefaultLifeStages(fiAge, lifeExpectancy).map((nextStage) => {
+    const existingStage = existingStages.find((stage) => stage.id === nextStage.id);
+    return existingStage
+      ? { ...existingStage, startAge: nextStage.startAge, endAge: nextStage.endAge }
+      : nextStage;
+  });
+}
+
+function mergePersistedPlannerState(
+  persistedState: unknown,
+  currentState: PlannerState & Actions,
+): PlannerState & Actions {
+  if (!persistedState || typeof persistedState !== 'object') return currentState;
+  const mergedState = {
+    ...currentState,
+    ...(persistedState as Partial<PlannerState & Actions>),
+  };
+
+  return {
+    ...mergedState,
+    ...normalizePlannerState(mergedState),
+  };
+}
+
 export const usePlannerStore = create<PlannerState & Actions>()(
   persist(
     (set) => ({
@@ -55,17 +81,39 @@ export const usePlannerStore = create<PlannerState & Actions>()(
         currentStep: step,
         maxVisitedStep: Math.max(s.maxVisitedStep, step),
       })),
-      setMode: (mode) => set((s) => ({
-        mode,
-        spendingCategories: buildCategoriesForRlss(s.rlssStandard ?? 'minimum', mode),
-      })),
+      setMode: (mode) => set((s) => {
+        const normalized = normalizePlanningBounds(
+          s.person1.currentAge,
+          mode === 'couple' ? s.person2.currentAge : 0,
+          s.fiAge,
+          s.assumptions.lifeExpectancy,
+        );
+
+        return {
+          mode,
+          fiAge: normalized.fiAge,
+          lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+          assumptions: { ...s.assumptions, lifeExpectancy: normalized.lifeExpectancy },
+          spendingCategories: buildCategoriesForRlss(s.rlssStandard ?? 'minimum', mode),
+        };
+      }),
 
       // FI age setter — rebuilds life stages anchored to new FI age
       setFiAge: (fiAge) =>
-        set((s) => ({
-          fiAge,
-          lifeStages: buildDefaultLifeStages(fiAge, s.assumptions.lifeExpectancy),
-        })),
+        set((s) => {
+          const normalized = normalizePlanningBounds(
+            s.person1.currentAge,
+            s.mode === 'couple' ? s.person2.currentAge : 0,
+            fiAge,
+            s.assumptions.lifeExpectancy,
+          );
+
+          return {
+            fiAge: normalized.fiAge,
+            lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+            assumptions: { ...s.assumptions, lifeExpectancy: normalized.lifeExpectancy },
+          };
+        }),
 
       setP1Name: (name) => set((s) => ({ person1: { ...s.person1, name } })),
 
@@ -73,31 +121,45 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       // Also clamps fiAge to currentAge if the person is already at or past their freedom phase.
       setP1Dob: (dateOfBirth) =>
         set((s) => {
-          const age = ageFromDOB(dateOfBirth, s.person1.currentAge);
-          const maxFiAge = s.assumptions.lifeExpectancy - 1;
-          const fiAge = Math.min(age >= s.fiAge ? age : s.fiAge, maxFiAge);
+          const normalizedDob = clampDateOfBirth(dateOfBirth);
+          const normalized = normalizePlanningBounds(
+            ageFromDOB(normalizedDob, s.person1.currentAge),
+            s.mode === 'couple' ? s.person2.currentAge : 0,
+            s.fiAge,
+            s.assumptions.lifeExpectancy,
+          );
+
           return {
-            person1: { ...s.person1, dateOfBirth, currentAge: age },
-            fiAge,
-            lifeStages: buildDefaultLifeStages(fiAge, s.assumptions.lifeExpectancy).map((ns) => {
-              const ex = s.lifeStages.find((ls) => ls.id === ns.id);
-              return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
-            }),
+            person1: {
+              ...s.person1,
+              dateOfBirth: normalizedDob || dateOfBirth,
+              currentAge: normalized.currentAge,
+            },
+            fiAge: normalized.fiAge,
+            lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+            assumptions: { ...s.assumptions, lifeExpectancy: normalized.lifeExpectancy },
           };
         }),
 
       // Legacy age setter (used by slider fallback)
       setP1Age: (age) =>
         set((s) => {
-          const maxFiAge = s.assumptions.lifeExpectancy - 1;
-          const fiAge = Math.min(age >= s.fiAge ? age : s.fiAge, maxFiAge);
+          const normalized = normalizePlanningBounds(
+            age,
+            s.mode === 'couple' ? s.person2.currentAge : 0,
+            s.fiAge,
+            s.assumptions.lifeExpectancy,
+          );
+
           return {
-            person1: { ...s.person1, currentAge: age },
-            fiAge,
-            lifeStages: buildDefaultLifeStages(fiAge, s.assumptions.lifeExpectancy).map((ns) => {
-              const ex = s.lifeStages.find((ls) => ls.id === ns.id);
-              return ex ? { ...ex, startAge: ns.startAge, endAge: ns.endAge } : ns;
-            }),
+            person1: {
+              ...s.person1,
+              dateOfBirth: dobFromAge(normalized.currentAge),
+              currentAge: normalized.currentAge,
+            },
+            fiAge: normalized.fiAge,
+            lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+            assumptions: { ...s.assumptions, lifeExpectancy: normalized.lifeExpectancy },
           };
         }),
 
@@ -120,11 +182,46 @@ export const usePlannerStore = create<PlannerState & Actions>()(
 
       setP2Dob: (dateOfBirth) =>
         set((s) => {
-          const age = ageFromDOB(dateOfBirth, s.person2.currentAge);
-          return { person2: { ...s.person2, dateOfBirth, currentAge: age } };
+          const normalizedDob = clampDateOfBirth(dateOfBirth);
+          const normalized = normalizePlanningBounds(
+            s.person1.currentAge,
+            ageFromDOB(normalizedDob, s.person2.currentAge),
+            s.fiAge,
+            s.assumptions.lifeExpectancy,
+          );
+
+          return {
+            person2: {
+              ...s.person2,
+              dateOfBirth: normalizedDob || dateOfBirth,
+              currentAge: normalized.secondaryCurrentAge,
+            },
+            fiAge: normalized.fiAge,
+            lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+            assumptions: { ...s.assumptions, lifeExpectancy: normalized.lifeExpectancy },
+          };
         }),
 
-      setP2Age: (age) => set((s) => ({ person2: { ...s.person2, currentAge: age } })),
+      setP2Age: (age) =>
+        set((s) => {
+          const normalized = normalizePlanningBounds(
+            s.person1.currentAge,
+            age,
+            s.fiAge,
+            s.assumptions.lifeExpectancy,
+          );
+
+          return {
+            person2: {
+              ...s.person2,
+              dateOfBirth: dobFromAge(normalized.secondaryCurrentAge),
+              currentAge: normalized.secondaryCurrentAge,
+            },
+            fiAge: normalized.fiAge,
+            lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+            assumptions: { ...s.assumptions, lifeExpectancy: normalized.lifeExpectancy },
+          };
+        }),
 
       setP2Income: (key, updates) =>
         set((s) => ({
@@ -167,12 +264,19 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       updateAssumptions: (updates) =>
         set((s) => {
           const newAssumptions = { ...s.assumptions, ...updates };
-          // Keep the last life stage's endAge in sync with the planning horizon
           if (updates.lifeExpectancy !== undefined) {
-            const lifeStages = s.lifeStages.map((ls, i, arr) =>
-              i === arr.length - 1 ? { ...ls, endAge: updates.lifeExpectancy as number } : ls
+            const normalized = normalizePlanningBounds(
+              s.person1.currentAge,
+              s.mode === 'couple' ? s.person2.currentAge : 0,
+              s.fiAge,
+              newAssumptions.lifeExpectancy,
             );
-            return { assumptions: newAssumptions, lifeStages };
+
+            return {
+              fiAge: normalized.fiAge,
+              assumptions: { ...newAssumptions, lifeExpectancy: normalized.lifeExpectancy },
+              lifeStages: syncLifeStages(s.lifeStages, normalized.fiAge, normalized.lifeExpectancy),
+            };
           }
           return { assumptions: newAssumptions };
         }),
@@ -189,6 +293,9 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       loadDemo: () => set(createMockDemoState()),
       resetPlan: () => set(createDefaultState(STATE_PENSION.DEFAULT_AGE)),
     }),
-    { name: 'life-planner-v6' }
+    {
+      name: 'life-planner-v6',
+      merge: mergePersistedPlannerState,
+    }
   )
 );

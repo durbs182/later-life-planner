@@ -5,6 +5,15 @@ import type {
 import {
   RLSS, DEFAULT_ASSUMPTIONS, STATE_PENSION, PENSION_RULES, CARE_RESERVE,
 } from '@/config/financialConstants';
+import {
+  clampCurrentAge,
+  clampDateOfBirth,
+  clampFiAge,
+  clampLifeExpectancy,
+  MIN_SUPPORTED_CURRENT_AGE,
+  MAX_SUPPORTED_CURRENT_AGE,
+  normalizePlanningBounds,
+} from '@/lib/planningBounds';
 
 // ─── Re-export RLSS for components that import from here ─────────────────────
 export { RLSS as RLSS_STANDARDS };
@@ -16,16 +25,18 @@ export { RLSS as RLSS_STANDARDS };
  * Falls back to the provided default if the string is empty/invalid.
  */
 export function ageFromDOB(dob: string, fallback: number = DEFAULT_ASSUMPTIONS.DEFAULT_AGE): number {
-  if (!dob) return fallback;
+  const safeFallback = clampCurrentAge(fallback);
+  if (!dob) return safeFallback;
   const birth = new Date(dob);
-  if (isNaN(birth.getTime())) return fallback;
+  if (isNaN(birth.getTime())) return safeFallback;
   const today = new Date();
   let age = today.getFullYear() - birth.getFullYear();
   const m = today.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
   // Guard against partial date input (e.g. browser fires with year "0001" while
-  // the user is still typing). An age outside 0–120 is not a real DOB yet.
-  if (age < 0 || age > 120) return fallback;
+  // the user is still typing). An age outside the supported planning range is
+  // not a real DOB for this app yet.
+  if (age < MIN_SUPPORTED_CURRENT_AGE || age > MAX_SUPPORTED_CURRENT_AGE) return safeFallback;
   return age;
 }
 
@@ -34,7 +45,7 @@ export function ageFromDOB(dob: string, fallback: number = DEFAULT_ASSUMPTIONS.D
  * Used when creating default state before the user enters their DOB.
  */
 export function dobFromAge(age: number): string {
-  const year = new Date().getFullYear() - age;
+  const year = new Date().getFullYear() - clampCurrentAge(age);
   return `${year}-01-01`;
 }
 
@@ -49,8 +60,12 @@ export function buildDefaultLifeStages(
   fiAge: number = DEFAULT_ASSUMPTIONS.FI_AGE,
   lifeExpectancy: number = DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY,
 ): LifeStage[] {
-  const activeEnd  = fiAge + 10;
-  const gradualEnd = fiAge + 20;
+  const totalYears = Math.max(3, lifeExpectancy - fiAge + 1);
+  const goYears = Math.max(1, Math.min(11, totalYears - 2));
+  const sloYears = Math.max(1, Math.min(10, totalYears - goYears - 1));
+  const activeEnd = fiAge + goYears - 1;
+  const gradualEnd = activeEnd + sloYears;
+
   return [
     { id: 'go-go',  label: 'Go-Go Years',   startAge: fiAge,          endAge: activeEnd,      color: '#f97316' },
     { id: 'slo-go', label: 'Slo-Go Years',  startAge: activeEnd + 1,  endAge: gradualEnd,     color: '#10b981' },
@@ -166,18 +181,22 @@ export function buildDefaultAssets(): PersonAssets {
 // ─── Default state ────────────────────────────────────────────────────────────
 
 export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFAULT_AGE): PlannerState {
-  // If the person is already at or past the default FI age, freedom starts now.
-  // Otherwise use the default FI age (65). Never force fiAge ahead of currentAge.
-  const fiAge = primaryAge >= DEFAULT_ASSUMPTIONS.FI_AGE ? primaryAge : DEFAULT_ASSUMPTIONS.FI_AGE;
+  const normalizedPrimaryAge = clampCurrentAge(primaryAge);
+  const lifeExpectancy = clampLifeExpectancy(DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY, normalizedPrimaryAge);
+  const preferredFiAge = normalizedPrimaryAge >= DEFAULT_ASSUMPTIONS.FI_AGE
+    ? normalizedPrimaryAge
+    : DEFAULT_ASSUMPTIONS.FI_AGE;
+  const fiAge = clampFiAge(preferredFiAge, normalizedPrimaryAge, lifeExpectancy);
+
   return {
     currentStep: 0,
     maxVisitedStep: 0,
     mode: 'single',
     person1: {
       name: '',
-      dateOfBirth: dobFromAge(primaryAge),
-      currentAge: primaryAge,
-      incomeSources: buildDefaultIncome(primaryAge),
+      dateOfBirth: dobFromAge(normalizedPrimaryAge),
+      currentAge: normalizedPrimaryAge,
+      incomeSources: buildDefaultIncome(normalizedPrimaryAge),
       assets: buildDefaultAssets(),
     },
     person2: {
@@ -190,17 +209,53 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
     fiAge,
     lifeVision: '',
     aspirations: [],
-    lifeStages: buildDefaultLifeStages(fiAge, DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY),
+    lifeStages: buildDefaultLifeStages(fiAge, lifeExpectancy),
     spendingCategories: buildCategoriesForRlss('minimum', 'single'),
     assumptions: {
       investmentGrowth:             DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH,
       inflation:                    DEFAULT_ASSUMPTIONS.INFLATION,
-      lifeExpectancy:               DEFAULT_ASSUMPTIONS.LIFE_EXPECTANCY,
+      lifeExpectancy,
       statePensionSoleIncomeExempt: true,
     },
     rlssStandard: 'minimum',
     jointGia: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
     careReserve: { enabled: false, amount: CARE_RESERVE.DEFAULT_AMOUNT },
+  };
+}
+
+export function normalizePlannerState(state: PlannerState): PlannerState {
+  const normalizedP1Dob = clampDateOfBirth(state.person1.dateOfBirth);
+  const normalizedP2Dob = clampDateOfBirth(state.person2.dateOfBirth);
+  const normalized = normalizePlanningBounds(
+    ageFromDOB(normalizedP1Dob, state.person1.currentAge),
+    ageFromDOB(normalizedP2Dob, state.person2.currentAge),
+    state.fiAge,
+    state.assumptions.lifeExpectancy,
+  );
+
+  return {
+    ...state,
+    person1: {
+      ...state.person1,
+      dateOfBirth: normalizedP1Dob || dobFromAge(normalized.currentAge),
+      currentAge: normalized.currentAge,
+    },
+    person2: {
+      ...state.person2,
+      dateOfBirth: normalizedP2Dob || dobFromAge(normalized.secondaryCurrentAge),
+      currentAge: normalized.secondaryCurrentAge,
+    },
+    fiAge: normalized.fiAge,
+    lifeStages: buildDefaultLifeStages(normalized.fiAge, normalized.lifeExpectancy).map((nextStage) => {
+      const existingStage = state.lifeStages.find((stage) => stage.id === nextStage.id);
+      return existingStage
+        ? { ...existingStage, startAge: nextStage.startAge, endAge: nextStage.endAge }
+        : nextStage;
+    }),
+    assumptions: {
+      ...state.assumptions,
+      lifeExpectancy: normalized.lifeExpectancy,
+    },
   };
 }
 
