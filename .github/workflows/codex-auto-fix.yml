@@ -16,6 +16,7 @@ jobs:
       cancel-in-progress: true
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
+    env:
       FAILED_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
       FAILED_RUN_URL: ${{ github.event.workflow_run.html_url }}
       FAILED_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
