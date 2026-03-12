@@ -583,7 +583,7 @@ export function calculateGamificationMetrics(state: PlannerState, projections?: 
 export function formatCurrency(value: number, compact = false): string {
   if (compact && Math.abs(value) >= 1_000_000) return '£' + (value / 1_000_000).toFixed(1) + 'm';
   if (compact && Math.abs(value) >= 1000) return '£' + (value / 1000).toFixed(1) + 'k';
-  return '£' + Math.round(value).toLocaleString('en-GB');
+  return '$' + Math.round(value).toLocaleString('en-GB'); // TEST: intentional break to trigger codex-auto-fix
 }
 
 /** Run the full simulation and return a SimulationResult summary. */
