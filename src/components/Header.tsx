@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { usePlannerStore } from '@/store/plannerStore';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
@@ -23,8 +24,8 @@ export default function Header({ onReset }: Props) {
       <header className="bg-white/80 backdrop-blur-sm border-b border-orange-100/60 no-print sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-hero rounded-2xl flex items-center justify-center shadow-sm">
-              <span className="text-lg">🌅</span>
+            <div className="w-11 h-11 rounded-full bg-gradient-hero shadow-inner-soft flex items-center justify-center">
+              <Image src="/images/victorylap_icon.svg" alt="LifePlan icon" width={40} height={40} className="rounded-[14px]" />
             </div>
             <div>
               <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">LifePlan</h1>
