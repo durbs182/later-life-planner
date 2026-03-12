@@ -1,0 +1,87 @@
+name: Codex Auth Refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-auth:
+    runs-on: ubuntu-latest
+    env:
+      CODEX_HOME: ${{ runner.temp }}/.codex
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Install Codex CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g @openai/codex
+
+      - name: Prepare CODEX_HOME
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+          cat > "$CODEX_HOME/config.toml" <<'EOF'
+          cli_auth_credentials_store = "file"
+          EOF
+
+      - name: Azure login via credential
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_CODEX_KV }}
+
+      - name: Restore auth.json from Azure Key Vault
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+          KEYVAULT_NAME: ${{ secrets.AZURE_KEYVAULT_NAME }}
+          KEYVAULT_SECRET_NAME: codex-auth-json
+        run: |
+          set -euo pipefail
+          az keyvault secret show \
+            --vault-name "$KEYVAULT_NAME" \
+            --name "$KEYVAULT_SECRET_NAME" \
+            --query value \
+            --output tsv > "$CODEX_HOME/auth.json"
+          chmod 600 "$CODEX_HOME/auth.json"
+
+      - name: Refresh auth.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          codex exec --json "Refresh the authentication credentials stored in auth.json without touching repository files."
+
+      - name: Persist refreshed auth.json back to Azure Key Vault
+        shell: bash
+        env:
+          KEYVAULT_NAME: ${{ secrets.AZURE_KEYVAULT_NAME }}
+          KEYVAULT_SECRET_NAME: codex-auth-json
+        run: |
+          set -euo pipefail
+          az keyvault secret set \
+            --vault-name "$KEYVAULT_NAME" \
+            --name "$KEYVAULT_SECRET_NAME" \
+            --value "$(cat "$CODEX_HOME/auth.json")" \
+            --output none

@@ -597,3 +597,4 @@ export function runSimulation(state: PlannerState): SimulationResult {
     sustainableRlssLevel: getSustainableRlssLevel(projections, state.mode, state.assumptions.inflation),
   };
 }
+
