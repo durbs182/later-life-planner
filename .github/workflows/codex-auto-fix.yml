@@ -90,7 +90,11 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          codex exec --json "Review this Next.js repository, run Vitest, and apply the minimal change to src/ that fixes the failing tests without changing tests/ or docs/."
+          codex exec --sandbox workspace-write --json "Review this Next.js repository, identify what is broken by reading the test files and source files under src/. Apply the minimal change to one or more files under src/ that fixes the failing tests. Do not modify any file under tests/ or docs/."
+          if git diff --quiet; then
+            echo "::error::Codex made no changes to the workspace — cannot create a fix PR." >&2
+            exit 1
+          fi
 
       - name: Verify tests
         run: npm test --silent
