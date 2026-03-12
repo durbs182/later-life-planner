@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   refresh-auth:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       CODEX_HOME: ${{ runner.temp }}/.codex
