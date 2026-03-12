@@ -3,7 +3,7 @@ name: Codex Auto-Fix on Failure
 on:
   workflow_run:
     # Trigger this job after any run of the primary CI workflow completes
-    workflows: ["CI"]
+    workflows: ["CI/CD"]
     types: [completed]
 
 permissions:
