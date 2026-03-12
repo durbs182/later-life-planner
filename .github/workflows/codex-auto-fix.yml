@@ -12,6 +12,9 @@ permissions:
 
 jobs:
   auto-fix:
+    concurrency:
+      group: codex-auto-fix
+      cancel-in-progress: true
     # Only run when the referenced workflow concluded with a failure
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
@@ -44,19 +47,21 @@ jobs:
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
       - name: Run Codex
-        uses: openai/codex-action@main
+        uses: openai/codex-action@dbe3d52c04f09b8b5712c97eae07e413dff25442
         id: codex
         with:
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          prompt: "You are working in a Node.js monorepo with Jest tests and GitHub Actions. Read the repository, run the test suite, identify the minimal change needed to make all tests pass, implement only that change, and stop. Do not refactor unrelated code or files. Keep changes small and surgical."
-          codex_args: '["--config","sandbox_mode=\"workspace-write\""]'
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: "You are working in a Next.js TypeScript application. The test suite (Vitest, not Jest) is failing. Read the repository, run the test suite to identify what is broken, then implement the minimal change to source files under src/ that makes all tests pass. Do not modify any file under tests/ or docs/. Do not refactor unrelated code. Keep changes small and surgical."
+          sandbox: workspace-write
 
       - name: Verify tests
         run: npm test --silent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Create pull request with fixes
         if: success()
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c
         with:
           commit-message: "fix(ci): auto-fix failing tests via Codex"
           branch: codex/auto-fix-${{ github.event.workflow_run.run_id }}
