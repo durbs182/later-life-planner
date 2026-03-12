@@ -2,7 +2,6 @@ name: Codex Auto-Fix on Failure
 
 on:
   workflow_run:
-    # Trigger this job after any run of the primary CI workflow completes
     workflows: ["CI/CD"]
     types: [completed]
 
@@ -15,7 +14,6 @@ jobs:
     concurrency:
       group: codex-auto-fix
       cancel-in-progress: true
-    # Only run when the referenced workflow concluded with a failure
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     env:
@@ -31,7 +29,7 @@ jobs:
             echo "OPENAI_API_KEY secret is not set. Skipping auto-fix." >&2
             exit 1
           fi
-      - name: Checkout Failing Ref
+      - name: Checkout failing ref
         uses: actions/checkout@v4
         with:
           ref: ${{ env.FAILED_HEAD_SHA }}
@@ -46,13 +44,60 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm i; fi
-      - name: Run Codex
-        uses: openai/codex-action@dbe3d52c04f09b8b5712c97eae07e413dff25442
-        id: codex
+
+      - name: Install jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Install Codex CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g @openai/codex
+
+      - name: Prepare CODEX_HOME
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+          cat > "$CODEX_HOME/config.toml" <<'EOF'
+          cli_auth_credentials_store = "file"
+          EOF
+
+      - name: Azure login via Codex credential
+        uses: azure/login@v2
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt: "You are working in a Next.js TypeScript application. The test suite (Vitest, not Jest) is failing. Read the repository, run the test suite to identify what is broken, then implement the minimal change to source files under src/ that makes all tests pass. Do not modify any file under tests/ or docs/. Do not refactor unrelated code. Keep changes small and surgical."
-          sandbox: workspace-write
+          creds: ${{ secrets.AZURE_CREDENTIALS_CODEX_KV }}
+
+      - name: Restore auth.json from Azure Key Vault
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+          KEYVAULT_NAME: ${{ secrets.AZURE_KEYVAULT_NAME }}
+          KEYVAULT_SECRET_NAME: codex-auth-json
+        run: |
+          set -euo pipefail
+          az keyvault secret show \
+            --vault-name "$KEYVAULT_NAME" \
+            --name "$KEYVAULT_SECRET_NAME" \
+            --query value \
+            --output tsv > "$CODEX_HOME/auth.json"
+          chmod 600 "$CODEX_HOME/auth.json"
+
+      - name: Run Codex auto-fix
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          codex exec --json "Review this Next.js repository, run Vitest, and apply the minimal change to src/ that fixes the failing tests without changing tests/ or docs/."
 
       - name: Verify tests
         run: npm test --silent
