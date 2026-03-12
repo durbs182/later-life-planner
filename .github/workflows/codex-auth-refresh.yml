@@ -12,8 +12,6 @@ jobs:
   refresh-auth:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    env:
-      CODEX_HOME: ${{ runner.temp }}/.codex
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -39,6 +37,8 @@ jobs:
 
       - name: Prepare CODEX_HOME
         shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
         run: |
           set -euo pipefail
           mkdir -p "$CODEX_HOME"
@@ -69,6 +69,8 @@ jobs:
 
       - name: Refresh auth.json
         shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -77,6 +79,7 @@ jobs:
       - name: Persist refreshed auth.json back to Azure Key Vault
         shell: bash
         env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
           KEYVAULT_NAME: ${{ secrets.AZURE_KEYVAULT_NAME }}
           KEYVAULT_SECRET_NAME: codex-auth-json
         run: |
