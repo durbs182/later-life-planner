@@ -11,8 +11,14 @@ import {
   ageFromDOB,
   dobFromAge,
   buildCategoriesForRlss,
+  normalizePlannerState,
 } from '@/lib/mockData';
 import { RLSS, DEFAULT_ASSUMPTIONS } from '@/config/financialConstants';
+import {
+  MAX_SUPPORTED_CURRENT_AGE,
+  MAX_PLANNING_HORIZON,
+  MIN_SUPPORTED_CURRENT_AGE,
+} from '@/lib/planningBounds';
 
 // ─── createDefaultState ───────────────────────────────────────────────────────
 
@@ -64,6 +70,19 @@ describe('createDefaultState', () => {
   test('jointGia is present', () => {
     expect(createDefaultState(57).jointGia).toBeDefined();
   });
+
+  test('clamps unsupported primary ages and raises life expectancy to stay valid', () => {
+    const state = createDefaultState(MAX_SUPPORTED_CURRENT_AGE + 10);
+    expect(state.person1.currentAge).toBe(MAX_SUPPORTED_CURRENT_AGE);
+    expect(state.fiAge).toBe(MAX_SUPPORTED_CURRENT_AGE);
+    expect(state.assumptions.lifeExpectancy).toBe(MAX_PLANNING_HORIZON);
+  });
+
+  test('raises underage primary ages to the adult minimum', () => {
+    const state = createDefaultState(12);
+    expect(state.person1.currentAge).toBe(MIN_SUPPORTED_CURRENT_AGE);
+    expect(state.fiAge).toBe(DEFAULT_ASSUMPTIONS.FI_AGE);
+  });
 });
 
 // ─── buildDefaultLifeStages ───────────────────────────────────────────────────
@@ -103,6 +122,15 @@ describe('buildDefaultLifeStages', () => {
       expect(stages[2].endAge).toBe(95);
     }
   });
+
+  test('preserves three contiguous stages when FI age is close to the planning horizon', () => {
+    const stages = buildDefaultLifeStages(103, 105);
+    expect(stages).toEqual([
+      expect.objectContaining({ id: 'go-go', startAge: 103, endAge: 103 }),
+      expect.objectContaining({ id: 'slo-go', startAge: 104, endAge: 104 }),
+      expect.objectContaining({ id: 'no-go', startAge: 105, endAge: 105 }),
+    ]);
+  });
 });
 
 // ─── ageFromDOB / dobFromAge ──────────────────────────────────────────────────
@@ -131,10 +159,11 @@ describe('ageFromDOB', () => {
     expect(ageFromDOB(futureDob, 99)).toBe(99);
   });
 
-  test('returns 0 for a DOB set to today', () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const age = ageFromDOB(today);
-    expect(age).toBe(0);
+  test('returns fallback for an underage DOB', () => {
+    const underageDob = new Date();
+    underageDob.setFullYear(underageDob.getFullYear() - (MIN_SUPPORTED_CURRENT_AGE - 1));
+    const age = ageFromDOB(underageDob.toISOString().slice(0, 10), 57);
+    expect(age).toBe(57);
   });
 });
 
@@ -150,6 +179,35 @@ describe('dobFromAge', () => {
     const dob = dobFromAge(age);
     const year = parseInt(dob.slice(0, 4));
     expect(year).toBe(currentYear - age);
+  });
+});
+
+describe('normalizePlannerState', () => {
+  test('clamps invalid persisted DOB/FI combinations back into a valid range', () => {
+    const baseState = createDefaultState(57);
+    const normalized = normalizePlannerState({
+      ...baseState,
+      person1: {
+        ...baseState.person1,
+        dateOfBirth: '1900-01-01',
+        currentAge: 125,
+      },
+      fiAge: 120,
+      assumptions: {
+        ...baseState.assumptions,
+        lifeExpectancy: 95,
+      },
+    });
+
+    expect(normalized.person1.currentAge).toBe(MAX_SUPPORTED_CURRENT_AGE);
+    expect(normalized.person1.dateOfBirth).toMatch(/^\d{4}-01-01$/);
+    expect(normalized.fiAge).toBe(MAX_SUPPORTED_CURRENT_AGE);
+    expect(normalized.assumptions.lifeExpectancy).toBe(MAX_PLANNING_HORIZON);
+    expect(normalized.lifeStages.map((stage) => [stage.startAge, stage.endAge])).toEqual([
+      [103, 103],
+      [104, 104],
+      [105, 105],
+    ]);
   });
 });
 

@@ -1,6 +1,14 @@
 'use client';
 
 import { usePlannerStore } from '@/store/plannerStore';
+import {
+  getFiAgeMax,
+  getLifeExpectancyMin,
+  getMaxSupportedDob,
+  getMinSupportedDob,
+  getRangeProgress,
+  MAX_PLANNING_HORIZON,
+} from '@/lib/planningBounds';
 import clsx from 'clsx';
 
 interface Props { onNext: () => void }
@@ -17,6 +25,20 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
 
   // Format a date value for display (age label)
   const ageLabel = (age: number) => `${age} years old`;
+  const minSupportedDob = getMinSupportedDob();
+  const maxSupportedDob = getMaxSupportedDob();
+  const planningHorizonMin = getLifeExpectancyMin(
+    person1.currentAge,
+    mode === 'couple' ? person2.currentAge : 0,
+  );
+  const fiAgeMin = person1.currentAge;
+  const fiAgeMax = Math.max(fiAgeMin, getFiAgeMax(assumptions.lifeExpectancy));
+  const fiProgress = getRangeProgress(fiAge, fiAgeMin, fiAgeMax);
+  const planningHorizonProgress = getRangeProgress(
+    assumptions.lifeExpectancy,
+    planningHorizonMin,
+    MAX_PLANNING_HORIZON,
+  );
 
   return (
     <div className="space-y-6 pb-24">
@@ -92,7 +114,8 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
               type="date"
               value={person1.dateOfBirth}
               onChange={(e) => setP1Dob(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
+              min={minSupportedDob}
+              max={maxSupportedDob}
               className="input-base"
             />
             {person1.currentAge > 0 && (
@@ -132,7 +155,8 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
                 type="date"
                 value={person2.dateOfBirth}
                 onChange={(e) => setP2Dob(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                min={minSupportedDob}
+                max={maxSupportedDob}
                 className="input-base"
               />
               {person2.currentAge > 0 && (
@@ -152,11 +176,15 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
         </p>
         <div className="flex items-center gap-4">
           <input
-            type="range" min={person1.currentAge} max={assumptions.lifeExpectancy - 1} step={1}
+            type="range"
+            min={fiAgeMin}
+            max={fiAgeMax}
+            step={1}
             value={fiAge}
             onChange={(e) => setFiAge(parseInt(e.target.value))}
             className="flex-1"
-            style={{ background: `linear-gradient(to right, #f97316 ${((fiAge - person1.currentAge) / (assumptions.lifeExpectancy - 1 - person1.currentAge)) * 100}%, #e2e8f0 ${((fiAge - person1.currentAge) / (assumptions.lifeExpectancy - 1 - person1.currentAge)) * 100}%)` }}
+            disabled={fiAgeMin === fiAgeMax}
+            style={{ background: `linear-gradient(to right, #f97316 ${fiProgress}%, #e2e8f0 ${fiProgress}%)` }}
           />
           <div className="w-16 h-14 bg-orange-500 text-white font-black text-xl rounded-2xl flex items-center justify-center flex-shrink-0">
             {fiAge}
@@ -177,11 +205,15 @@ export default function Step1HouseholdSetup({ onNext }: Props) {
         <p className="section-subheading">We&apos;ll model your plan to this age. Being optimistic is wise.</p>
         <div className="flex items-center gap-4">
           <input
-            type="range" min={80} max={105} step={1}
+            type="range"
+            min={planningHorizonMin}
+            max={MAX_PLANNING_HORIZON}
+            step={1}
             value={assumptions.lifeExpectancy}
             onChange={(e) => updateAssumptions({ lifeExpectancy: parseInt(e.target.value) })}
             className="flex-1"
-            style={{ background: `linear-gradient(to right, #8b5cf6 ${((assumptions.lifeExpectancy - 80) / 25) * 100}%, #e2e8f0 ${((assumptions.lifeExpectancy - 80) / 25) * 100}%)` }}
+            disabled={planningHorizonMin === MAX_PLANNING_HORIZON}
+            style={{ background: `linear-gradient(to right, #8b5cf6 ${planningHorizonProgress}%, #e2e8f0 ${planningHorizonProgress}%)` }}
           />
           <div className="w-16 h-14 bg-violet-500 text-white font-black text-xl rounded-2xl flex items-center justify-center flex-shrink-0">
             {assumptions.lifeExpectancy}
