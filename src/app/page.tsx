@@ -52,6 +52,11 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [currentStep]);
 
+  useEffect(() => {
+    if (!accepted) return;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [accepted]);
+
   if (accepted === null) return null;
   if (!accepted) return <DisclaimerGate onAccept={handleAccept} />;
 
