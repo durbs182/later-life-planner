@@ -1,5 +1,9 @@
 # Data Storage & Security Design
 
+> Superseded: use [storage-plan.md](/Users/pauldurbin/later-life-planner/docs/storage-plan.md) and [security-decisions.md](/Users/pauldurbin/later-life-planner/docs/security-decisions.md) for current implementation.
+>
+> This file is retained as historical/reference material. The newer docs are the canonical source for current implementation work.
+
 ## Overview
 
 User financial data (pensions, ISAs, GIAs, income projections) is sensitive. The storage design

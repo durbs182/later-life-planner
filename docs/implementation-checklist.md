@@ -1,0 +1,97 @@
+# Implementation Checklist
+
+Status: active draft
+
+This checklist translates the current canonical planning docs into a practical execution sequence:
+
+- `docs/auth-plan.md`
+- `docs/storage-plan.md`
+- `docs/security-decisions.md`
+
+Priority order:
+
+1. Phase 0: product and consistency cleanup
+2. Phase 1: Clerk auth foundation
+3. Phase 2: encrypted persistence backbone
+4. Phase 3: sync and migration UX
+5. Phase 4: hardening, tests, and operational readiness
+
+## Phase 0: Product and Consistency Cleanup
+
+- [x] Remove forbidden user-facing uses of "retirement" where they conflict with the product prompt.
+- [x] Update the AI life-vision route prompt to use later-life / freedom-phase language.
+- [x] Replace hardcoded financial figures in UI copy with values sourced from `src/config/financialConstants.ts`.
+- [x] Align `WITHDRAWAL_ORDER` constants with the actual implemented engine order, or refactor the engine to consume the central constant directly.
+- [x] Update `README.md` language so it reflects the current product framing.
+
+## Phase 1: Clerk Auth Foundation
+
+- [ ] Add `@clerk/nextjs`.
+- [ ] Add Clerk environment variable placeholders to `.env.example`.
+- [ ] Wrap the app with `ClerkProvider`.
+- [ ] Add `src/middleware.ts` for protected route handling.
+- [ ] Add `src/app/sign-in/[[...sign-in]]/page.tsx`.
+- [ ] Add `src/app/sign-up/[[...sign-up]]/page.tsx`.
+- [ ] Add a shared auth helper for protected server routes.
+- [ ] Add signed-in header controls:
+- [ ] User account button
+- [ ] Save-status area
+- [ ] Sign-out-safe reset behavior
+- [ ] Decide whether the disclaimer is pre-auth, post-auth, or both.
+
+## Phase 2: Encrypted Persistence Backbone
+
+- [ ] Add `src/lib/crypto.ts`.
+- [ ] Add `src/lib/cosmos.ts`.
+- [ ] Add authenticated `GET /api/data`.
+- [ ] Add authenticated `PUT /api/data`.
+- [ ] Enforce identity from verified Clerk auth only.
+- [ ] Persist ciphertext only; never persist plaintext planner data.
+- [ ] Introduce `schemaVersion`, `revision`, and `updatedAt` handling.
+- [ ] Add validation for ciphertext payload shape and size.
+
+## Phase 3: Sync and Migration UX
+
+- [ ] Add a canonical planner hydration action to the Zustand store.
+- [ ] Separate domain state from UI-only state for persistence purposes.
+- [ ] Add `src/hooks/usePlanSync.ts`.
+- [ ] Load, decrypt, and hydrate planner state on authenticated startup.
+- [ ] Debounce encrypt-and-save on canonical planner state changes.
+- [ ] Add save-state UX:
+- [ ] Loading
+- [ ] Saving
+- [ ] Saved
+- [ ] Conflict
+- [ ] Error
+- [ ] Add localStorage migration prompt for legacy local plans.
+- [ ] Prevent silent overwrite of an existing remote plan.
+
+## Phase 4: Security and Reliability
+
+- [ ] Add optimistic concurrency handling using `revision`.
+- [ ] Add route rate limiting for protected data routes.
+- [ ] Add secure handling for malformed ciphertext and corrupt payloads.
+- [ ] Ensure sign-out clears decrypted planner state from memory.
+- [ ] Ensure planner plaintext never reaches logs.
+- [ ] Define key-wrapping integration path with Azure Key Vault.
+
+## Phase 5: Tests and Docs
+
+- [ ] Add auth route tests.
+- [ ] Add protected API auth tests.
+- [ ] Add crypto round-trip tests.
+- [ ] Add sync-state and conflict tests.
+- [ ] Add migration-flow tests.
+- [ ] Update `README.md` to reflect authenticated encrypted persistence.
+- [ ] Update `.env.example` with Clerk, Cosmos, and Key Vault placeholders.
+- [ ] Document deployment assumptions for the chosen hosting environment.
+
+## Immediate Next Slice
+
+Recommended first implementation slice:
+
+1. Add Clerk dependency and env placeholders.
+2. Add `ClerkProvider`.
+3. Add middleware and sign-in/sign-up routes.
+4. Add a minimal signed-in header shell.
+5. Keep the planner domain logic untouched while auth lands cleanly.

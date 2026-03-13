@@ -1,5 +1,9 @@
 # Auth & Multi-User Implementation Prompt
 
+> Superseded: use [auth-plan.md](/Users/pauldurbin/later-life-planner/docs/auth-plan.md), [storage-plan.md](/Users/pauldurbin/later-life-planner/docs/storage-plan.md), and [security-decisions.md](/Users/pauldurbin/later-life-planner/docs/security-decisions.md) for current implementation.
+>
+> This file is retained for historical context only. Its Clerk direction remains relevant, but its Supabase storage plan is no longer current.
+
 Use this document as the prompt for implementing auth and multi-user support in the later-life-planner app.
 
 ---

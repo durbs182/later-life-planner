@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
 import CurrencyInput from '@/components/ui/CurrencyInput';
+import { DEFAULT_ASSUMPTIONS, STATE_PENSION } from '@/config/financialConstants';
 import clsx from 'clsx';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ type JointDraft = {
 
 function emptyDraft(): PersonDraft {
   return {
-    statePension: { enabled: true, weeklyAmount: 221, startAge: 67 },
+    statePension: { enabled: true, weeklyAmount: STATE_PENSION.FULL_NEW_WEEKLY, startAge: STATE_PENSION.DEFAULT_AGE },
     dbPensions:   [],
     annuity:      { enabled: false, annualIncome: 0, startAge: 65 },
     otherIncome:  { enabled: false, annualAmount: 0, startAge: 65 },
@@ -56,7 +57,7 @@ function emptyDraft(): PersonDraft {
 
 function emptyJoint(): JointDraft {
   return {
-    gia:      { enabled: false, totalValue: 0, baseCost: 0, growthRate: 4 },
+    gia:      { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
     property: { enabled: false, propertyValue: 0, baseCost: 0, annualRent: 0, durationYears: 20, owner: 'joint' },
   };
 }
@@ -225,7 +226,10 @@ function StepSP({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: 
     <div className="space-y-5">
       {sp.enabled ? (
         <>
-          <Field label="Weekly amount" hint="Check your forecast at gov.uk/check-state-pension · Full amount is £221.20/week (2024/25)">
+          <Field
+            label="Weekly amount"
+            hint={`Check your forecast at gov.uk/check-state-pension · Full amount is £${STATE_PENSION.FULL_NEW_WEEKLY.toFixed(2)}/week`}
+          >
             <CurrencyInput value={sp.weeklyAmount} onChange={(v) => upd({ weeklyAmount: v })} max={300} step={1} />
           </Field>
           <Field label="Expected start age">
@@ -333,7 +337,7 @@ function StepOther({ draft, onChange, isPartner }: { draft: PersonDraft; onChang
 
 function StepDC({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const dcs = draft.dcPensions;
-  const add = () => onChange({ ...draft, dcPensions: [...dcs, { value: 0, growthRate: 4 }] });
+  const add = () => onChange({ ...draft, dcPensions: [...dcs, { value: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH }] });
   const remove = (i: number) => onChange({ ...draft, dcPensions: dcs.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<DcEntry>) => onChange({ ...draft, dcPensions: dcs.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = dcs.reduce((s, e) => s + e.value, 0);
@@ -371,7 +375,7 @@ function StepDC({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: 
 
 function StepISA({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const isas = draft.isas;
-  const add = () => onChange({ ...draft, isas: [...isas, { value: 0, growthRate: 4 }] });
+  const add = () => onChange({ ...draft, isas: [...isas, { value: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH }] });
   const remove = (i: number) => onChange({ ...draft, isas: isas.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<IsaEntry>) => onChange({ ...draft, isas: isas.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = isas.reduce((s, e) => s + e.value, 0);
@@ -409,7 +413,7 @@ function StepISA({ draft, onChange, isPartner }: { draft: PersonDraft; onChange:
 
 function StepGIA({ draft, onChange, isPartner }: { draft: PersonDraft; onChange: (d: PersonDraft) => void; isPartner?: boolean }) {
   const gias = draft.gias;
-  const add = () => onChange({ ...draft, gias: [...gias, { value: 0, baseCost: 0, growthRate: 4 }] });
+  const add = () => onChange({ ...draft, gias: [...gias, { value: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH }] });
   const remove = (i: number) => onChange({ ...draft, gias: gias.filter((_, idx) => idx !== i) });
   const upd = (i: number, p: Partial<GiaEntry>) => onChange({ ...draft, gias: gias.map((e, idx) => idx === i ? { ...e, ...p } : e) });
   const total = gias.reduce((s, e) => s + e.value, 0);
