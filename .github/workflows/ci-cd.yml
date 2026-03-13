@@ -1,4 +1,4 @@
-# CI/CD for later-life-planner
+# ci validation commentn# CI/CD for later-life-planner
 # Test on every push/PR to master when app, test, or workflow files change.
 # Build + deploy only when container-affecting files change on master.
 # Manual trigger via workflow_dispatch always runs CI, but deploy still stays gated to master.
@@ -161,3 +161,5 @@ jobs:
             --resource-group rg-later-life-planner \
             --query properties.configuration.ingress.fqdn -o tsv)
           echo "Deployed to: https://$fqdn"
+
+# ci-validate-workflow-only
