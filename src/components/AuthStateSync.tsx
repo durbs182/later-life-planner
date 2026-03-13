@@ -2,7 +2,6 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { useEffect, useRef } from 'react';
-import { DISCLAIMER_KEY } from '@/lib/browserStorageKeys';
 import { usePlannerStore } from '@/store/plannerStore';
 
 export default function AuthStateSync() {
@@ -22,7 +21,6 @@ export default function AuthStateSync() {
 
     resetPlan();
     usePlannerStore.persist.clearStorage();
-    localStorage.removeItem(DISCLAIMER_KEY);
     hasSeenSignedInState.current = false;
   }, [isLoaded, userId, resetPlan]);
 

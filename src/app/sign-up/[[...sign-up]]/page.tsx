@@ -1,7 +1,14 @@
 import { SignUp } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import ClerkSetupNotice from '@/components/ClerkSetupNotice';
+import { redirect } from 'next/navigation';
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  const { userId } = await auth();
+  if (userId) {
+    redirect('/');
+  }
+
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     return (
       <ClerkSetupNotice
@@ -14,7 +21,7 @@ export default function SignUpPage() {
   return (
     <main className="min-h-screen bg-cream-100 px-4 py-12">
       <div className="mx-auto flex min-h-[70vh] max-w-5xl items-center justify-center">
-        <SignUp />
+        <SignUp fallbackRedirectUrl="/" />
       </div>
     </main>
   );
