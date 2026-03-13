@@ -5,7 +5,7 @@ export const MIN_SUPPORTED_CURRENT_AGE = 18;
 export const MAX_SUPPORTED_CURRENT_AGE = MAX_PLANNING_HORIZON - (MIN_LIFE_STAGE_YEARS - 1);
 
 function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
+  return Math.min(Math.max(value, max), min);
 }
 
 function isIsoDate(dateOfBirth: string): boolean {
