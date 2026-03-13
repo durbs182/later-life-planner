@@ -8,6 +8,7 @@ import {
   getAssetDepletionAge, formatCurrency, getTotalUnrealisedGain,
   calculateGamificationMetrics,
 } from '@/lib/calculations';
+import { CGT, INCOME_TAX } from '@/config/financialConstants';
 import { RLSS_STANDARDS } from '@/lib/mockData';
 import type { YearlyProjection } from '@/lib/types';
 import clsx from 'clsx';
@@ -83,6 +84,10 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
   const lifetimeIncome    = projections.reduce((s, p) => s + p.totalIncome, 0);
   const taxFreeYears      = projections.filter(p => Math.round(p.totalTaxPaid) === 0).length;
   const effectiveRate     = lifetimeIncome > 0 ? (lifetimeTotalTax / lifetimeIncome) * 100 : 0;
+  const personalAllowance = formatCurrency(INCOME_TAX.PERSONAL_ALLOWANCE, true);
+  const annualExempt = formatCurrency(CGT.ANNUAL_EXEMPT, true);
+  const cgtBasicRate = `${Math.round(CGT.BASIC_RATE * 100)}%`;
+  const cgtHigherRate = `${Math.round(CGT.HIGHER_RATE * 100)}%`;
 
   return (
     <div className="game-card">
@@ -116,10 +121,10 @@ function TaxOverview({ projections }: { projections: YearlyProjection[] }) {
 
       <div className="space-y-2">
         {[
-          { n: 1, icon: '🏦', label: 'DC pension — within personal allowance', desc: 'Any unused personal allowance (£12,570) is filled by DC pension withdrawals. Each withdrawal is 25% tax-free; the remaining 75% sits within the allowance → 0% income tax.', color: 'bg-violet-50 border-violet-100' },
-          { n: 2, icon: '📊', label: 'GIA — within CGT exempt amount', desc: 'Investment gains up to £3,000/person are crystallised tax-free each year. Only drawn when needed for spending.', color: 'bg-amber-50 border-amber-100' },
+          { n: 1, icon: '🏦', label: 'DC pension — within personal allowance', desc: `Any unused personal allowance (${personalAllowance}) is filled by DC pension withdrawals. Each withdrawal is 25% tax-free; the remaining 75% sits within the allowance → 0% income tax.`, color: 'bg-violet-50 border-violet-100' },
+          { n: 2, icon: '📊', label: 'GIA — within CGT exempt amount', desc: `Investment gains up to ${annualExempt}/person are crystallised tax-free each year. Only drawn when needed for spending.`, color: 'bg-amber-50 border-amber-100' },
           { n: 3, icon: '✅', label: 'ISA', desc: 'Completely tax-free. Used after personal allowance and CGT allowance have been maximised.', color: 'bg-emerald-50 border-emerald-100' },
-          { n: 4, icon: '💰', label: 'Remaining GIA & cash', desc: 'GIA gains above the exempt amount are taxed at 18% (basic-rate) or 24% (higher-rate). Cash withdrawals are always tax-free.', color: 'bg-sky-50 border-sky-100' },
+          { n: 4, icon: '💰', label: 'Remaining GIA & cash', desc: `GIA gains above the exempt amount are taxed at ${cgtBasicRate} (basic-rate) or ${cgtHigherRate} (higher-rate). Cash withdrawals are always tax-free.`, color: 'bg-sky-50 border-sky-100' },
           { n: 5, icon: '💼', label: 'DC pension — above personal allowance', desc: 'Remaining gap covered by further pension withdrawals. The 75% taxable portion now attracts income tax at marginal rate. Only reached when other sources are exhausted or the spending gap is large.', color: 'bg-slate-50 border-slate-100' },
         ].map(({ n, icon, label, desc, color }) => (
           <div key={n} className={clsx('flex gap-3 p-3 rounded-2xl border', color)}>

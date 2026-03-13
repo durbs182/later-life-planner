@@ -2,7 +2,7 @@
 
 A UK later-life financial planning tool for people aged 50–75. Aspiration-first: define the life you want, then see how your income and assets can fund it.
 
-Built with Next.js 14, TypeScript, TailwindCSS, and Recharts. Deployable to Vercel with no backend or authentication required.
+Built with Next.js 14, TypeScript, TailwindCSS, and Recharts. The current app is a local-first MVP. Account-based auth and encrypted persistence are documented separately and are intended to follow the canonical implementation docs in `docs/`.
 
 ---
 
@@ -14,7 +14,7 @@ A five-step wizard that takes you from life vision to a full lifetime financial 
 Choose individual or couple mode. Capture names, current ages, and financial independence (FI) age — the age from which work becomes optional.
 
 **Step 2 — Life Vision**
-Set your retirement aspirations and define up to three life stages (Go-Go Years, Slo-Go Years, No-Go Years) with age boundaries and spending multipliers for each stage.
+Set your later-life aspirations and define up to three life stages (Go-Go Years, Slo-Go Years, No-Go Years) with age boundaries and spending multipliers for each stage.
 
 **Step 3 — Spending Goals**
 Set target annual spending in today's £. Choose a starting point from UK Retirement Living Standards (PLSA 2024), then refine by category:
@@ -176,10 +176,16 @@ Deploy to Vercel in one step:
 npx vercel
 ```
 
-No environment variables or database setup required. Investment return, inflation, and life expectancy defaults can be overridden via environment variables:
+For the current local-first app, no database setup is required. Investment return, inflation, and life expectancy defaults can be overridden via environment variables:
 
 ```
 NEXT_PUBLIC_INVESTMENT_RETURN=4
 NEXT_PUBLIC_DEFAULT_INFLATION=2.5
 NEXT_PUBLIC_DEFAULT_LIFE_EXPECTANCY=95
 ```
+
+Planned account-based auth and encrypted sync are documented in:
+
+- `docs/auth-plan.md`
+- `docs/storage-plan.md`
+- `docs/security-decisions.md`

@@ -57,12 +57,16 @@ export const CGT = {
 export const STATE_PENSION = {
   /** Full new State Pension weekly amount 2024/25 (after triple lock). */
   FULL_NEW_WEEKLY: 221.20,
+  /** Current minimum State Pension age for people already in scope today. */
+  CURRENT_MIN_AGE: 66,
   /** Years of National Insurance needed for the full new State Pension. */
   QUALIFYING_YEARS_FULL: 35,
   /** Minimum NI years to receive any new State Pension. */
   MIN_QUALIFYING_YEARS: 10,
   /** Current State Pension age. Rising to 67 between 2026–2028. */
   DEFAULT_AGE: 67,
+  /** Published rise to age 67 is due by this year. */
+  RISE_TO_67_BY_YEAR: 2028,
 } as const;
 
 // ─── UK Retirement Living Standards (RLSS) 2024 ──────────────────────────────
@@ -172,8 +176,8 @@ export const CARE_RESERVE = {
 
 export const WITHDRAWAL_ORDER = [
   'personal_allowance', // Guaranteed income fills personal allowance first
-  'isa',                // ISA — fully tax-free; drawn before GIA to avoid unnecessary CGT
   'cgt_allowance',      // GIA within per-person CGT budget (individual + joint share ≤ £3,000 each)
+  'isa',                // ISA — fully tax-free; drawn after the CGT-free GIA slice
   'gia',                // GIA — CGT on gains above annual exempt
   'cash',               // Cash savings — no tax on withdrawal
   'ufpls',              // DC pension via UFPLS — 25% tax-free per withdrawal, 75% taxable income

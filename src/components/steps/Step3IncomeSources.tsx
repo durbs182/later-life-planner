@@ -5,6 +5,7 @@ import { usePlannerStore } from '@/store/plannerStore';
 import Toggle from '@/components/ui/Toggle';
 import CurrencyInput from '@/components/ui/CurrencyInput';
 import GuidedSetupWizard from '@/components/GuidedSetupWizard';
+import { CGT, STATE_PENSION } from '@/config/financialConstants';
 import type { PersonIncomeSources, PersonAssets, AssetOwner } from '@/lib/types';
 import clsx from 'clsx';
 
@@ -183,14 +184,22 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
         </SourceCard>
 
         <SourceCard icon="🏛️" title="State Pension"
-          desc="UK new State Pension — up to £221.20/week (2024/25)"
+          desc={`UK new State Pension — up to £${STATE_PENSION.FULL_NEW_WEEKLY.toFixed(2)}/week`}
           enabled={src.statePension.enabled} onToggle={(v) => set('statePension', { enabled: v })}
         >
           <FieldRow label="Weekly amount" hint={<>Check your forecast at{' '}<a href="https://www.gov.uk/check-state-pension" target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">gov.uk/check-state-pension</a></>}>
             <CurrencyInput value={src.statePension.weeklyAmount} onChange={(v) => set('statePension', { weeklyAmount: v })} max={300} step={1} />
           </FieldRow>
-          <FieldRow label="Start age" hint="Statutory minimum is 66, rising to 67 by 2028">
-            <AgeStepper value={src.statePension.startAge} onChange={(v) => set('statePension', { startAge: v })} min={66} max={75} />
+          <FieldRow
+            label="Start age"
+            hint={`Statutory minimum is ${STATE_PENSION.CURRENT_MIN_AGE}, rising to ${STATE_PENSION.DEFAULT_AGE} by ${STATE_PENSION.RISE_TO_67_BY_YEAR}`}
+          >
+            <AgeStepper
+              value={src.statePension.startAge}
+              onChange={(v) => set('statePension', { startAge: v })}
+              min={STATE_PENSION.CURRENT_MIN_AGE}
+              max={75}
+            />
           </FieldRow>
           <div className="py-2 text-xs text-sky-700 bg-sky-50 rounded-xl px-3">
             Annual: <strong>£{(src.statePension.weeklyAmount * 52).toLocaleString('en-GB')}</strong> · Indexed to inflation
@@ -374,7 +383,7 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label, sharedGia, onShare
         </FieldRow>
         {giaGain > 0 && (
           <div className="py-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3">
-            Unrealised gain: <strong>£{giaGain.toLocaleString('en-GB')}</strong> · CGT applies on gains above the £3,000 annual exempt amount.
+            Unrealised gain: <strong>£{giaGain.toLocaleString('en-GB')}</strong> · CGT applies on gains above the £{CGT.ANNUAL_EXEMPT.toLocaleString('en-GB')} annual exempt amount.
           </div>
         )}
       </SourceCard>

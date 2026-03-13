@@ -13,7 +13,7 @@ const BodySchema = z.object({
 
 const MAX_TOTAL_ASPIRATION_CHARS = 200;
 
-const SYSTEM_PROMPT = `You write short, plain-English retirement vision statements.
+const SYSTEM_PROMPT = `You write short, plain-English later-life vision statements.
 Rules:
 - Use everyday words. Never use words like "envision", "curate", "tapestry", "rootedness", "embark", "journey", "intentional", "meaningful", or similar abstract filler.
 - Write like a real person talking to a friend — warm and direct, not like a brochure.
@@ -71,8 +71,8 @@ export async function POST(req: NextRequest) {
     : 'enjoying later life';
 
   const prompt = mode === 'couple'
-    ? `Write a life vision statement for a couple planning retirement. Their priorities are: ${aspirationList}. Use "we" and "us". Keep it real and personal — 2 to 3 short paragraphs.`
-    : `Write a life vision statement for someone planning retirement. Their priorities are: ${aspirationList}. Keep it real and personal — 2 to 3 short paragraphs.`;
+    ? `Write a life vision statement for a couple planning later life. Their priorities are: ${aspirationList}. Use "we" and "us". Keep it real and personal — 2 to 3 short paragraphs.`
+    : `Write a life vision statement for someone planning later life. Their priorities are: ${aspirationList}. Keep it real and personal — 2 to 3 short paragraphs.`;
 
   const encoder = new TextEncoder();
 
