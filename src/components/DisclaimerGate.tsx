@@ -164,7 +164,7 @@ export default function DisclaimerGate({ onAccept }: Props) {
                       : 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-inner'
                   }`}
                 >
-                  Launch planner →
+                  Get started
                 </button>
                 <p className="mt-2 text-xs text-slate-500">
                   You can review the assumptions and reset the plan at any time.
