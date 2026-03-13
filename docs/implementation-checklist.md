@@ -33,7 +33,7 @@ Priority order:
 - [x] Add `src/app/sign-in/[[...sign-in]]/page.tsx`.
 - [x] Add `src/app/sign-up/[[...sign-up]]/page.tsx`.
 - [x] Add a shared auth helper for protected server routes.
-- [ ] Add signed-in header controls:
+- [x] Add signed-in header controls:
 - [x] User account button
 - [x] Save-status area
 - [x] Sign-out-safe reset behavior
