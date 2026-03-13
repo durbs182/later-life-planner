@@ -1,5 +1,6 @@
 'use client';
 
+import { UserButton } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { usePlannerStore } from '@/store/plannerStore';
@@ -7,6 +8,7 @@ import Header from '@/components/Header';
 import StepIndicator from '@/components/StepIndicator';
 import SummaryBar from '@/components/SummaryBar';
 import DisclaimerGate from '@/components/DisclaimerGate';
+import { DISCLAIMER_KEY } from '@/lib/browserStorageKeys';
 import Step1HouseholdSetup from '@/components/steps/Step1HouseholdSetup';
 import Step1LifeVision from '@/components/steps/Step1LifeVision';
 import Step2SpendingGoals from '@/components/steps/Step2SpendingGoals';
@@ -22,9 +24,8 @@ const STEPS = [
   { label: 'Dashboard',     description: 'See your lifetime plan' },
 ];
 
-const DISCLAIMER_KEY = 'llp-disclaimer-accepted';
-
 export default function Home() {
+  const hasClerkPublishableKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const { currentStep, maxVisitedStep, setCurrentStep, resetPlan } = usePlannerStore();
   const [accepted, setAccepted] = useState<boolean | null>(null);
 
@@ -56,7 +57,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-cream-100">
-      <Header onReset={handleReset} />
+      <Header
+        onReset={handleReset}
+        saveStatus="local"
+        authControls={hasClerkPublishableKey ? <UserButton /> : undefined}
+      />
 
       {/* Step navigation bar */}
       <div className="sticky top-[56px] z-10 bg-white/80 backdrop-blur-sm border-b border-orange-100/60 no-print">

@@ -2,7 +2,7 @@
 
 A UK later-life financial planning tool for people aged 50–75. Aspiration-first: define the life you want, then see how your income and assets can fund it.
 
-Built with Next.js 14, TypeScript, TailwindCSS, and Recharts. The current app is a local-first MVP. Account-based auth and encrypted persistence are documented separately and are intended to follow the canonical implementation docs in `docs/`.
+Built with Next.js 14, TypeScript, TailwindCSS, and Recharts. The app now includes a Clerk auth foundation while planner data remains local-first until encrypted persistence lands. The canonical auth and storage plan lives in `docs/`.
 
 ---
 
@@ -176,7 +176,7 @@ Deploy to Vercel in one step:
 npx vercel
 ```
 
-For the current local-first app, no database setup is required. Investment return, inflation, and life expectancy defaults can be overridden via environment variables:
+No database setup is required yet. Clerk auth can be enabled with the environment variables in `.env.example`, and investment return, inflation, and life expectancy defaults can be overridden via environment variables:
 
 ```
 NEXT_PUBLIC_INVESTMENT_RETURN=4
