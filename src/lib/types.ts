@@ -7,3 +7,5 @@ export * from '@/models/types';
 // ci-validate: concurrency test commit 1
 
 // ci-validate: concurrency test commit 2
+
+// ci-validate: concurrency commit A
