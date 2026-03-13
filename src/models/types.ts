@@ -204,6 +204,10 @@ export interface PlannerState {
   careReserve: CareReserve;
 }
 
+export type PlannerUiState = Pick<PlannerState, 'currentStep' | 'maxVisitedStep'>;
+export type PersistedPlannerState = Omit<PlannerState, keyof PlannerUiState>;
+export type PlannerSaveStatus = 'local' | 'loading' | 'saving' | 'saved' | 'error' | 'conflict';
+
 // ─── Projection output ────────────────────────────────────────────────────────
 
 export interface YearlyProjection {

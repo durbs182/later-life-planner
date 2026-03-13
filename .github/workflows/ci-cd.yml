@@ -111,6 +111,11 @@ jobs:
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY="${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}" \
+            --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" \
+            --build-arg NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in" \
+            --build-arg NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up" \
+            --build-arg NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL="/" \
+            --build-arg NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL="/" \
             .
 
   deploy:
@@ -131,12 +136,21 @@ jobs:
           az containerapp secret set \
             --name ca-later-life-planner \
             --resource-group rg-later-life-planner \
-            --secrets "turnstile-secret-key=${{ secrets.TURNSTILE_SECRET_KEY }}"
+            --secrets \
+              "turnstile-secret-key=${{ secrets.TURNSTILE_SECRET_KEY }}" \
+              "clerk-secret-key=${{ secrets.CLERK_SECRET_KEY }}"
           REVISION=$(az containerapp update \
             --name ca-later-life-planner \
             --resource-group rg-later-life-planner \
             --image acrblackdog69llp.azurecr.io/later-life-planner:${{ github.sha }} \
-            --set-env-vars "TURNSTILE_SECRET_KEY=secretref:turnstile-secret-key" \
+            --set-env-vars \
+              "TURNSTILE_SECRET_KEY=secretref:turnstile-secret-key" \
+              "CLERK_SECRET_KEY=secretref:clerk-secret-key" \
+              "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" \
+              "NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in" \
+              "NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up" \
+              "NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/" \
+              "NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/" \
             --query properties.latestRevisionName \
             -o tsv)
           if [ -z "$REVISION" ]; then

@@ -4,12 +4,35 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { usePlannerStore } from '@/store/plannerStore';
 import ConfirmModal from '@/components/ui/ConfirmModal';
+import type { PlannerSaveStatus } from '@/models/types';
 
 type PendingAction = 'reset' | 'demo' | null;
 
-interface Props { onReset: () => void }
+const SAVE_STATUS_STYLES: Record<PlannerSaveStatus, string> = {
+  local: 'bg-slate-100 text-slate-500',
+  loading: 'bg-amber-100 text-amber-700',
+  saving: 'bg-amber-100 text-amber-700',
+  saved: 'bg-emerald-100 text-emerald-700',
+  error: 'bg-rose-100 text-rose-700',
+  conflict: 'bg-rose-100 text-rose-700',
+};
 
-export default function Header({ onReset }: Props) {
+const SAVE_STATUS_LABELS: Record<PlannerSaveStatus, string> = {
+  local: 'Local draft',
+  loading: 'Loading',
+  saving: 'Saving',
+  saved: 'Saved',
+  error: 'Save error',
+  conflict: 'Conflict',
+};
+
+interface Props {
+  onReset: () => void;
+  saveStatus?: PlannerSaveStatus;
+  authControls?: React.ReactNode;
+}
+
+export default function Header({ onReset, saveStatus = 'local', authControls }: Props) {
   const { loadDemo } = usePlannerStore();
   const [pending, setPending] = useState<PendingAction>(null);
 
@@ -33,7 +56,11 @@ export default function Header({ onReset }: Props) {
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
+            <div className={`hidden rounded-full px-3 py-1 text-xs font-semibold sm:block ${SAVE_STATUS_STYLES[saveStatus]}`}>
+              {SAVE_STATUS_LABELS[saveStatus]}
+            </div>
+            {authControls}
             <button
               onClick={() => setPending('demo')}
               className="btn-ghost text-orange-600 hover:text-orange-700 hover:bg-orange-50"

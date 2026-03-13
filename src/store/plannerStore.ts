@@ -4,14 +4,16 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
   PlannerState, PlanningMode, LifeStage, GIAAsset, CareReserve,
-  PersonIncomeSources, PersonAssets, Assumptions, AspirationTag, RlssStandard,
+  PersonIncomeSources, PersonAssets, Assumptions, AspirationTag, RlssStandard, PersistedPlannerState,
 } from '@/models/types';
 import {
   createDefaultState, createMockDemoState, buildDefaultLifeStages,
-  buildCategoriesForRlss, ageFromDOB, dobFromAge, normalizePlannerState,
+  buildCategoriesForRlss, ageFromDOB, dobFromAge,
 } from '@/lib/mockData';
 import { clampDateOfBirth, normalizePlanningBounds } from '@/lib/planningBounds';
 import { STATE_PENSION } from '@/config/financialConstants';
+import { LEGACY_PLANNER_STORAGE_KEY } from '@/lib/browserStorageKeys';
+import { extractPlannerUiState, hydratePlannerState } from '@/lib/persistedPlan';
 
 type Actions = {
   setCurrentStep: (step: number) => void;
@@ -44,6 +46,7 @@ type Actions = {
   setRlssStandard: (standard: RlssStandard | null) => void;
 
   loadDemo: () => void;
+  loadState: (persistedState: Partial<PersistedPlannerState>) => void;
   resetPlan: () => void;
 };
 
@@ -61,14 +64,25 @@ function mergePersistedPlannerState(
   currentState: PlannerState & Actions,
 ): PlannerState & Actions {
   if (!persistedState || typeof persistedState !== 'object') return currentState;
-  const mergedState = {
+  const nextUiState = extractPlannerUiState({
     ...currentState,
-    ...(persistedState as Partial<PlannerState & Actions>),
-  };
+    currentStep: typeof (persistedState as Partial<PlannerState>).currentStep === 'number'
+      ? (persistedState as Partial<PlannerState>).currentStep as number
+      : currentState.currentStep,
+    maxVisitedStep: typeof (persistedState as Partial<PlannerState>).maxVisitedStep === 'number'
+      ? (persistedState as Partial<PlannerState>).maxVisitedStep as number
+      : currentState.maxVisitedStep,
+  });
 
   return {
-    ...mergedState,
-    ...normalizePlannerState(mergedState),
+    ...currentState,
+    ...hydratePlannerState(
+      {
+        ...currentState,
+        ...nextUiState,
+      },
+      persistedState as Partial<PersistedPlannerState>,
+    ),
   };
 }
 
@@ -291,10 +305,11 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setRlssStandard: (rlssStandard) => set({ rlssStandard }),
 
       loadDemo: () => set(createMockDemoState()),
+      loadState: (persistedState) => set((s) => hydratePlannerState(s, persistedState)),
       resetPlan: () => set(createDefaultState(STATE_PENSION.DEFAULT_AGE)),
     }),
     {
-      name: 'life-planner-v6',
+      name: LEGACY_PLANNER_STORAGE_KEY,
       merge: mergePersistedPlannerState,
     }
   )

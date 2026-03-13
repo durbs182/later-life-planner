@@ -17,14 +17,16 @@ export default function DisclaimerGate({ onAccept }: Props) {
         {/* Logo / brand mark */}
         <div className="text-center">
           <div className="flex justify-center mb-1">
-            <Image
-              src="/images/victorylap_logo.svg"
-              alt="Later Life Planner"
-              width={300}
-              height={78}
-              className="w-full max-w-[300px] h-auto"
-              priority
-            />
+            <div className="relative w-full max-w-[300px] aspect-[300/78]">
+              <Image
+                src="/images/victorylap_logo.svg"
+                alt="Later Life Planner"
+                fill
+                sizes="(max-width: 640px) 100vw, 300px"
+                className="object-contain"
+                priority
+              />
+            </div>
           </div>
           <p className="text-xs sm:text-sm font-semibold tracking-[0.18em] uppercase text-slate-500/90 mb-2">
             Later Life Planner

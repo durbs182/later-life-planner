@@ -26,18 +26,19 @@ Priority order:
 
 ## Phase 1: Clerk Auth Foundation
 
-- [ ] Add `@clerk/nextjs`.
-- [ ] Add Clerk environment variable placeholders to `.env.example`.
-- [ ] Wrap the app with `ClerkProvider`.
-- [ ] Add `src/middleware.ts` for protected route handling.
-- [ ] Add `src/app/sign-in/[[...sign-in]]/page.tsx`.
-- [ ] Add `src/app/sign-up/[[...sign-up]]/page.tsx`.
-- [ ] Add a shared auth helper for protected server routes.
+- [x] Add `@clerk/nextjs`.
+- [x] Add Clerk environment variable placeholders to `.env.example`.
+- [x] Wrap the app with `ClerkProvider`.
+- [x] Add `src/middleware.ts` for protected route handling.
+- [x] Add `src/app/sign-in/[[...sign-in]]/page.tsx`.
+- [x] Add `src/app/sign-up/[[...sign-up]]/page.tsx`.
+- [x] Add a shared auth helper for protected server routes.
 - [ ] Add signed-in header controls:
-- [ ] User account button
-- [ ] Save-status area
-- [ ] Sign-out-safe reset behavior
-- [ ] Decide whether the disclaimer is pre-auth, post-auth, or both.
+- [x] User account button
+- [x] Save-status area
+- [x] Sign-out-safe reset behavior
+- [x] Decide whether the disclaimer is pre-auth, post-auth, or both.
+  Current decision: post-auth inside the protected planner shell.
 
 ## Phase 2: Encrypted Persistence Backbone
 
