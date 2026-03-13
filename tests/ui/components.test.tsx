@@ -312,7 +312,7 @@ describe('StepIndicator', () => {
 describe('DisclaimerGate', () => {
   test('renders "Get started" button', () => {
     render(<DisclaimerGate onAccept={vi.fn()} />);
-    expect(screen.getByText(/Get started/)).toBeInTheDocument();
+    expect(screen.getByText(/This should fail/)).toBeInTheDocument();
   });
 
   test('"Get started" button is disabled before checkbox is checked', () => {
