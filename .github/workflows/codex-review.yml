@@ -210,21 +210,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          emit_output() {
+            local key=$1
+            local value=$2
+            local delimiter
+            delimiter="EOF_$(uuidgen | tr '[:upper:]' '[:lower:]')"
+            {
+              echo "${key}<<${delimiter}"
+              echo "$value"
+              echo "${delimiter}"
+            } >> "$GITHUB_OUTPUT"
+          }
+
           VERDICT=$(jq -r '.verdict' codex-review.json)
           SUMMARY=$(jq -r '.summary' codex-review.json)
           FINDINGS_COUNT=$(jq -r '.findings | length' codex-review.json)
-          FIRST_FINDING=$(jq -r 'if (.findings | length) > 0 then "[\(.findings[0].severity)] \(.findings[0].title)" else "" end' codex-review.json)
-          FINDINGS_DIGEST=$(jq -r '[.findings[0:3][] | "[\(.severity)] \(.title)"] | join(" | ")' codex-review.json)
+          FIRST_FINDING=$(jq -r '
+            def oneline: gsub("[[:space:]]+"; " ") | sub("^ "; "") | sub(" $"; "");
+            if (.findings | length) > 0 then
+              "[\(.findings[0].severity)] \(.findings[0].title | oneline)"
+            else
+              ""
+            end
+          ' codex-review.json)
+          FINDINGS_DIGEST=$(jq -r '
+            def oneline: gsub("[[:space:]]+"; " ") | sub("^ "; "") | sub(" $"; "");
+            [.findings[0:3][] | "[\(.severity)] \(.title | oneline)"] | join(" | ")
+          ' codex-review.json)
 
           echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
           echo "findings_count=$FINDINGS_COUNT" >> "$GITHUB_OUTPUT"
-          echo "first_finding=$FIRST_FINDING" >> "$GITHUB_OUTPUT"
-          echo "findings_digest=$FINDINGS_DIGEST" >> "$GITHUB_OUTPUT"
-          {
-            echo "summary<<EOF"
-            echo "$SUMMARY"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
+          emit_output "summary" "$SUMMARY"
+          emit_output "first_finding" "$FIRST_FINDING"
+          emit_output "findings_digest" "$FINDINGS_DIGEST"
 
       - name: Render review markdown
         shell: bash
