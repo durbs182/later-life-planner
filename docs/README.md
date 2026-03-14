@@ -45,6 +45,7 @@ Operational notes, CI/CD validation writeups, and workflow-specific guidance liv
 - `operations/ci-cd-claude-test-instructions.md`
 - `operations/codex-auto-fix-issues.md`
 - `operations/codex-parallel-local.md`
+- Validate merge-gating workflow changes on a disposable PR before relying on them for branch protection.
 
 ## Reviews
 
