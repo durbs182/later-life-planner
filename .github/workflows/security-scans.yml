@@ -50,14 +50,14 @@ jobs:
           set +e
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             semgrep scan \
-              --config auto \
+              --config p/default \
               --error \
               --sarif \
               --output semgrep.sarif \
               --baseline-commit "${{ github.event.pull_request.base.sha }}"
           else
             semgrep scan \
-              --config auto \
+              --config p/default \
               --error \
               --sarif \
               --output semgrep.sarif
