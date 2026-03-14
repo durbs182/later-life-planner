@@ -160,8 +160,6 @@ jobs:
           cat > codex-review-prompt.md <<EOF
           Review pull request #${{ github.event.pull_request.number }} for the Later Life Planner repository against origin/${{ github.base_ref }}.
 
-          Pull request title: ${{ github.event.pull_request.title }}
-
           Return only a JSON object that matches the provided schema.
 
           Verdict rules:
