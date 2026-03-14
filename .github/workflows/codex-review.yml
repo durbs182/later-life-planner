@@ -15,40 +15,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  changes:
-    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    outputs:
-      review: ${{ steps.filter.outputs.review }}
-    steps:
-      - uses: dorny/paths-filter@9d7afb8d214ad99e78fbd4247752c4caed2b6e4c # v4.0.0
-        id: filter
-        with:
-          filters: |
-            review:
-              - 'src/**'
-              - 'tests/**'
-              - 'public/**'
-              - 'infra/**'
-              - '.github/workflows/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'next.config.mjs'
-              - 'tsconfig.json'
-              - 'tsconfig.test.json'
-              - 'tailwind.config.*'
-              - 'postcss.config.*'
-              - 'vitest.config.*'
-              - 'Dockerfile'
-              - '.eslintrc.*'
-
   review:
-    needs: changes
     if: |
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
-      needs.changes.outputs.review == 'true'
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -200,3 +171,41 @@ jobs:
             echo
             cat codex-review.md
           } >> "$GITHUB_STEP_SUMMARY"
+
+  review-gate:
+    needs: review
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce Codex review result
+        shell: bash
+        env:
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+          REVIEW_RESULT: ${{ needs.review.result }}
+        run: |
+          set -euo pipefail
+
+          if [ "$PR_IS_DRAFT" = "true" ]; then
+            echo "Draft PR; Codex review will be enforced after ready_for_review."
+            exit 0
+          fi
+
+          if [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            echo "::error::Codex review is required for merge, but this PR head repo is not trusted for the current secret-backed review workflow." >&2
+            exit 1
+          fi
+
+          if [ "$PR_AUTHOR" = "dependabot[bot]" ]; then
+            echo "::error::Codex review is required for merge, but Dependabot PRs cannot use the current secret-backed review workflow." >&2
+            exit 1
+          fi
+
+          if [ "$REVIEW_RESULT" != "success" ]; then
+            echo "::error::Codex review ended with result: $REVIEW_RESULT" >&2
+            exit 1
+          fi
+
+          echo "Codex review passed."
