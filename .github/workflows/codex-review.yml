@@ -9,7 +9,7 @@ permissions:
   actions: read
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: codex-review-${{ github.event.pull_request.number }}
@@ -325,6 +325,10 @@ jobs:
                 ;;
               403)
                 echo "::warning::Skipping PR comment because the workflow token cannot write issue comments for this event (HTTP 403)." >&2
+                if [ -s "$RESPONSE_FILE" ]; then
+                  head -c 500 "$RESPONSE_FILE" >&2
+                  echo >&2
+                fi
                 return 10
                 ;;
               *)
