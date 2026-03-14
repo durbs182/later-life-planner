@@ -2,25 +2,25 @@
 
 Status: draft
 
-This outline is a product-specific starting point for the Later-Life Planner privacy notice.
+This outline is a product-specific starting point for the Later-Life Planner privacy notice operated by VictoryLap Ltd.
 
 It is not final legal text.
 
-Before publication, fill in the controller details, vendor list, transfer details, and lawful-basis decisions with the appropriate legal or privacy owner.
+Before publication, fill in the remaining controller details, vendor list, transfer details, and lawful-basis decisions with the appropriate legal or privacy owner.
 
 ## 1. Who We Are
 
 Purpose:
 
-- identify the organisation operating Later-Life Planner
+- identify VictoryLap Ltd as the organisation operating Later-Life Planner
 - provide a contact route for privacy questions
 
 Include:
 
-- legal entity name
-- trading name if different
+- legal entity name: `VictoryLap Ltd`
+- trading name: `VictoryLap` if that remains the brand presented to users
 - registered address or principal business address
-- privacy contact email
+- privacy contact email, for example `privacy@victorylap...`
 - DPO contact details if one is appointed
 
 Suggested plain-English heading:
@@ -35,6 +35,7 @@ Purpose:
 
 Suggested wording points:
 
+- Later-Life Planner is provided by VictoryLap Ltd
 - the planner helps users explore later-life financial planning scenarios
 - the notice explains what personal data is used, why it is used, how long it is kept, and what rights users have
 
@@ -93,6 +94,8 @@ Purpose:
 
 This section must be completed with the final legal decision.
 
+The lawful-basis table should be stated as the position of VictoryLap Ltd as controller.
+
 Likely structure:
 
 | Purpose | Likely lawful basis | Notes to confirm |
@@ -142,6 +145,8 @@ For the current architecture, that likely includes:
 
 - Clerk
 - Microsoft Azure
+
+The notice should make clear that these providers act for VictoryLap Ltd in connection with operating Later-Life Planner, subject to the final legal and contractual structure.
 
 ## 8. International Transfers
 
@@ -250,7 +255,7 @@ Purpose:
 
 Include:
 
-- privacy contact email
+- VictoryLap privacy contact email
 - support contact route
 - ICO complaint information and link
 
@@ -274,7 +279,7 @@ Suggested points:
 
 Before publishing the final notice:
 
-- confirm the controller identity and contact details
+- confirm VictoryLap Ltd's controller identity, registered details, and contact routes
 - confirm the lawful basis for each main purpose
 - confirm vendor list and transfer details
 - confirm backup-retention wording matches the chosen Azure backup tier
@@ -282,6 +287,7 @@ Before publishing the final notice:
 - confirm whether analytics or non-essential cookies are present at launch
 - confirm whether a DPO is required and whether the notice needs DPO contact details
 - confirm the notice is linked from sign-in, footer, and account/help areas
+- confirm the company number and registered office details once VictoryLap Ltd is incorporated
 
 ## Source Material
 

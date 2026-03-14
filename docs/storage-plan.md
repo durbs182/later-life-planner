@@ -305,7 +305,8 @@ For this product, the recommended baseline is:
 - publish a privacy notice before live encrypted persistence launches
 - link the notice from the sign-in flow, footer, and any account/help area
 - explain the data lifecycle in plain language, including live retention and backup-retention limits
-- identify the controller, contact route, lawful basis, recipients, international transfers, rights, and complaint route to the ICO
+- identify `VictoryLap Ltd` as the controller for Later-Life Planner unless the corporate structure changes before launch
+- include a VictoryLap privacy contact route, lawful basis, recipients, international transfers, rights, and complaint route to the ICO
 
 The notice should be written for ordinary users, not compliance specialists.
 
@@ -330,7 +331,7 @@ If non-essential cookies or similar tracking technologies are introduced later:
 
 ### Internal accountability requirements
 
-Before production persistence goes live, the organisation should have:
+Before production persistence goes live, `VictoryLap Ltd` should have:
 
 - a documented lawful-basis decision for the planner data
 - a record of processing activities
@@ -343,7 +344,7 @@ Before production persistence goes live, the organisation should have:
 
 The storage design does not automatically require a DPO.
 
-However, the organisation should:
+However, `VictoryLap Ltd` should:
 
 - document whether a DPO is required under the UK GDPR criteria
 - record that decision even if the answer is no
@@ -356,7 +357,7 @@ Inference from the ICO guidance:
 
 ### ICO fee and registration check
 
-Before launch, confirm whether the organisation must pay the ICO data protection fee.
+Before launch, confirm whether `VictoryLap Ltd` must pay the ICO data protection fee.
 
 Do not assume exemption.
 
@@ -572,7 +573,7 @@ Export should be produced in the browser from decrypted canonical planner data w
 - ensure erased data is not reintroduced after restores
 - add inactivity review and purge policy only if the business can justify it clearly
 - complete a DPIA or documented DPIA screening decision before production persistence launch
-- publish the privacy notice and confirm the ICO fee and controller-processor contract position
+- publish the VictoryLap privacy notice and confirm the ICO fee and controller-processor contract position
 
 ## External References
 
