@@ -48,7 +48,7 @@ jobs:
           EOF
 
       - name: Azure login via credential
-        uses: azure/login@v2
+        uses: azure/login@v2 # Current official release still runs on Node 20; update when Azure ships a Node 24 build
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS_CODEX_KV }}
 
