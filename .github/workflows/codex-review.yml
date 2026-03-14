@@ -94,6 +94,8 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
+          echo "::error::Intentional failure to verify review-gate diagnostics." >&2
+          exit 1
           codex exec \
             --ephemeral \
             --full-auto \
