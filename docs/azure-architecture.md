@@ -112,6 +112,10 @@ Recommended default for v1:
   - operations automation secrets
   - application wrapped-key support
 
+Current decision:
+
+- use the existing `rg-later-life-planner` for v1 persistence resources
+
 ## IaC Backfill Required
 
 The persistence resources were created directly in Azure to unblock Phase 1.5.
@@ -123,6 +127,12 @@ Before production persistence ships, add these to `infra/main.bicep` (or a dedic
 - SQL container `user-plans` with partition key `/id`
 - Key Vault `kv-llp-app` with RBAC and purge protection
 - ACA system-assigned identity and role assignments for Cosmos DB + Key Vault
+
+## Deployment Wiring Status
+
+The ACA environment variables for Cosmos DB and Key Vault are set manually in Azure today.
+
+The CI/CD workflow does not yet write these values during deploy, so it should be updated before automated redeploys become the default path for persistence work.
 
 ## High-Level Architecture
 

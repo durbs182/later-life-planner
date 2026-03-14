@@ -372,6 +372,15 @@ Recommended baseline:
 - Azure Cosmos DB continuous backup with point-in-time restore
 - the 7-day continuous backup tier for the initial release, unless a longer recovery window is explicitly justified
 - same-account restore for accidentally deleted Cosmos databases or containers where Azure supports it
+
+Current provisioned backup policy:
+
+- periodic backup
+- 4-hour interval
+- 8-hour retention
+- local redundancy
+
+This means point-in-time restore is not currently available. If PITR is required for production, switch to continuous 7-day and update the runbooks.
 - Azure Key Vault soft delete and purge protection for the application key vault
 - Azure activity logs and diagnostics for restore actions and key operations
 

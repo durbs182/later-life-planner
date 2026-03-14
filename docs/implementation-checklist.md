@@ -46,16 +46,19 @@ Priority order:
 ## Phase 1.5: Azure Persistence Infrastructure
 
 - [x] Decide whether persistence resources live in the existing `rg-later-life-planner` or a dedicated data resource group.
+  Decision: use the existing `rg-later-life-planner` for v1.
 - [x] Create Azure Cosmos DB account for planner persistence.
 - [x] Choose the Cosmos DB backup mode and retention tier for planner data.
   Recommended: use the lowest-cost option that still meets recovery needs. For MVP, prefer periodic backup by default, or continuous 7-day only if point-in-time restore is required.
+  Current: periodic backup, 4h interval, 8h retention, local redundancy.
 - [x] Create database `later-life-planner`.
 - [x] Create container `user-plans` with partition key `/id`.
 - [x] Create an application Key Vault for wrapped-key support.
 - [x] Enable Key Vault soft delete and purge protection.
 - [x] Decide and provision runtime Azure auth for app data access.
   Recommended: Azure Container Apps managed identity with data-plane access to Cosmos DB and Key Vault.
-- [x] Wire Azure resource identifiers and access settings into Azure Container Apps and GitHub Actions where needed.
+- [x] Wire Azure resource identifiers and access settings into Azure Container Apps (manual update).
+- [ ] Update CI/CD to set Cosmos DB and Key Vault env vars on deploy.
 - [ ] Backfill IaC for Cosmos DB, Key Vault, and ACA managed identity (currently provisioned manually).
 - [ ] Smoke-test non-production access to Cosmos DB and Key Vault before writing persistence code.
 - [x] Document who can run restore and deletion operations for planner data.
