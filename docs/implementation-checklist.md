@@ -47,13 +47,16 @@ Priority order:
 
 - [ ] Decide whether persistence resources live in the existing `rg-later-life-planner` or a dedicated data resource group.
 - [ ] Create Azure Cosmos DB account for planner persistence.
+- [ ] Choose the Cosmos DB continuous backup tier for planner data.
 - [ ] Create database `later-life-planner`.
 - [ ] Create container `user-plans` with partition key `/id`.
 - [ ] Create an application Key Vault for wrapped-key support.
+- [ ] Enable Key Vault soft delete and purge protection.
 - [ ] Decide and provision runtime Azure auth for app data access.
   Recommended: Azure Container Apps managed identity with data-plane access to Cosmos DB and Key Vault.
 - [ ] Wire Azure resource identifiers and access settings into Azure Container Apps and GitHub Actions where needed.
 - [ ] Smoke-test non-production access to Cosmos DB and Key Vault before writing persistence code.
+- [ ] Document who can run restore and deletion operations for planner data.
 - [ ] Keep ACR and ACA deployment resources as-is; this phase adds persistence resources rather than changing the release platform.
 
 ## Phase 2: Encrypted Persistence Backbone
@@ -63,9 +66,11 @@ Priority order:
 - [ ] Add authenticated `GET /api/data`.
 - [ ] Add authenticated `PUT /api/data`.
 - [ ] Enforce identity from verified Clerk auth only.
+- [ ] Create the remote planner document only on first successful save or migration.
 - [ ] Persist ciphertext only; never persist plaintext planner data.
-- [ ] Introduce `schemaVersion`, `revision`, and `updatedAt` handling.
+- [ ] Introduce `createdAt`, `schemaVersion`, `revision`, and `updatedAt` handling.
 - [ ] Add validation for ciphertext payload shape and size.
+- [ ] Keep deletion support-led in the initial persistence release.
 
 ## Phase 3: Sync and Migration UX
 
@@ -82,6 +87,10 @@ Priority order:
 - [ ] Error
 - [ ] Add localStorage migration prompt for legacy local plans.
 - [ ] Prevent silent overwrite of an existing remote plan.
+- [ ] Add a minimal account-data panel for lifecycle actions once the persistence core is stable.
+- [ ] Add browser-side export of canonical planner data.
+- [ ] Decide whether users can delete only planner data or must delete the full account.
+- [ ] Add self-serve delete UI only when the support and recovery path is ready.
 
 ## Phase 4: Security and Reliability
 
@@ -91,6 +100,12 @@ Priority order:
 - [ ] Ensure sign-out clears decrypted planner state from memory.
 - [ ] Ensure planner plaintext never reaches logs.
 - [ ] Define key-wrapping integration path with Azure Key Vault.
+- [ ] Write and test point-in-time restore runbooks for planner data.
+- [ ] Write and test user-deletion runbooks, including backup-expiry handling.
+- [ ] Ensure erased user data is not reintroduced after restore operations.
+- [ ] Decide whether an inactive-account review or purge policy is required.
+- [ ] Complete a DPIA or documented DPIA screening decision before production persistence launch.
+- [ ] Document whether a DPO is required and record the reasoning.
 
 ## Phase 5: Tests and Docs
 
@@ -102,13 +117,19 @@ Priority order:
 - [ ] Update `README.md` to reflect authenticated encrypted persistence.
 - [ ] Update `.env.example` with Clerk, Cosmos, and Key Vault placeholders.
 - [ ] Document deployment assumptions for the chosen hosting environment.
+- [ ] Document retention, deletion, export, and backup-recovery policy for user data.
+- [ ] Publish a privacy notice before production persistence launches.
+- [ ] Decide the initial cookie posture and keep it essential-only unless a consent mechanism is ready.
+- [ ] Confirm controller-processor contracts or equivalent terms with Clerk, Azure, and other relevant vendors.
+- [ ] Confirm the ICO data protection fee position before launch.
 
 ## Immediate Next Slice
 
 Recommended next implementation slice:
 
 1. Create Cosmos DB and application Key Vault resources.
-2. Decide the runtime auth path from Azure Container Apps to Cosmos DB and Key Vault.
-3. Wire resource identifiers and access settings into the deployed app environment.
-4. Smoke-test connectivity from the running app environment.
-5. Start `src/lib/crypto.ts`, `src/lib/cosmos.ts`, and the protected persistence routes.
+2. Choose the Cosmos backup tier and enable Key Vault soft delete and purge protection.
+3. Decide the runtime auth path from Azure Container Apps to Cosmos DB and Key Vault.
+4. Wire resource identifiers and access settings into the deployed app environment.
+5. Smoke-test connectivity from the running app environment.
+6. Start `src/lib/crypto.ts`, `src/lib/cosmos.ts`, and the protected persistence routes.

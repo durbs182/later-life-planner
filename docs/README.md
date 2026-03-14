@@ -20,6 +20,7 @@ These support implementation but are not the main execution-order docs:
 
 - `testing-plan.md`
 - `codex-later-life-planner-engineer-prompt.md`
+- `privacy-notice-outline.md`
 
 ## Historical Docs
 
