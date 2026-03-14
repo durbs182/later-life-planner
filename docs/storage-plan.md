@@ -403,6 +403,8 @@ Initial ownership model:
 
 This prevents accidental restores into production and creates a clear accountability trail.
 
+If the `nxlap-data-ops` group is not yet provisioned, use a break-glass owner temporarily and record the membership in the ops log.
+
 ### Administrative posture
 
 Recovery and deletion are administrative workflows, not just API features.
