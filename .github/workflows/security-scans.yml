@@ -79,27 +79,38 @@ jobs:
       - name: Summarize Semgrep SARIF
         if: ${{ always() && hashFiles('semgrep.sarif') != '' }}
         id: summarize
-        shell: bash
+        shell: sh
         run: |
-          set -euo pipefail
-          findings_count=$(jq '[.runs[].results[]?] | length' semgrep.sarif)
-          tool_error_count=$(jq '[.runs[].invocations[]?.toolExecutionNotifications[]? | select((.level // "") == "error")] | length' semgrep.sarif)
-          tool_warning_count=$(jq '[.runs[].invocations[]?.toolExecutionNotifications[]? | select((.level // "") == "warning")] | length' semgrep.sarif)
-          tool_notifications=$(jq -r '.runs[].invocations[]?.toolExecutionNotifications[]? | "[\(.level // "unknown")] \(.message.text // .message.markdown // "no message")"' semgrep.sarif)
-          if [ -n "$tool_notifications" ]; then
-            echo "$tool_notifications"
-          fi
-          {
-            echo "findings_count=$findings_count"
-            echo "tool_error_count=$tool_error_count"
-            echo "tool_warning_count=$tool_warning_count"
-          } >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          sarif = json.loads(Path("semgrep.sarif").read_text())
+          runs = sarif.get("runs", [])
+          findings_count = sum(len(run.get("results", [])) for run in runs)
+          notifications = []
+          for run in runs:
+            for invocation in run.get("invocations", []):
+              notifications.extend(invocation.get("toolExecutionNotifications", []))
+
+          tool_error_count = sum(1 for item in notifications if (item.get("level") or "") == "error")
+          tool_warning_count = sum(1 for item in notifications if (item.get("level") or "") == "warning")
+
+          for item in notifications:
+            level = item.get("level") or "unknown"
+            message = item.get("message", {}).get("text") or item.get("message", {}).get("markdown") or "no message"
+            print(f"[{level}] {message}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+            handle.write(f"findings_count={findings_count}\n")
+            handle.write(f"tool_error_count={tool_error_count}\n")
+            handle.write(f"tool_warning_count={tool_warning_count}\n")
+          PY
 
       - name: Fail on Semgrep findings
-        shell: bash
+        shell: sh
         run: |
-          set -euo pipefail
-
           if [ ! -f semgrep.sarif ]; then
             echo "::error::Semgrep did not produce a SARIF report."
             exit 1
