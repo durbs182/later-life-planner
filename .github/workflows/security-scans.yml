@@ -119,12 +119,6 @@ jobs:
           case "${{ steps.scan.outputs.exit_code }}" in
             0|1)
               ;;
-            8)
-              if [ "${{ steps.summarize.outputs.tool_warning_count }}" = "0" ]; then
-                echo "::error::Semgrep exited with code 8 without any SARIF warnings to classify the condition."
-                exit 1
-              fi
-              ;;
             *)
               echo "::error::Semgrep exited unexpectedly with code ${{ steps.scan.outputs.exit_code }}."
               exit 1
@@ -139,10 +133,6 @@ jobs:
           if [ "${{ steps.summarize.outputs.findings_count }}" != "0" ]; then
             echo "::error::Semgrep found blocking findings."
             exit 1
-          fi
-
-          if [ "${{ steps.scan.outputs.exit_code }}" = "8" ]; then
-            echo "::warning::Semgrep completed with tool warnings but no blocking findings."
           fi
 
   actionlint:
