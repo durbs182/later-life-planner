@@ -1,0 +1,112 @@
+name: Security Scans
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: security-scans-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+
+  semgrep:
+    name: semgrep
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.155.0
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Run Semgrep
+        id: scan
+        shell: sh
+        env:
+          SEMGREP_SEND_METRICS: 'off'
+        run: |
+          set +e
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            semgrep scan \
+              --config auto \
+              --error \
+              --sarif \
+              --output semgrep.sarif \
+              --baseline-commit "${{ github.event.pull_request.base.sha }}"
+          else
+            semgrep scan \
+              --config auto \
+              --error \
+              --sarif \
+              --output semgrep.sarif
+          fi
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload SARIF
+        if: ${{ always() && hashFiles('semgrep.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@5f4f5521f531db731e046360f0d8e53cbbf1a8e2 # v4.24.3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Fail on Semgrep findings
+        shell: sh
+        run: |
+          case "${{ steps.scan.outputs.exit_code }}" in
+            0)
+              ;;
+            1)
+              echo "::error::Semgrep found blocking findings."
+              exit 1
+              ;;
+            *)
+              echo "::error::Semgrep exited unexpectedly with code ${{ steps.scan.outputs.exit_code }}."
+              exit 1
+              ;;
+          esac
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            -o actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.11/actionlint_1.7.11_linux_amd64.tar.gz
+          echo "900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a  actionlint.tar.gz" | sha256sum -c -
+          tar -xzf actionlint.tar.gz actionlint
+          sudo mv actionlint /usr/local/bin/actionlint
+
+      - name: Run actionlint
+        run: actionlint -color
