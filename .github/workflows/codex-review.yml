@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
+  actions: read
   contents: read
   issues: write
   pull-requests: read
@@ -212,6 +213,44 @@ jobs:
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Inspect failed review job
+        id: inspect
+        if: |
+          needs.review.result != 'success' &&
+          github.event.pull_request.draft == false &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          github.event.pull_request.user.login != 'dependabot[bot]'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          API_ROOT="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          JOBS_JSON=$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${API_ROOT}/actions/runs/${GITHUB_RUN_ID}/jobs?per_page=100")
+
+          REVIEW_JOB_JSON=$(printf '%s' "$JOBS_JSON" |
+            jq -c '.jobs[] | select(.name == "review")' |
+            tail -n 1)
+
+          if [ -z "$REVIEW_JOB_JSON" ]; then
+            exit 0
+          fi
+
+          FAILED_STEP=$(printf '%s' "$REVIEW_JOB_JSON" |
+            jq -r '[.steps[] | select(.conclusion == "failure") | .name][0] // ""')
+          JOB_URL=$(printf '%s' "$REVIEW_JOB_JSON" | jq -r '.html_url // ""')
+
+          if [ -n "$FAILED_STEP" ]; then
+            echo "failed_step=$FAILED_STEP" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ -n "$JOB_URL" ]; then
+            echo "job_url=$JOB_URL" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Enforce Codex review result
         shell: bash
         env:
@@ -220,6 +259,8 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
           REVIEW_RESULT: ${{ needs.review.result }}
+          FAILED_STEP: ${{ steps.inspect.outputs.failed_step }}
+          JOB_URL: ${{ steps.inspect.outputs.job_url }}
         run: |
           set -euo pipefail
 
@@ -239,7 +280,25 @@ jobs:
           fi
 
           if [ "$REVIEW_RESULT" != "success" ]; then
-            echo "::error::Codex review ended with result: $REVIEW_RESULT" >&2
+            SUMMARY="Codex review ended with result: $REVIEW_RESULT"
+            if [ -n "$FAILED_STEP" ]; then
+              SUMMARY="$SUMMARY; failed step: $FAILED_STEP"
+            fi
+            if [ -n "$JOB_URL" ]; then
+              SUMMARY="$SUMMARY. See: $JOB_URL"
+            fi
+            echo "::error::$SUMMARY" >&2
+            {
+              echo "## Codex Review Gate"
+              echo
+              echo "- Review result: \`$REVIEW_RESULT\`"
+              if [ -n "$FAILED_STEP" ]; then
+                echo "- Failed step: \`$FAILED_STEP\`"
+              fi
+              if [ -n "$JOB_URL" ]; then
+                echo "- Review job: $JOB_URL"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
