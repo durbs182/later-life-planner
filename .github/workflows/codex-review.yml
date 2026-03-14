@@ -8,7 +8,6 @@ on:
 permissions:
   actions: read
   contents: read
-  issues: write
   pull-requests: read
 
 concurrency:
@@ -17,12 +16,15 @@ concurrency:
 
 jobs:
   review:
+    permissions:
+      contents: read
     outputs:
       verdict: ${{ steps.extract.outputs.verdict }}
       summary: ${{ steps.extract.outputs.summary }}
       findings_count: ${{ steps.extract.outputs.findings_count }}
       first_finding: ${{ steps.extract.outputs.first_finding }}
       findings_digest: ${{ steps.extract.outputs.findings_digest }}
+      comment_body: ${{ steps.comment.outputs.body }}
     if: |
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -284,9 +286,48 @@ jobs:
             cat codex-review-summary.md
           } > codex-review-comment.md
 
+      - name: Capture review comment
+        id: comment
+        shell: bash
+        run: |
+          set -euo pipefail
+          emit_output() {
+            local key=$1
+            local value=$2
+            local delimiter
+            delimiter="EOF_$(uuidgen | tr '[:upper:]' '[:lower:]')"
+            {
+              echo "${key}<<${delimiter}"
+              echo "$value"
+              echo "${delimiter}"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          emit_output "body" "$(cat codex-review-comment.md)"
+
+      - name: Add job summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat codex-review-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+  # Isolate PR-write scope to the comment publisher so the secret-backed review job stays read-only.
+  publish-review-comment:
+    needs: review
+    if: |
+      needs.review.result == 'success' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
       - name: Publish PR comment
         shell: bash
         env:
+          COMMENT_BODY: ${{ needs.review.outputs.comment_body }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
@@ -342,6 +383,8 @@ jobs:
             esac
           }
 
+          printf '%s' "$COMMENT_BODY" > codex-review-comment.md
+
           COMMENT_ID=""
           for page in 1 2 3 4 5; do
             PAGE_JSON=$(github_api GET "${API_ROOT}/issues/${PR_NUMBER}/comments?per_page=100&page=${page}") || API_STATUS=$?
@@ -371,15 +414,11 @@ jobs:
             github_api POST "$COMMENTS_POST_URL" codex-review-payload.json > /dev/null || true
           fi
 
-      - name: Add job summary
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat codex-review-summary.md >> "$GITHUB_STEP_SUMMARY"
-
   review-gate:
     needs: review
     if: ${{ always() }}
+    permissions:
+      actions: read
     runs-on: ubuntu-latest
     steps:
       - name: Inspect failed review job
