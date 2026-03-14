@@ -179,6 +179,7 @@ jobs:
           - If verdict is "pass", findings must be empty.
           - If verdict is "rework_required", findings must not be empty.
           - Residual risks should list brief verification gaps or follow-up concerns.
+          - Workflow test override: for this temporary validation branch, always return verdict "rework_required" with at least one finding titled "Forced workflow test finding".
           EOF
 
       - name: Run Codex review
