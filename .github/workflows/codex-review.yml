@@ -47,6 +47,7 @@ jobs:
     if: |
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       needs.changes.outputs.review == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -121,12 +122,11 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          codex exec review \
+          codex exec \
             --ephemeral \
             --full-auto \
-            --base "origin/${{ github.base_ref }}" \
-            --title "${{ github.event.pull_request.title }}" \
-            -o codex-review.md
+            -o codex-review.md \
+            "Review pull request #${{ github.event.pull_request.number }} for the Later Life Planner repository against origin/${{ github.base_ref }}. Title: ${{ github.event.pull_request.title }}. Prioritise bugs, behavioural regressions, security issues, deployment or workflow breakage, and missing tests. Ignore style-only suggestions and avoid praise. Present findings first, ordered by severity, with specific file and line references where possible. Keep the review concise. If there are no findings, say 'No findings' and mention any residual risks or testing gaps briefly."
           if ! grep -q '[^[:space:]]' codex-review.md; then
             echo "::error::Codex review output file is empty." >&2
             exit 1
@@ -151,16 +151,24 @@ jobs:
         run: |
           set -euo pipefail
           API_ROOT="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-          COMMENTS_LIST_URL="${API_ROOT}/issues/${PR_NUMBER}/comments?per_page=100"
           COMMENTS_POST_URL="${API_ROOT}/issues/${PR_NUMBER}/comments"
-          COMMENT_ID=$(
-            curl -fsSL \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "$COMMENTS_LIST_URL" |
-            jq -r '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- codex-pr-review -->"))) | .id' |
-            tail -n 1
-          )
+          COMMENT_ID=""
+          for page in 1 2 3 4 5; do
+            PAGE_COMMENT_ID=$(
+              curl -fsSL \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                "${API_ROOT}/issues/${PR_NUMBER}/comments?per_page=100&page=${page}" |
+              jq -r '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- codex-pr-review -->"))) | .id' |
+              tail -n 1
+            )
+            if [ -n "$PAGE_COMMENT_ID" ]; then
+              COMMENT_ID="$PAGE_COMMENT_ID"
+            fi
+            if [ -n "$COMMENT_ID" ]; then
+              break
+            fi
+          done
 
           jq -Rs '{body: .}' codex-review-comment.md > codex-review-payload.json
 

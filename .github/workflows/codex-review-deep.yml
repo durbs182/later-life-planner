@@ -263,16 +263,24 @@ jobs:
         run: |
           set -euo pipefail
           API_ROOT="https://api.github.com/repos/${GITHUB_REPOSITORY}"
-          COMMENTS_LIST_URL="${API_ROOT}/issues/${PR_NUMBER}/comments?per_page=100"
           COMMENTS_POST_URL="${API_ROOT}/issues/${PR_NUMBER}/comments"
-          COMMENT_ID=$(
-            curl -fsSL \
-              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-              -H "Accept: application/vnd.github+json" \
-              "$COMMENTS_LIST_URL" |
-            jq -r '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- codex-deep-pr-review:${{ inputs.review_focus }} -->"))) | .id' |
-            tail -n 1
-          )
+          COMMENT_ID=""
+          for page in 1 2 3 4 5; do
+            PAGE_COMMENT_ID=$(
+              curl -fsSL \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H "Accept: application/vnd.github+json" \
+                "${API_ROOT}/issues/${PR_NUMBER}/comments?per_page=100&page=${page}" |
+              jq -r '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- codex-deep-pr-review:${{ inputs.review_focus }} -->"))) | .id' |
+              tail -n 1
+            )
+            if [ -n "$PAGE_COMMENT_ID" ]; then
+              COMMENT_ID="$PAGE_COMMENT_ID"
+            fi
+            if [ -n "$COMMENT_ID" ]; then
+              break
+            fi
+          done
 
           jq -Rs '{body: .}' codex-review-comment.md > codex-review-payload.json
 
