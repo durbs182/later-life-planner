@@ -126,8 +126,7 @@ jobs:
             --full-auto \
             --base "origin/${{ github.base_ref }}" \
             --title "${{ github.event.pull_request.title }}" \
-            -o codex-review.md \
-            "Review this pull request for the Later Life Planner repository. Prioritise bugs, behavioural regressions, security issues, deployment or workflow breakage, and missing tests. Ignore style-only suggestions and avoid praise. Present findings first, ordered by severity, with specific file and line references where possible. Keep the review concise. If there are no findings, say 'No findings' and mention any residual risks or testing gaps briefly."
+            -o codex-review.md
           if ! grep -q '[^[:space:]]' codex-review.md; then
             echo "::error::Codex review output file is empty." >&2
             exit 1

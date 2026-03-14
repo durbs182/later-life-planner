@@ -228,11 +228,11 @@ jobs:
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          codex exec review \
+          # `codex exec review` rejects `--base` when a custom prompt is supplied in the
+          # current CLI, so deep review uses generic exec with an explicit prompt file.
+          codex exec \
             --ephemeral \
             --full-auto \
-            --base "origin/${{ steps.pr.outputs.base_ref }}" \
-            --title "${{ steps.pr.outputs.title }}" \
             -o codex-review.md \
             - < codex-review-prompt.md
           if ! grep -q '[^[:space:]]' codex-review.md; then
