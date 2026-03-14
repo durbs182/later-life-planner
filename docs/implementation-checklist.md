@@ -7,14 +7,17 @@ This checklist translates the current canonical planning docs into a practical e
 - `docs/auth-plan.md`
 - `docs/storage-plan.md`
 - `docs/security-decisions.md`
+- `docs/azure-architecture.md`
 
 Priority order:
 
 1. Phase 0: product and consistency cleanup
 2. Phase 1: Clerk auth foundation
-3. Phase 2: encrypted persistence backbone
-4. Phase 3: sync and migration UX
-5. Phase 4: hardening, tests, and operational readiness
+3. Phase 1.5: Azure persistence infrastructure
+4. Phase 2: encrypted persistence backbone
+5. Phase 3: sync and migration UX
+6. Phase 4: hardening, tests, and operational readiness
+7. Phase 5: tests and docs
 
 ## Phase 0: Product and Consistency Cleanup
 
@@ -33,12 +36,25 @@ Priority order:
 - [x] Add `src/app/sign-in/[[...sign-in]]/page.tsx`.
 - [x] Add `src/app/sign-up/[[...sign-up]]/page.tsx`.
 - [x] Add a shared auth helper for protected server routes.
-- [ ] Add signed-in header controls:
+- [x] Add signed-in header controls:
 - [x] User account button
 - [x] Save-status area
 - [x] Sign-out-safe reset behavior
 - [x] Decide whether the disclaimer is pre-auth, post-auth, or both.
   Current decision: post-auth inside the protected planner shell.
+
+## Phase 1.5: Azure Persistence Infrastructure
+
+- [ ] Decide whether persistence resources live in the existing `rg-later-life-planner` or a dedicated data resource group.
+- [ ] Create Azure Cosmos DB account for planner persistence.
+- [ ] Create database `later-life-planner`.
+- [ ] Create container `user-plans` with partition key `/id`.
+- [ ] Create an application Key Vault for wrapped-key support.
+- [ ] Decide and provision runtime Azure auth for app data access.
+  Recommended: Azure Container Apps managed identity with data-plane access to Cosmos DB and Key Vault.
+- [ ] Wire Azure resource identifiers and access settings into Azure Container Apps and GitHub Actions where needed.
+- [ ] Smoke-test non-production access to Cosmos DB and Key Vault before writing persistence code.
+- [ ] Keep ACR and ACA deployment resources as-is; this phase adds persistence resources rather than changing the release platform.
 
 ## Phase 2: Encrypted Persistence Backbone
 
@@ -89,10 +105,10 @@ Priority order:
 
 ## Immediate Next Slice
 
-Recommended first implementation slice:
+Recommended next implementation slice:
 
-1. Add Clerk dependency and env placeholders.
-2. Add `ClerkProvider`.
-3. Add middleware and sign-in/sign-up routes.
-4. Add a minimal signed-in header shell.
-5. Keep the planner domain logic untouched while auth lands cleanly.
+1. Create Cosmos DB and application Key Vault resources.
+2. Decide the runtime auth path from Azure Container Apps to Cosmos DB and Key Vault.
+3. Wire resource identifiers and access settings into the deployed app environment.
+4. Smoke-test connectivity from the running app environment.
+5. Start `src/lib/crypto.ts`, `src/lib/cosmos.ts`, and the protected persistence routes.
