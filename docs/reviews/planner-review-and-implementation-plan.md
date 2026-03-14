@@ -4,7 +4,7 @@ Review date: March 13, 2026
 
 This document reviews the current state of the Later-Life Planner app against:
 
-- `docs/product_prompt.md`
+- `docs/prompts/product_prompt.md`
 - `docs/superseded/auth-implementation-prompt.md`
 - `docs/superseded/data-storage-design.md`
 
@@ -12,7 +12,7 @@ Decision precedence used in this review:
 
 - `superseded/data-storage-design.md` overrides `superseded/auth-implementation-prompt.md` for storage and security architecture.
 - `superseded/auth-implementation-prompt.md` still governs Clerk auth UX and migration flow where it does not conflict with the storage design.
-- `product_prompt.md` governs product language, UX direction, financial rules, architecture boundaries, and testing expectations.
+- `prompts/product_prompt.md` governs product language, UX direction, financial rules, architecture boundaries, and testing expectations.
 
 ## Executive Summary
 

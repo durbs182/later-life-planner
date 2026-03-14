@@ -6,13 +6,20 @@ This folder is organized so the current implementation documents stay easy to fi
 
 These are the primary source-of-truth documents for product, implementation order, architecture, and security:
 
-- `product_prompt.md`
+- `prompts/product_prompt.md`
 - `implementation-checklist.md`
 - `auth-plan.md`
 - `storage-plan.md`
 - `security-decisions.md`
 - `azure-architecture.md`
 - `persistence-security-review.md`
+
+## Prompts
+
+Reusable prompt/reference material lives in [`prompts/`](/Users/pauldurbin/later-life-planner/docs/prompts):
+
+- `prompts/product_prompt.md`
+- `prompts/branding-expert.md`
 
 ## Active Reference Docs
 
@@ -52,7 +59,7 @@ Design references live in [`ui-reference-images/`](/Users/pauldurbin/later-life-
 
 ## Conventions
 
-- Keep canonical implementation docs at the root of `docs/`.
+- Keep canonical implementation docs at the root of `docs/`, except reusable prompt material which lives in `docs/prompts/`.
 - Put one-off reviews in `docs/reviews/`.
 - Put operational runbooks and workflow validation notes in `docs/operations/`.
 - Put loose design assets in `docs/ui-reference-images/`.

@@ -72,7 +72,7 @@ Support single users or couples. Capture all income streams individually per per
 ## Documentation
 
 - Maintain README.md with project overview, architecture, configuration, calculation engine, setup instructions
-- Store original build prompt in /docs/product_prompt.md
+- Store original build prompt in /docs/prompts/product_prompt.md
 - UI reference images stored in /docs/ui-reference-images/
 
 ---
@@ -184,5 +184,5 @@ An optional earmarked capital reserve for potential late-life care costs — sep
 - Inline documentation for all financial calculations
 - Unit tests for all core engines
 - README with project overview, setup, architecture, assumptions
-- Original prompt stored in /docs/product_prompt.md
+- Original prompt stored in /docs/prompts/product_prompt.md
 - UI reference images in /docs/ui-reference-images/
