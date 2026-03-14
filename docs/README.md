@@ -65,3 +65,4 @@ Design references live in [`ui-reference-images/`](/Users/pauldurbin/later-life-
 - Put operational runbooks and workflow validation notes in `docs/operations/`.
 - Put loose design assets in `docs/ui-reference-images/`.
 - Avoid adding scratch files to `docs/`; if a note is temporary, keep it out of the repo.
+- Keep docs-only changes small so workflow-gating tests remain easy to isolate.
