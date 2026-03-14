@@ -156,4 +156,4 @@ Not validated locally:
 - Azure Container Apps deploy/restart behavior
 
 For live validation steps, see:
-- `docs/ci-cd-claude-test-instructions.md`
+- `docs/operations/ci-cd-claude-test-instructions.md`
