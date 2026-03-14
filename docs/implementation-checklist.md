@@ -47,7 +47,8 @@ Priority order:
 
 - [ ] Decide whether persistence resources live in the existing `rg-later-life-planner` or a dedicated data resource group.
 - [ ] Create Azure Cosmos DB account for planner persistence.
-- [ ] Choose the Cosmos DB continuous backup tier for planner data.
+- [ ] Choose the Cosmos DB backup mode and retention tier for planner data.
+  Recommended: use the lowest-cost option that still meets recovery needs. For MVP, prefer periodic backup by default, or continuous 7-day only if point-in-time restore is required.
 - [ ] Create database `later-life-planner`.
 - [ ] Create container `user-plans` with partition key `/id`.
 - [ ] Create an application Key Vault for wrapped-key support.
