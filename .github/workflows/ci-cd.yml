@@ -143,7 +143,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Login to Azure
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — latest; no Node 24 release yet, update when available
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — current official release still runs on Node 20; update when Azure ships a Node 24 build
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
@@ -183,7 +183,7 @@ jobs:
       needs.build-and-push.result == 'success'
     steps:
       - name: Login to Azure
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — latest; no Node 24 release yet, update when available
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — current official release still runs on Node 20; update when Azure ships a Node 24 build
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 

@@ -64,7 +64,7 @@ jobs:
           EOF
 
       - name: Azure login via Codex credential
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — latest; no Node 24 release yet, update when available
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — current official release still runs on Node 20; update when Azure ships a Node 24 build
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS_CODEX_KV }}
 
