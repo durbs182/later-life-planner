@@ -17,6 +17,12 @@ concurrency:
 
 jobs:
   review:
+    outputs:
+      verdict: ${{ steps.extract.outputs.verdict }}
+      summary: ${{ steps.extract.outputs.summary }}
+      findings_count: ${{ steps.extract.outputs.findings_count }}
+      first_finding: ${{ steps.extract.outputs.first_finding }}
+      findings_digest: ${{ steps.extract.outputs.findings_digest }}
     if: |
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -87,6 +93,92 @@ jobs:
             --output tsv > "$CODEX_HOME/auth.json"
           chmod 600 "$CODEX_HOME/auth.json"
 
+      - name: Prepare review schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          cat > codex-review-schema.json <<'EOF'
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["verdict", "summary", "findings", "residual_risks"],
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["pass", "rework_required", "review_error"]
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["severity", "title", "details", "file", "line"],
+                  "properties": {
+                    "severity": {
+                      "type": "string",
+                      "enum": ["critical", "high", "medium", "low"]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "details": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "file": {
+                      "type": ["string", "null"]
+                    },
+                    "line": {
+                      "type": ["integer", "null"],
+                      "minimum": 1
+                    }
+                  }
+                }
+              },
+              "residual_risks": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Prepare review prompt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          cat > codex-review-prompt.md <<EOF
+          Review pull request #${{ github.event.pull_request.number }} for the Later Life Planner repository against origin/${{ github.base_ref }}.
+
+          Return only a JSON object that matches the provided schema.
+
+          Verdict rules:
+          - Use "pass" when there are no material issues that require developer re-work before merge.
+          - Use "rework_required" when one or more material issues require developer changes before merge.
+          - Use "review_error" only when you cannot complete the review from the available repository state.
+
+          Review rules:
+          - Prioritise bugs, behavioural regressions, security issues, deployment or workflow breakage, and missing tests.
+          - Ignore style-only suggestions and avoid praise.
+          - Findings must be ordered by severity.
+          - Include only findings that should block or meaningfully delay merge.
+          - Use concise, developer-readable titles and details.
+          - Include file and line only when you can point to a specific location.
+          - If verdict is "pass", findings must be empty.
+          - If verdict is "rework_required", findings must not be empty.
+          - Residual risks should list brief verification gaps or follow-up concerns.
+          EOF
+
       - name: Run Codex review
         shell: bash
         env:
@@ -97,22 +189,99 @@ jobs:
           codex exec \
             --ephemeral \
             --full-auto \
-            -o codex-review.md \
-            "Review pull request #${{ github.event.pull_request.number }} for the Later Life Planner repository against origin/${{ github.base_ref }}. Title: ${{ github.event.pull_request.title }}. Prioritise bugs, behavioural regressions, security issues, deployment or workflow breakage, and missing tests. Ignore style-only suggestions and avoid praise. Present findings first, ordered by severity, with specific file and line references where possible. Keep the review concise. If there are no findings, say 'No findings' and mention any residual risks or testing gaps briefly."
-          if ! grep -q '[^[:space:]]' codex-review.md; then
-            echo "::error::Codex review output file is empty." >&2
+            --output-schema codex-review-schema.json \
+            -o codex-review.json \
+            - < codex-review-prompt.md
+          if ! jq -e '
+            (.verdict | IN("pass", "rework_required", "review_error")) and
+            (.summary | type == "string" and length > 0) and
+            (.findings | type == "array") and
+            (.residual_risks | type == "array") and
+            (if .verdict == "pass" then (.findings | length == 0)
+             elif .verdict == "rework_required" then (.findings | length > 0)
+             else true end)
+          ' codex-review.json > /dev/null; then
+            echo "::error::Codex review output is missing the required structured verdict." >&2
             exit 1
           fi
 
-      - name: Prepare sticky comment
+      - name: Extract review verdict
+        id: extract
         shell: bash
         run: |
           set -euo pipefail
+          emit_output() {
+            local key=$1
+            local value=$2
+            local delimiter
+            delimiter="EOF_$(uuidgen | tr '[:upper:]' '[:lower:]')"
+            {
+              echo "${key}<<${delimiter}"
+              echo "$value"
+              echo "${delimiter}"
+            } >> "$GITHUB_OUTPUT"
+          }
+
+          VERDICT=$(jq -r '.verdict' codex-review.json)
+          SUMMARY=$(jq -r '.summary' codex-review.json)
+          FINDINGS_COUNT=$(jq -r '.findings | length' codex-review.json)
+          FIRST_FINDING=$(jq -r '
+            def oneline: gsub("[[:space:]]+"; " ") | sub("^ "; "") | sub(" $"; "");
+            if (.findings | length) > 0 then
+              "[\(.findings[0].severity)] \(.findings[0].title | oneline)"
+            else
+              ""
+            end
+          ' codex-review.json)
+          FINDINGS_DIGEST=$(jq -r '
+            def oneline: gsub("[[:space:]]+"; " ") | sub("^ "; "") | sub(" $"; "");
+            [.findings[0:3][] | "[\(.severity)] \(.title | oneline)"] | join(" | ")
+          ' codex-review.json)
+
+          echo "verdict=$VERDICT" >> "$GITHUB_OUTPUT"
+          echo "findings_count=$FINDINGS_COUNT" >> "$GITHUB_OUTPUT"
+          emit_output "summary" "$SUMMARY"
+          emit_output "first_finding" "$FIRST_FINDING"
+          emit_output "findings_digest" "$FINDINGS_DIGEST"
+
+      - name: Render review markdown
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -r '
+            def location:
+              if (.file // "") == "" then ""
+              elif (.line // 0) > 0 then " (`\(.file):\(.line)`)"
+              else " (`\(.file)`)"
+              end;
+            def findings_block:
+              if (.findings | length) == 0 then
+                "### Findings\n\nNo findings."
+              else
+                "### Findings\n\n" + (
+                  .findings |
+                  map("- [\(.severity | ascii_upcase)] \(.title)\((. | location))\n  \(.details)") |
+                  join("\n")
+                )
+              end;
+            def residual_block:
+              if (.residual_risks | length) == 0 then
+                ""
+              else
+                "\n\n### Residual Risks\n\n" + (
+                  .residual_risks |
+                  map("- " + .) |
+                  join("\n")
+                )
+              end;
+            "## Codex PR Review\n\n- Verdict: `\(.verdict)`\n- Summary: \(.summary)\n\n" +
+            findings_block +
+            residual_block + "\n"
+          ' codex-review.json > codex-review-summary.md
+
           {
             echo '<!-- codex-pr-review -->'
-            echo '## Codex PR Review'
-            echo
-            cat codex-review.md
+            cat codex-review-summary.md
           } > codex-review-comment.md
 
       - name: Publish PR comment
@@ -156,6 +325,10 @@ jobs:
                 ;;
               403)
                 echo "::warning::Skipping PR comment because the workflow token cannot write issue comments for this event (HTTP 403)." >&2
+                if [ -s "$RESPONSE_FILE" ]; then
+                  head -c 500 "$RESPONSE_FILE" >&2
+                  echo >&2
+                fi
                 return 10
                 ;;
               *)
@@ -202,11 +375,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          {
-            echo '## Codex PR Review'
-            echo
-            cat codex-review.md
-          } >> "$GITHUB_STEP_SUMMARY"
+          cat codex-review-summary.md >> "$GITHUB_STEP_SUMMARY"
 
   review-gate:
     needs: review
@@ -259,6 +428,11 @@ jobs:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
           REVIEW_RESULT: ${{ needs.review.result }}
+          REVIEW_VERDICT: ${{ needs.review.outputs.verdict }}
+          REVIEW_SUMMARY: ${{ needs.review.outputs.summary }}
+          FINDINGS_COUNT: ${{ needs.review.outputs.findings_count }}
+          FIRST_FINDING: ${{ needs.review.outputs.first_finding }}
+          FINDINGS_DIGEST: ${{ needs.review.outputs.findings_digest }}
           FAILED_STEP: ${{ steps.inspect.outputs.failed_step }}
           JOB_URL: ${{ steps.inspect.outputs.job_url }}
         run: |
@@ -302,4 +476,50 @@ jobs:
             exit 1
           fi
 
-          echo "Codex review passed."
+          case "$REVIEW_VERDICT" in
+            pass)
+              {
+                echo "## Codex Review Gate"
+                echo
+                echo "- Verdict: \`pass\`"
+                echo "- Summary: $REVIEW_SUMMARY"
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "Codex review passed."
+              ;;
+            rework_required)
+              SUMMARY="Codex review requires developer re-work"
+              if [ -n "$FIRST_FINDING" ]; then
+                SUMMARY="$SUMMARY; first finding: $FIRST_FINDING"
+              fi
+              echo "::error::$SUMMARY" >&2
+              {
+                echo "## Codex Review Gate"
+                echo
+                echo "- Verdict: \`rework_required\`"
+                echo "- Summary: $REVIEW_SUMMARY"
+                echo "- Findings count: $FINDINGS_COUNT"
+                if [ -n "$FINDINGS_DIGEST" ]; then
+                  echo "- Top findings: $FINDINGS_DIGEST"
+                fi
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            review_error)
+              SUMMARY="Codex review could not complete cleanly"
+              if [ -n "$REVIEW_SUMMARY" ]; then
+                SUMMARY="$SUMMARY; $REVIEW_SUMMARY"
+              fi
+              echo "::error::$SUMMARY" >&2
+              {
+                echo "## Codex Review Gate"
+                echo
+                echo "- Verdict: \`review_error\`"
+                echo "- Summary: $REVIEW_SUMMARY"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            *)
+              echo "::error::Codex review returned an unknown verdict: $REVIEW_VERDICT" >&2
+              exit 1
+              ;;
+          esac
