@@ -5,13 +5,13 @@ Review date: March 13, 2026
 This document reviews the current state of the Later-Life Planner app against:
 
 - `docs/product_prompt.md`
-- `docs/auth-implementation-prompt.md`
-- `docs/data-storage-design.md`
+- `docs/superseded/auth-implementation-prompt.md`
+- `docs/superseded/data-storage-design.md`
 
 Decision precedence used in this review:
 
-- `data-storage-design.md` overrides `auth-implementation-prompt.md` for storage and security architecture.
-- `auth-implementation-prompt.md` still governs Clerk auth UX and migration flow where it does not conflict with the storage design.
+- `superseded/data-storage-design.md` overrides `superseded/auth-implementation-prompt.md` for storage and security architecture.
+- `superseded/auth-implementation-prompt.md` still governs Clerk auth UX and migration flow where it does not conflict with the storage design.
 - `product_prompt.md` governs product language, UX direction, financial rules, architecture boundaries, and testing expectations.
 
 ## Executive Summary
@@ -259,7 +259,7 @@ The secure storage design is not yet implemented.
 
 ### Security Gap Summary
 
-Today, planner data is stored in plaintext in browser storage. That is acceptable for a local MVP, but it does not meet the requirements in `data-storage-design.md`.
+Today, planner data is stored in plaintext in browser storage. That is acceptable for a local MVP, but it does not meet the requirements in `superseded/data-storage-design.md`.
 
 ## Key Findings and Gaps
 
@@ -503,7 +503,7 @@ Do not implement Supabase.
 
 Reason:
 
-`data-storage-design.md` explicitly replaces Supabase with Cosmos DB and client-side encryption. Implementing Supabase now would create throwaway work and architectural drift.
+`superseded/data-storage-design.md` explicitly replaces Supabase with Cosmos DB and client-side encryption. Implementing Supabase now would create throwaway work and architectural drift.
 
 ### Recommendation 2
 

@@ -4,7 +4,7 @@ Status: draft
 
 This document defines persisted storage for Later-Life Planner.
 
-It supersedes the Supabase storage direction in `docs/auth-implementation-prompt.md`.
+It supersedes the Supabase storage direction in `docs/superseded/auth-implementation-prompt.md`.
 
 Use this document as the storage source of truth for implementation.
 
