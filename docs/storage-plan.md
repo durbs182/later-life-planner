@@ -382,6 +382,18 @@ Later phases can additionally use:
 
 ## Backup, Recovery, And Deletion Operations
 
+### Operational ownership
+
+Restore and deletion operations must be restricted to a small, explicitly named operator group for `NxLap Ltd`.
+
+Initial ownership model:
+
+- operators: `NxLap Ltd` engineering lead plus one designated backup operator
+- approvals: any restore or deletion workflow requires explicit human approval, not just automated jobs
+- access control: use Azure RBAC roles scoped to the specific Cosmos account and Key Vault, preferably with time-bounded access
+
+This prevents accidental restores into production and creates a clear accountability trail.
+
 ### Administrative posture
 
 Recovery and deletion are administrative workflows, not just API features.
