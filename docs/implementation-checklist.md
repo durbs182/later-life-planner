@@ -120,8 +120,8 @@ Priority order:
 - [ ] Document retention, deletion, export, and backup-recovery policy for user data.
 - [ ] Publish a privacy notice before production persistence launches.
 - [ ] Decide the initial cookie posture and keep it essential-only unless a consent mechanism is ready.
-- [ ] Confirm controller-processor contracts or equivalent terms for VictoryLap Ltd with Clerk, Azure, and other relevant vendors.
-- [ ] Confirm the ICO data protection fee position for VictoryLap Ltd before launch.
+- [ ] Confirm controller-processor contracts or equivalent terms for NxLap Ltd with Clerk, Azure, and other relevant vendors.
+- [ ] Confirm the ICO data protection fee position for NxLap Ltd before launch.
 
 ## Immediate Next Slice
 

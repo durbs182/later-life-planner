@@ -2,7 +2,7 @@
 
 Status: draft
 
-This outline is a product-specific starting point for the Later-Life Planner privacy notice operated by VictoryLap Ltd.
+This outline is a product-specific starting point for the Later-Life Planner privacy notice operated by NxLap Ltd, trading as VictoryLap.
 
 It is not final legal text.
 
@@ -12,13 +12,13 @@ Before publication, fill in the remaining controller details, vendor list, trans
 
 Purpose:
 
-- identify VictoryLap Ltd as the organisation operating Later-Life Planner
+- identify NxLap Ltd as the organisation operating Later-Life Planner, with VictoryLap as the trading name presented to users
 - provide a contact route for privacy questions
 
 Include:
 
-- legal entity name: `VictoryLap Ltd`
-- trading name: `VictoryLap` if that remains the brand presented to users
+- legal entity name: `NxLap Ltd`
+- trading name: `VictoryLap`
 - registered address or principal business address
 - privacy contact email, for example `privacy@victorylap...`
 - DPO contact details if one is appointed
@@ -35,7 +35,7 @@ Purpose:
 
 Suggested wording points:
 
-- Later-Life Planner is provided by VictoryLap Ltd
+- Later-Life Planner is provided by NxLap Ltd, trading as VictoryLap
 - the planner helps users explore later-life financial planning scenarios
 - the notice explains what personal data is used, why it is used, how long it is kept, and what rights users have
 
@@ -94,7 +94,7 @@ Purpose:
 
 This section must be completed with the final legal decision.
 
-The lawful-basis table should be stated as the position of VictoryLap Ltd as controller.
+The lawful-basis table should be stated as the position of NxLap Ltd as controller.
 
 Likely structure:
 
@@ -146,7 +146,7 @@ For the current architecture, that likely includes:
 - Clerk
 - Microsoft Azure
 
-The notice should make clear that these providers act for VictoryLap Ltd in connection with operating Later-Life Planner, subject to the final legal and contractual structure.
+The notice should make clear that these providers act for NxLap Ltd in connection with operating Later-Life Planner, subject to the final legal and contractual structure.
 
 ## 8. International Transfers
 
@@ -279,7 +279,7 @@ Suggested points:
 
 Before publishing the final notice:
 
-- confirm VictoryLap Ltd's controller identity, registered details, and contact routes
+- confirm NxLap Ltd's controller identity, registered details, and contact routes
 - confirm the lawful basis for each main purpose
 - confirm vendor list and transfer details
 - confirm backup-retention wording matches the chosen Azure backup tier
@@ -287,7 +287,7 @@ Before publishing the final notice:
 - confirm whether analytics or non-essential cookies are present at launch
 - confirm whether a DPO is required and whether the notice needs DPO contact details
 - confirm the notice is linked from sign-in, footer, and account/help areas
-- confirm the company number and registered office details once VictoryLap Ltd is incorporated
+- confirm the company number and registered office details once NxLap Ltd is incorporated
 
 ## Source Material
 
