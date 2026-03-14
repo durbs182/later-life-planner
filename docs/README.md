@@ -44,6 +44,7 @@ Operational notes, CI/CD validation writeups, and workflow-specific guidance liv
 - `operations/ci-cd-review.md`
 - `operations/ci-cd-claude-test-instructions.md`
 - `operations/codex-auto-fix-issues.md`
+- `operations/codex-parallel-local.md`
 
 ## Reviews
 

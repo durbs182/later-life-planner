@@ -1,0 +1,3 @@
+# name	branch	worktree	prompt_file	owned_paths
+tests	codex/example-tests	../later-life-planner-tests	docs/operations/codex-prompts/tests-agent.md	tests
+ui	codex/example-ui	../later-life-planner-ui	docs/operations/codex-prompts/ui-agent.md	src/app,src/components
