@@ -1,0 +1,194 @@
+name: Codex PR Review
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: codex-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    outputs:
+      review: ${{ steps.filter.outputs.review }}
+    steps:
+      - uses: dorny/paths-filter@9d7afb8d214ad99e78fbd4247752c4caed2b6e4c # v4.0.0
+        id: filter
+        with:
+          filters: |
+            review:
+              - 'src/**'
+              - 'tests/**'
+              - 'public/**'
+              - 'infra/**'
+              - '.github/workflows/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'next.config.mjs'
+              - 'tsconfig.json'
+              - 'tsconfig.test.json'
+              - 'tailwind.config.*'
+              - 'postcss.config.*'
+              - 'vitest.config.*'
+              - 'Dockerfile'
+              - '.eslintrc.*'
+
+  review:
+    needs: changes
+    if: |
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      needs.changes.outputs.review == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout pull request head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install jq
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Install Codex CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g @openai/codex
+
+      - name: Prepare CODEX_HOME
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+        run: |
+          set -euo pipefail
+          mkdir -p "$CODEX_HOME"
+          chmod 700 "$CODEX_HOME"
+          cat > "$CODEX_HOME/config.toml" <<'EOF'
+          cli_auth_credentials_store = "file"
+          EOF
+
+      - name: Azure login via Codex credential
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0 — latest; no Node 24 release yet, update when available
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_CODEX_KV }}
+
+      - name: Restore auth.json from Azure Key Vault
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+          KEYVAULT_NAME: ${{ secrets.AZURE_KEYVAULT_NAME }}
+          KEYVAULT_SECRET_NAME: codex-auth-json
+        run: |
+          set -euo pipefail
+          az keyvault secret show \
+            --vault-name "$KEYVAULT_NAME" \
+            --name "$KEYVAULT_SECRET_NAME" \
+            --query value \
+            --output tsv > "$CODEX_HOME/auth.json"
+          chmod 600 "$CODEX_HOME/auth.json"
+
+      - name: Run Codex review
+        shell: bash
+        env:
+          CODEX_HOME: ${{ runner.temp }}/.codex
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          codex exec review \
+            --ephemeral \
+            --full-auto \
+            --base "origin/${{ github.base_ref }}" \
+            --title "${{ github.event.pull_request.title }}" \
+            -o codex-review.md \
+            "Review this pull request for the Later Life Planner repository. Prioritise bugs, behavioural regressions, security issues, deployment or workflow breakage, and missing tests. Ignore style-only suggestions and avoid praise. Present findings first, ordered by severity, with specific file and line references where possible. Keep the review concise. If there are no findings, say 'No findings' and mention any residual risks or testing gaps briefly."
+          if ! grep -q '[^[:space:]]' codex-review.md; then
+            echo "::error::Codex review output file is empty." >&2
+            exit 1
+          fi
+
+      - name: Prepare sticky comment
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '<!-- codex-pr-review -->'
+            echo '## Codex PR Review'
+            echo
+            cat codex-review.md
+          } > codex-review-comment.md
+
+      - name: Publish PR comment
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          API_ROOT="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          COMMENTS_LIST_URL="${API_ROOT}/issues/${PR_NUMBER}/comments?per_page=100"
+          COMMENTS_POST_URL="${API_ROOT}/issues/${PR_NUMBER}/comments"
+          COMMENT_ID=$(
+            curl -fsSL \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "$COMMENTS_LIST_URL" |
+            jq -r '.[] | select(.user.login == "github-actions[bot]" and (.body | contains("<!-- codex-pr-review -->"))) | .id' |
+            tail -n 1
+          )
+
+          jq -Rs '{body: .}' codex-review-comment.md > codex-review-payload.json
+
+          if [ -n "$COMMENT_ID" ]; then
+            curl -fsSL \
+              -X PATCH \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              "${API_ROOT}/issues/comments/${COMMENT_ID}" \
+              --data @codex-review-payload.json > /dev/null
+          else
+            curl -fsSL \
+              -X POST \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              "$COMMENTS_POST_URL" \
+              --data @codex-review-payload.json > /dev/null
+          fi
+
+      - name: Add job summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '## Codex PR Review'
+            echo
+            cat codex-review.md
+          } >> "$GITHUB_STEP_SUMMARY"

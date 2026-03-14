@@ -194,6 +194,7 @@ jobs:
             --name ca-later-life-planner \
             --resource-group rg-later-life-planner \
             --secrets \
+              "anthropic-api-key=${{ secrets.ANTHROPIC_API_KEY }}" \
               "turnstile-secret-key=${{ secrets.TURNSTILE_SECRET_KEY }}" \
               "clerk-secret-key=${{ secrets.CLERK_SECRET_KEY }}"
           REVISION=$(az containerapp update \
@@ -201,6 +202,7 @@ jobs:
             --resource-group rg-later-life-planner \
             --image acrblackdog69llp.azurecr.io/later-life-planner:${{ github.sha }} \
             --set-env-vars \
+              "ANTHROPIC_API_KEY=secretref:anthropic-api-key" \
               "TURNSTILE_SECRET_KEY=secretref:turnstile-secret-key" \
               "CLERK_SECRET_KEY=secretref:clerk-secret-key" \
               "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" \
