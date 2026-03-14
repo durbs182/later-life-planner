@@ -17,8 +17,8 @@ Before making changes, use these documents as the source of truth:
 - /Users/pauldurbin/later-life-planner/docs/implementation-checklist.md
 
 Read these historical documents only when you need older context:
-- /Users/pauldurbin/later-life-planner/docs/auth-implementation-prompt.md
-- /Users/pauldurbin/later-life-planner/docs/data-storage-design.md
+- /Users/pauldurbin/later-life-planner/docs/superseded/auth-implementation-prompt.md
+- /Users/pauldurbin/later-life-planner/docs/superseded/data-storage-design.md
 
 Decision precedence:
 - Treat implementation-checklist.md as authoritative for execution order. Start with the earliest unfinished phase and work forward sequentially.

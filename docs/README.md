@@ -22,12 +22,12 @@ These support implementation but are not the main execution-order docs:
 - `codex-later-life-planner-engineer-prompt.md`
 - `privacy-notice-outline.md`
 
-## Historical Docs
+## Superseded Docs
 
-These are retained for context and compatibility with existing agent instructions, but they are not the current implementation source of truth:
+These are retained for historical context only. They are not the current implementation source of truth and now live in [`superseded/`](/Users/pauldurbin/later-life-planner/docs/superseded):
 
-- `auth-implementation-prompt.md`
-- `data-storage-design.md`
+- `superseded/auth-implementation-prompt.md`
+- `superseded/data-storage-design.md`
 
 ## Operations
 
