@@ -46,7 +46,7 @@ import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer } from './tax
 import {
   resolvePotBucketSplit, blendGrowthRateForPot,
   calculateBucketTargets, calculateRebalancingActions,
-  type BucketTriple,
+  type BucketTriple, type PotLike,
 } from './bucketLadderEngine';
 
 /**
@@ -61,6 +61,71 @@ import {
 export interface ProjectionOptions {
   growthShockYear?: number;
   growthShockPercent?: number;
+}
+
+interface BucketSnapshotInputs {
+  bucketLadder: NonNullable<PlannerState['bucketLadderConfig']>;
+  mode: 'single' | 'couple';
+  spending: number;
+  yearIndex: number;
+  prevGrowthBucketValue: number;
+  pots: Array<{ currentValue: number; def: PotLike; enabled: boolean }>;
+  /** Combined cash savings to add to Bucket 1 (already filtered for enabled+mode). */
+  cashSavings: number;
+}
+
+interface BucketSnapshotResult {
+  bucketValues: NonNullable<YearlyProjection['bucketValues']>;
+  rebalanceActions: RebalanceAction[] | undefined;
+}
+
+/**
+ * Compute end-of-year bucket balances + rebalance actions for the projection.
+ *
+ * Extracted from calculateProjections so the main loop stays focused on the
+ * tax/drawdown waterfall. Rebalance actions are advisory only in Stage A —
+ * they don't mutate underlying pot allocations during the simulation.
+ */
+function computeBucketSnapshot(inputs: BucketSnapshotInputs): BucketSnapshotResult {
+  const { bucketLadder, spending, yearIndex, prevGrowthBucketValue, pots, cashSavings } = inputs;
+
+  const acc: BucketTriple = { cash: cashSavings, income: 0, growth: 0 };
+  for (const pot of pots) {
+    if (!pot.enabled || pot.currentValue <= 0) continue;
+    const split = resolvePotBucketSplit({
+      holdings: pot.def.holdings,
+      allocation: pot.def.allocation,
+      totalValue: pot.currentValue,
+    });
+    acc.cash += split.cash;
+    acc.income += split.income;
+    acc.growth += split.growth;
+  }
+
+  const bucketValues = {
+    cash: Math.max(0, acc.cash),
+    income: Math.max(0, acc.income),
+    growth: Math.max(0, acc.growth),
+    total: Math.max(0, acc.cash + acc.income + acc.growth),
+  };
+
+  const targets = calculateBucketTargets(spending, bucketLadder);
+  const growthChangePctLastYear = yearIndex > 0 && prevGrowthBucketValue > 0
+    ? ((bucketValues.growth - prevGrowthBucketValue) / prevGrowthBucketValue) * 100
+    : undefined;
+
+  const actions = calculateRebalancingActions({
+    buckets: { cash: bucketValues.cash, income: bucketValues.income, growth: bucketValues.growth },
+    targets,
+    config: bucketLadder,
+    growthChangePctLastYear,
+    trigger: bucketLadder.rebalanceTrigger,
+  });
+
+  return {
+    bucketValues,
+    rebalanceActions: actions.length > 0 ? actions : undefined,
+  };
 }
 
 // ─── Per-person income aggregator ────────────────────────────────────────────
@@ -201,25 +266,25 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
   const jointGiaRate = jointGia.growthRate ?? investmentGrowth;
 
   const p1IsaG = (ladderEnabled
-    ? blendGrowthRateForPot(person1.assets.isaInvestments as never, p1IsaRate)
+    ? blendGrowthRateForPot(person1.assets.isaInvestments, p1IsaRate)
     : p1IsaRate) / 100;
   const p1GiaG = (ladderEnabled
-    ? blendGrowthRateForPot(person1.assets.generalInvestments as never, p1GiaRate)
+    ? blendGrowthRateForPot(person1.assets.generalInvestments, p1GiaRate)
     : p1GiaRate) / 100;
   const p1DcG = (ladderEnabled
-    ? blendGrowthRateForPot(person1.incomeSources.dcPension as never, p1DcRate)
+    ? blendGrowthRateForPot(person1.incomeSources.dcPension, p1DcRate)
     : p1DcRate) / 100;
   const p2IsaG = (ladderEnabled
-    ? blendGrowthRateForPot(person2.assets.isaInvestments as never, p2IsaRate)
+    ? blendGrowthRateForPot(person2.assets.isaInvestments, p2IsaRate)
     : p2IsaRate) / 100;
   const p2GiaG = (ladderEnabled
-    ? blendGrowthRateForPot(person2.assets.generalInvestments as never, p2GiaRate)
+    ? blendGrowthRateForPot(person2.assets.generalInvestments, p2GiaRate)
     : p2GiaRate) / 100;
   const p2DcG = (ladderEnabled
-    ? blendGrowthRateForPot(person2.incomeSources.dcPension as never, p2DcRate)
+    ? blendGrowthRateForPot(person2.incomeSources.dcPension, p2DcRate)
     : p2DcRate) / 100;
   const jointGiaG = (ladderEnabled
-    ? blendGrowthRateForPot(jointGia as never, jointGiaRate)
+    ? blendGrowthRateForPot(jointGia, jointGiaRate)
     : jointGiaRate) / 100;
 
   // ── Care Reserve — earmarked capital, invested but not drawn for spending ─
@@ -297,16 +362,15 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
     // Cash savings are never shocked.
     if (options?.growthShockYear === y && options?.growthShockPercent && options.growthShockPercent > 0) {
       const shockFrac = options.growthShockPercent / 100;
-      const shockPot = (currentValue: number, potDef: { holdings?: unknown; allocation?: unknown }): number => {
+      const shockPot = (currentValue: number, potDef: PotLike): number => {
         if (currentValue <= 0) return currentValue;
         if (!ladderEnabled) return currentValue * (1 - shockFrac);
         const split = resolvePotBucketSplit({
-          ...(potDef as object),
-          enabled: true,
+          holdings: potDef.holdings,
+          allocation: potDef.allocation,
           totalValue: currentValue,
-        } as never);
-        const growthExposure = split.growth;
-        return Math.max(0, currentValue - growthExposure * shockFrac);
+        });
+        return Math.max(0, currentValue - split.growth * shockFrac);
       };
       p1Isa     = shockPot(p1Isa,     person1.assets.isaInvestments);
       p1GiaV    = shockPot(p1GiaV,    person1.assets.generalInvestments);
@@ -802,63 +866,28 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
 
     const clamp = (v: number) => Math.max(0, v);
 
-    // ── Bucket ladder bookkeeping (only when enabled) ─────────────────────
-    // Compute end-of-year bucket balances from each pot's current value and
-    // its allocation/holdings. Then run the rebalance decision function and
-    // record the resulting actions in the YearlyProjection for the UI log.
-    // Rebalance actions in this iteration are advisory only — they are NOT
-    // applied to underlying pot allocations during the simulation. This is a
-    // Stage A simplification documented in the design doc; Stage B / a later
-    // iteration could mutate allocations year-over-year for full fidelity.
-    let bucketValuesOut: YearlyProjection['bucketValues'] | undefined;
-    let rebalanceActionsOut: RebalanceAction[] | undefined;
-    if (ladderEnabled && bucketLadder) {
-      const acc: BucketTriple = { cash: 0, income: 0, growth: 0 };
-      const addPot = (currentValue: number, potDef: { holdings?: unknown; allocation?: unknown; enabled?: boolean }) => {
-        if (!potDef?.enabled || currentValue <= 0) return;
-        const split = resolvePotBucketSplit({
-          ...(potDef as object),
-          enabled: true,
-          totalValue: currentValue,
-        } as never);
-        acc.cash += split.cash; acc.income += split.income; acc.growth += split.growth;
-      };
-      addPot(p1Isa,     person1.assets.isaInvestments);
-      addPot(p1GiaV,    person1.assets.generalInvestments);
-      addPot(p1Dc,      person1.incomeSources.dcPension);
-      if (mode === 'couple') {
-        addPot(p2Isa,   person2.assets.isaInvestments);
-        addPot(p2GiaV,  person2.assets.generalInvestments);
-        addPot(p2Dc,    person2.incomeSources.dcPension);
-      }
-      addPot(jointGiaV, jointGia);
-
-      // Cash savings → Bucket 1 (implicitly 100% cash).
-      if (person1.assets.cashSavings.enabled) acc.cash += p1Cash;
-      if (mode === 'couple' && person2.assets.cashSavings.enabled) acc.cash += p2Cash;
-
-      bucketValuesOut = {
-        cash: Math.max(0, acc.cash),
-        income: Math.max(0, acc.income),
-        growth: Math.max(0, acc.growth),
-        total: Math.max(0, acc.cash + acc.income + acc.growth),
-      };
-
-      const targets = calculateBucketTargets(spending, bucketLadder);
-      const growthChangePctLastYear = y > 0 && prevGrowthBucketValue > 0
-        ? ((bucketValuesOut.growth - prevGrowthBucketValue) / prevGrowthBucketValue) * 100
-        : undefined;
-
-      const actions = calculateRebalancingActions({
-        buckets: { cash: bucketValuesOut.cash, income: bucketValuesOut.income, growth: bucketValuesOut.growth },
-        targets,
-        config: bucketLadder,
-        growthChangePctLastYear,
-        trigger: bucketLadder.rebalanceTrigger,
-      });
-      rebalanceActionsOut = actions.length > 0 ? actions : undefined;
-      prevGrowthBucketValue = bucketValuesOut.growth;
-    }
+    // ── Bucket ladder bookkeeping (only when enabled; see helper below) ──
+    const bucketSnapshot = ladderEnabled && bucketLadder
+      ? computeBucketSnapshot({
+          bucketLadder, mode, spending, yearIndex: y,
+          prevGrowthBucketValue,
+          pots: [
+            { currentValue: p1Isa,  def: person1.assets.isaInvestments,     enabled: person1.assets.isaInvestments.enabled },
+            { currentValue: p1GiaV, def: person1.assets.generalInvestments, enabled: person1.assets.generalInvestments.enabled },
+            { currentValue: p1Dc,   def: person1.incomeSources.dcPension,   enabled: person1.incomeSources.dcPension.enabled },
+            { currentValue: p2Isa,  def: person2.assets.isaInvestments,     enabled: person2.assets.isaInvestments.enabled },
+            { currentValue: p2GiaV, def: person2.assets.generalInvestments, enabled: person2.assets.generalInvestments.enabled },
+            { currentValue: p2Dc,   def: person2.incomeSources.dcPension,   enabled: person2.incomeSources.dcPension.enabled },
+            { currentValue: jointGiaV, def: jointGia, enabled: jointGia.enabled },
+          ],
+          cashSavings:
+            (person1.assets.cashSavings.enabled ? p1Cash : 0)
+            + (mode === 'couple' && person2.assets.cashSavings.enabled ? p2Cash : 0),
+        })
+      : null;
+    const bucketValuesOut = bucketSnapshot?.bucketValues;
+    const rebalanceActionsOut = bucketSnapshot?.rebalanceActions;
+    if (bucketSnapshot) prevGrowthBucketValue = bucketSnapshot.bucketValues.growth;
 
     projections.push({
       yearIndex: y,

@@ -333,11 +333,11 @@ export function getRNRBTaperThresholdForYear(calendarYear: number): number {
 
 export const BUCKET_LADDER = {
   /** Default annual growth rate (%) for the cash bucket (money market / cash ISA). */
-  DEFAULT_CASH_GROWTH: 4.0,
+  DEFAULT_CASH_GROWTH: 4,
   /** Default blended annual growth rate (%) for the income bucket (bonds, metals, alternatives). */
   DEFAULT_INCOME_GROWTH: 4.5,
   /** Default annual growth rate (%) for the growth bucket (global equities). */
-  DEFAULT_GROWTH_GROWTH: 6.0,
+  DEFAULT_GROWTH_GROWTH: 6,
   /** Default years of annual spending held in Bucket 1. */
   DEFAULT_CASH_BUFFER_YEARS: 2,
   /** Default years of annual spending held in Bucket 2. */
@@ -360,11 +360,11 @@ export const BUCKET_LADDER = {
  * Mixed funds inherit a weighted average of these via their MixedAllocation.
  */
 export const ASSET_TYPE_GROWTH = {
-  cash: 4.0,
+  cash: 4,
   bonds: 4.5,
   preciousMetals: 3.5,
-  alternatives: 5.0,
-  equities: 6.0,
+  alternatives: 5,
+  equities: 6,
 } as const;
 
 /**

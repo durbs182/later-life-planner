@@ -76,11 +76,19 @@ export interface RefillEvent {
   reason: string;
 }
 
-/** Pot-shaped types that can carry holdings/allocation metadata. */
-type Allocable = (DCPensionSource | ISAAsset | GIAAsset) & {
-  enabled: boolean;
+/**
+ * Structural shape consumed by the bucket-resolution helpers. Any pot type
+ * (DCPensionSource, ISAAsset, GIAAsset, or a synthetic shock-time wrapper)
+ * that carries totalValue + optional holdings/allocation satisfies this.
+ */
+export interface PotLike {
   totalValue: number;
-};
+  holdings?: PotHolding[];
+  allocation?: PotAllocation;
+}
+
+/** Pot types that participate in household aggregation (carry `enabled`). */
+type EnabledPot = DCPensionSource | ISAAsset | GIAAsset;
 
 // ─── Asset-type → bucket mapping ──────────────────────────────────────────────
 
@@ -106,8 +114,8 @@ export const ASSET_TYPE_TO_BUCKET: Record<Exclude<AssetType, 'mixed'>, BucketKey
  *   3. Else: legacy default — entire pot value sits in the growth bucket.
  *      (This preserves existing behaviour for plans created before the ladder.)
  */
-export function resolvePotBucketSplit(pot: Allocable | null | undefined): BucketTriple {
-  if (!pot || !pot.totalValue || pot.totalValue <= 0) {
+export function resolvePotBucketSplit(pot: PotLike | null | undefined): BucketTriple {
+  if (!pot?.totalValue || pot.totalValue <= 0) {
     return zeroTriple();
   }
   if (pot.holdings && pot.holdings.length > 0) {
@@ -162,19 +170,19 @@ export function calculateBucketValues(state: PlannerState): BucketValues {
   const totals = zeroTriple();
 
   // Investment pots — each is split via resolvePotBucketSplit.
-  const pots: Allocable[] = [
-    state.person1.incomeSources.dcPension as Allocable,
-    state.person1.assets.isaInvestments as Allocable,
-    state.person1.assets.generalInvestments as Allocable,
-    state.jointGia as Allocable,
+  const pots: EnabledPot[] = [
+    state.person1.incomeSources.dcPension,
+    state.person1.assets.isaInvestments,
+    state.person1.assets.generalInvestments,
+    state.jointGia,
+    ...(state.mode === 'couple' ? [
+      state.person2.incomeSources.dcPension,
+      state.person2.assets.isaInvestments,
+      state.person2.assets.generalInvestments,
+    ] : []),
   ];
-  if (state.mode === 'couple') {
-    pots.push(state.person2.incomeSources.dcPension as Allocable);
-    pots.push(state.person2.assets.isaInvestments as Allocable);
-    pots.push(state.person2.assets.generalInvestments as Allocable);
-  }
   for (const pot of pots) {
-    if (!pot || !pot.enabled) continue;
+    if (!pot?.enabled) continue;
     addInto(totals, resolvePotBucketSplit(pot));
   }
 
@@ -224,8 +232,8 @@ export function effectiveBucketGrowthRates(config: BucketLadderConfig): BucketGr
  * Returns the pot's existing flat rate as fallback when no allocation info
  * is set — preserving today's behaviour.
  */
-export function blendGrowthRateForPot(pot: Allocable, fallbackRate: number): number {
-  if (!pot || !pot.totalValue || pot.totalValue <= 0) return fallbackRate;
+export function blendGrowthRateForPot(pot: PotLike | null | undefined, fallbackRate: number): number {
+  if (!pot?.totalValue || pot.totalValue <= 0) return fallbackRate;
 
   if (pot.holdings && pot.holdings.length > 0) {
     return blendFromHoldings(pot.holdings, pot.totalValue, fallbackRate);
@@ -291,100 +299,114 @@ export interface RebalanceArgs {
 export function calculateRebalancingActions(args: RebalanceArgs): RebalanceAction[] {
   if (args.trigger === 'off' || !args.config.enabled) return [];
 
-  const { buckets, targets, config, growthChangePctLastYear, trigger } = args;
+  const ctx = buildRebalanceContext(args);
+  return [
+    ...fillCashShortfall(ctx),
+    ...fillIncomeShortfall(ctx),
+    ...spillCashSurplus(ctx),
+    ...spillIncomeSurplus(ctx),
+  ];
+}
+
+interface RebalanceContext extends RebalanceArgs {
+  cashDrift: number;
+  incomeDrift: number;
+  driftLimit: number;
+  growthCrashed: boolean;
+}
+
+function buildRebalanceContext(args: RebalanceArgs): RebalanceContext {
+  const cashDrift = driftFraction(args.buckets.cash, args.targets.cash);
+  const incomeDrift = driftFraction(args.buckets.income, args.targets.income);
+  const driftLimit = args.config.rebalanceThresholdPercent / 100;
+  const growthCrashed = typeof args.growthChangePctLastYear === 'number'
+    && args.growthChangePctLastYear < -args.config.pauseRebalanceAfterEquityDropPercent;
+  return { ...args, cashDrift, incomeDrift, driftLimit, growthCrashed };
+}
+
+/** True when the shortfall side should fire under the current trigger. */
+function shortfallEligible(drift: number, trigger: RebalanceTrigger, driftLimit: number): boolean {
+  return drift < 0 && (trigger !== 'threshold' || Math.abs(drift) >= driftLimit);
+}
+
+function fillCashShortfall(ctx: RebalanceContext): RebalanceAction[] {
+  if (!shortfallEligible(ctx.cashDrift, ctx.trigger, ctx.driftLimit)) return [];
+  const shortfall = Math.max(0, ctx.targets.cash - ctx.buckets.cash);
+  if (shortfall <= 0) return [];
+
   const actions: RebalanceAction[] = [];
-
-  const cashDrift = driftFraction(buckets.cash, targets.cash);
-  const incomeDrift = driftFraction(buckets.income, targets.income);
-
-  const driftLimit = config.rebalanceThresholdPercent / 100;
-  const growthCrashThreshold = -config.pauseRebalanceAfterEquityDropPercent;
-  const growthCrashed = typeof growthChangePctLastYear === 'number'
-    && growthChangePctLastYear < growthCrashThreshold;
-
-  // Cash bucket under target → pull from income, then growth (paused if crashed).
-  if (cashDrift < 0 && (trigger !== 'threshold' || Math.abs(cashDrift) >= driftLimit)) {
-    const cashShortfall = Math.max(0, targets.cash - buckets.cash);
-    if (cashShortfall > 0) {
-      const remainingIncome = Math.max(0, buckets.income);
-      const fromIncome = Math.min(cashShortfall, remainingIncome);
-      if (fromIncome > 0) {
-        actions.push({
-          fromBucket: 'income', toBucket: 'cash', amount: fromIncome,
-          reason: cashDriftReason(trigger, cashDrift),
-          trigger,
-        });
-      }
-      const stillNeeded = cashShortfall - fromIncome;
-      if (stillNeeded > 0) {
-        if (growthCrashed) {
-          actions.push({
-            fromBucket: 'growth', toBucket: 'cash', amount: 0,
-            reason: `Refill from growth paused — growth bucket fell ${growthChangePctLastYear?.toFixed(1)}% last year`,
-            trigger: 'pauseAfterDrop',
-          });
-        } else {
-          const fromGrowth = Math.min(stillNeeded, Math.max(0, buckets.growth));
-          if (fromGrowth > 0) {
-            actions.push({
-              fromBucket: 'growth', toBucket: 'cash', amount: fromGrowth,
-              reason: 'Cash refill — income bucket insufficient',
-              trigger,
-            });
-          }
-        }
-      }
-    }
+  const fromIncome = Math.min(shortfall, Math.max(0, ctx.buckets.income));
+  if (fromIncome > 0) {
+    actions.push({
+      fromBucket: 'income', toBucket: 'cash', amount: fromIncome,
+      reason: cashDriftReason(ctx.trigger, ctx.cashDrift),
+      trigger: ctx.trigger,
+    });
   }
 
-  // Income bucket under target → pull from growth (also paused if growth crashed).
-  if (incomeDrift < 0 && (trigger !== 'threshold' || Math.abs(incomeDrift) >= driftLimit)) {
-    const incomeShortfall = Math.max(0, targets.income - buckets.income);
-    if (incomeShortfall > 0) {
-      if (growthCrashed) {
-        actions.push({
-          fromBucket: 'growth', toBucket: 'income', amount: 0,
-          reason: `Refill from growth paused — growth bucket fell ${growthChangePctLastYear?.toFixed(1)}% last year`,
-          trigger: 'pauseAfterDrop',
-        });
-      } else {
-        const fromGrowth = Math.min(incomeShortfall, Math.max(0, buckets.growth));
-        if (fromGrowth > 0) {
-          actions.push({
-            fromBucket: 'growth', toBucket: 'income', amount: fromGrowth,
-            reason: incomeDriftReason(trigger, incomeDrift),
-            trigger,
-          });
-        }
-      }
-    }
-  }
+  const stillNeeded = shortfall - fromIncome;
+  if (stillNeeded <= 0) return actions;
 
-  // Cash surplus beyond threshold → spill into income (don't starve longer-dated buckets).
-  if (cashDrift > driftLimit && targets.cash > 0) {
-    const surplus = buckets.cash - targets.cash;
-    if (surplus > 0) {
-      actions.push({
-        fromBucket: 'cash', toBucket: 'income', amount: surplus,
-        reason: `Cash bucket ${(cashDrift * 100).toFixed(1)}% over target — surplus moved to income`,
-        trigger,
-      });
-    }
+  if (ctx.growthCrashed) {
+    actions.push(pauseAfterDropAction('cash', ctx.growthChangePctLastYear));
+    return actions;
   }
-
-  // Income surplus beyond threshold → spill into growth.
-  if (incomeDrift > driftLimit && targets.income > 0) {
-    const surplus = buckets.income - targets.income;
-    if (surplus > 0) {
-      actions.push({
-        fromBucket: 'income', toBucket: 'growth', amount: surplus,
-        reason: `Income bucket ${(incomeDrift * 100).toFixed(1)}% over target — surplus moved to growth`,
-        trigger,
-      });
-    }
+  const fromGrowth = Math.min(stillNeeded, Math.max(0, ctx.buckets.growth));
+  if (fromGrowth > 0) {
+    actions.push({
+      fromBucket: 'growth', toBucket: 'cash', amount: fromGrowth,
+      reason: 'Cash refill — income bucket insufficient',
+      trigger: ctx.trigger,
+    });
   }
-
   return actions;
+}
+
+function fillIncomeShortfall(ctx: RebalanceContext): RebalanceAction[] {
+  if (!shortfallEligible(ctx.incomeDrift, ctx.trigger, ctx.driftLimit)) return [];
+  const shortfall = Math.max(0, ctx.targets.income - ctx.buckets.income);
+  if (shortfall <= 0) return [];
+
+  if (ctx.growthCrashed) {
+    return [pauseAfterDropAction('income', ctx.growthChangePctLastYear)];
+  }
+  const fromGrowth = Math.min(shortfall, Math.max(0, ctx.buckets.growth));
+  if (fromGrowth <= 0) return [];
+  return [{
+    fromBucket: 'growth', toBucket: 'income', amount: fromGrowth,
+    reason: incomeDriftReason(ctx.trigger, ctx.incomeDrift),
+    trigger: ctx.trigger,
+  }];
+}
+
+function spillCashSurplus(ctx: RebalanceContext): RebalanceAction[] {
+  if (ctx.cashDrift <= ctx.driftLimit || ctx.targets.cash <= 0) return [];
+  const surplus = ctx.buckets.cash - ctx.targets.cash;
+  if (surplus <= 0) return [];
+  return [{
+    fromBucket: 'cash', toBucket: 'income', amount: surplus,
+    reason: `Cash bucket ${(ctx.cashDrift * 100).toFixed(1)}% over target — surplus moved to income`,
+    trigger: ctx.trigger,
+  }];
+}
+
+function spillIncomeSurplus(ctx: RebalanceContext): RebalanceAction[] {
+  if (ctx.incomeDrift <= ctx.driftLimit || ctx.targets.income <= 0) return [];
+  const surplus = ctx.buckets.income - ctx.targets.income;
+  if (surplus <= 0) return [];
+  return [{
+    fromBucket: 'income', toBucket: 'growth', amount: surplus,
+    reason: `Income bucket ${(ctx.incomeDrift * 100).toFixed(1)}% over target — surplus moved to growth`,
+    trigger: ctx.trigger,
+  }];
+}
+
+function pauseAfterDropAction(toBucket: BucketKey, growthChangePct: number | undefined): RebalanceAction {
+  return {
+    fromBucket: 'growth', toBucket, amount: 0,
+    reason: `Refill from growth paused — growth bucket fell ${growthChangePct?.toFixed(1)}% last year`,
+    trigger: 'pauseAfterDrop',
+  };
 }
 
 // ─── Post-hoc refill schedule ─────────────────────────────────────────────────
@@ -407,50 +429,58 @@ export function calculateRefillSchedule(
 
   for (let i = 0; i < snapshots.length; i++) {
     const s = snapshots[i];
-    const trigger = s.spending * refillTriggerFraction;
-
-    if (s.cash < trigger) {
-      const cashTarget = s.spending * config.cashBufferYears;
-      let needed = Math.max(0, cashTarget - s.cash);
-      let availableIncome = s.income;
-      let availableGrowth = s.growth;
-
-      if (availableIncome > 0 && needed > 0) {
-        const fromIncome = Math.min(needed, availableIncome);
-        events.push({
-          year: s.year, age: s.age,
-          fromBucket: 'income', toBucket: 'cash', amount: fromIncome,
-          reason: 'Cash bucket below 6-month floor',
-        });
-        availableIncome -= fromIncome;
-        needed -= fromIncome;
-      }
-
-      if (needed > 0) {
-        const growthChangePct = i > 0 && prevGrowth > 0
-          ? ((s.growth - prevGrowth) / prevGrowth) * 100
-          : 0;
-        const crashed = i > 0 && growthChangePct < -config.pauseRebalanceAfterEquityDropPercent;
-        if (crashed) {
-          events.push({
-            year: s.year, age: s.age,
-            fromBucket: 'growth', toBucket: 'cash', amount: 0,
-            reason: `Refill from growth paused — growth bucket fell ${growthChangePct.toFixed(1)}% last year`,
-          });
-        } else if (availableGrowth > 0) {
-          const fromGrowth = Math.min(needed, availableGrowth);
-          events.push({
-            year: s.year, age: s.age,
-            fromBucket: 'growth', toBucket: 'cash', amount: fromGrowth,
-            reason: 'Cash refill — income bucket insufficient',
-          });
-        }
-      }
+    if (s.cash < s.spending * refillTriggerFraction) {
+      events.push(...refillEventsForSnapshot(s, config, i, prevGrowth));
     }
-
     prevGrowth = s.growth;
   }
+  return events;
+}
 
+/**
+ * Emit refill events for a single snapshot whose cash bucket has dipped below
+ * the trigger floor. Pulls from income first, then growth — with growth pause
+ * if last year's growth bucket fell more than pauseRebalanceAfterEquityDropPercent.
+ */
+function refillEventsForSnapshot(
+  s: BucketYearSnapshot,
+  config: BucketLadderConfig,
+  index: number,
+  prevGrowth: number,
+): RefillEvent[] {
+  const events: RefillEvent[] = [];
+  const cashTarget = s.spending * config.cashBufferYears;
+  let needed = Math.max(0, cashTarget - s.cash);
+  if (needed <= 0) return events;
+
+  if (s.income > 0) {
+    const fromIncome = Math.min(needed, s.income);
+    events.push({
+      year: s.year, age: s.age,
+      fromBucket: 'income', toBucket: 'cash', amount: fromIncome,
+      reason: 'Cash bucket below 6-month floor',
+    });
+    needed -= fromIncome;
+  }
+  if (needed <= 0) return events;
+
+  const growthChangePct = index > 0 && prevGrowth > 0
+    ? ((s.growth - prevGrowth) / prevGrowth) * 100
+    : 0;
+  const crashed = index > 0 && growthChangePct < -config.pauseRebalanceAfterEquityDropPercent;
+  if (crashed) {
+    events.push({
+      year: s.year, age: s.age,
+      fromBucket: 'growth', toBucket: 'cash', amount: 0,
+      reason: `Refill from growth paused — growth bucket fell ${growthChangePct.toFixed(1)}% last year`,
+    });
+  } else if (s.growth > 0) {
+    events.push({
+      year: s.year, age: s.age,
+      fromBucket: 'growth', toBucket: 'cash', amount: Math.min(needed, s.growth),
+      reason: 'Cash refill — income bucket insufficient',
+    });
+  }
   return events;
 }
 
