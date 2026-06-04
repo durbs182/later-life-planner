@@ -55,7 +55,7 @@ export function loadFixture(path: string): LoadedFixture {
  * Deep-merge plain objects. Arrays in the source replace target arrays.
  * Functions and class instances are not handled — fixtures are JSON.
  */
-function deepMerge<T>(target: T, source: Partial<T> | undefined): T {
+function deepMerge<T>(target: T, source: Partial<T> | null | undefined): T {
   if (!source) return target;
   if (Array.isArray(source)) return source as unknown as T;
   if (typeof source !== 'object' || source === null) return source as T;
