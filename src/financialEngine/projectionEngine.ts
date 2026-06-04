@@ -38,11 +38,30 @@
 import type {
   PlannerState, YearlyProjection, LifeStage,
   PersonIncomeSources, PersonAssets, SimulationResult,
-  GamificationMetrics,
+  GamificationMetrics, RebalanceAction,
 } from '@/models/types';
 import { CGT, PENSION_RULES, RLSS, CURRENT_TAX_YEAR_START, GAP_PERIOD_NET_SALARY_FACTOR } from '@/config/financialConstants';
 import { getSnapshotForYear } from '@/config/taxRuleSnapshot';
 import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer } from './taxCalculations';
+import {
+  resolvePotBucketSplit, blendGrowthRateForPot,
+  calculateBucketTargets, calculateRebalancingActions,
+  type BucketTriple,
+} from './bucketLadderEngine';
+
+/**
+ * Optional parameters for calculateProjections.
+ *
+ * `growthShockYear` / `growthShockPercent`: inject a one-off downward shock at
+ * the start of year N. Used by runSorrStressTest. When the bucket ladder is
+ * enabled, the shock applies only to the growth-bucket portion of each pot;
+ * when disabled, it applies to whole pot values (proxy for an equity-heavy
+ * portfolio). Cash savings are never shocked.
+ */
+export interface ProjectionOptions {
+  growthShockYear?: number;
+  growthShockPercent?: number;
+}
 
 // ─── Per-person income aggregator ────────────────────────────────────────────
 
@@ -121,11 +140,17 @@ function getAnnualDcContribution(
 
 // ─── Main projection loop ─────────────────────────────────────────────────────
 
-export function calculateProjections(state: PlannerState): YearlyProjection[] {
+export function calculateProjections(state: PlannerState, options?: ProjectionOptions): YearlyProjection[] {
   const { person1, person2, lifeStages, spendingCategories, assumptions, mode, fiAge, jointGia } = state;
   const { lifeExpectancy, inflation, investmentGrowth } = assumptions;
   const drawdownStrategy = state.drawdownStrategy ?? 'standard-ufpls';
   const isPclsBedIsa = drawdownStrategy === 'pcls-bed-isa';
+
+  // Bucket ladder feature flag. When disabled (the default), this whole module
+  // behaves exactly as before — same per-pot growth rates, no bucket tracking,
+  // no rebalance actions, no shock injection.
+  const bucketLadder = state.bucketLadderConfig;
+  const ladderEnabled = Boolean(bucketLadder?.enabled);
 
   // Resolve person2's FI age: user-specified, else preserve original household behaviour
   // by computing the age person2 would be when person1 reaches fiAge. This ensures
@@ -162,13 +187,40 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   let jointGiaBC = (mode === 'couple' && jointGia.enabled) ? jointGia.baseCost   : 0;
 
   // ── Per-asset growth rates (fall back to global investmentGrowth) ──────────
-  const p1IsaG     = (person1.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
-  const p1GiaG     = (person1.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
-  const p1DcG      = (person1.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
-  const p2IsaG     = (person2.assets.isaInvestments.growthRate     ?? investmentGrowth) / 100;
-  const p2GiaG     = (person2.assets.generalInvestments.growthRate ?? investmentGrowth) / 100;
-  const p2DcG      = (person2.incomeSources.dcPension.growthRate   ?? investmentGrowth) / 100;
-  const jointGiaG  = (jointGia.growthRate ?? investmentGrowth) / 100;
+  // When the bucket ladder is enabled, each pot's flat growth rate is replaced
+  // with a value-weighted blend derived from its holdings or quick-mode allocation
+  // (see blendGrowthRateForPot). Pots with no allocation info fall back to the
+  // pot's existing growthRate — preserving today's output for plans that haven't
+  // opted in to itemising their assets.
+  const p1IsaRate    = person1.assets.isaInvestments.growthRate     ?? investmentGrowth;
+  const p1GiaRate    = person1.assets.generalInvestments.growthRate ?? investmentGrowth;
+  const p1DcRate     = person1.incomeSources.dcPension.growthRate   ?? investmentGrowth;
+  const p2IsaRate    = person2.assets.isaInvestments.growthRate     ?? investmentGrowth;
+  const p2GiaRate    = person2.assets.generalInvestments.growthRate ?? investmentGrowth;
+  const p2DcRate     = person2.incomeSources.dcPension.growthRate   ?? investmentGrowth;
+  const jointGiaRate = jointGia.growthRate ?? investmentGrowth;
+
+  const p1IsaG = (ladderEnabled
+    ? blendGrowthRateForPot(person1.assets.isaInvestments as never, p1IsaRate)
+    : p1IsaRate) / 100;
+  const p1GiaG = (ladderEnabled
+    ? blendGrowthRateForPot(person1.assets.generalInvestments as never, p1GiaRate)
+    : p1GiaRate) / 100;
+  const p1DcG = (ladderEnabled
+    ? blendGrowthRateForPot(person1.incomeSources.dcPension as never, p1DcRate)
+    : p1DcRate) / 100;
+  const p2IsaG = (ladderEnabled
+    ? blendGrowthRateForPot(person2.assets.isaInvestments as never, p2IsaRate)
+    : p2IsaRate) / 100;
+  const p2GiaG = (ladderEnabled
+    ? blendGrowthRateForPot(person2.assets.generalInvestments as never, p2GiaRate)
+    : p2GiaRate) / 100;
+  const p2DcG = (ladderEnabled
+    ? blendGrowthRateForPot(person2.incomeSources.dcPension as never, p2DcRate)
+    : p2DcRate) / 100;
+  const jointGiaG = (ladderEnabled
+    ? blendGrowthRateForPot(jointGia as never, jointGiaRate)
+    : jointGiaRate) / 100;
 
   // ── Care Reserve — earmarked capital, invested but not drawn for spending ─
   // Grows at the portfolio investment growth rate each year.
@@ -185,6 +237,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
   const maxYears   = lifeExpectancy - person1.currentAge;
   const projections: YearlyProjection[] = [];
+
+  // Track prior-year growth bucket value so we can compute the % change and feed
+  // it to calculateRebalancingActions (drives the SORR-pause behaviour).
+  let prevGrowthBucketValue = 0;
 
   for (let y = 0; y <= maxYears; y++) {
     const p1Age      = person1.currentAge + y;
@@ -232,6 +288,34 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     const p2GapSalary = inGapPeriod
       ? Math.max(0, (person2.incomeSources.dcPension.workplaceSalary ?? 0) * inflFactor * GAP_PERIOD_NET_SALARY_FACTOR)
       : 0;
+
+    // ── Shock injection (before growth) ───────────────────────────────────
+    // Used by the SORR stress test in runSorrStressTest. When the bucket ladder
+    // is enabled the shock only hits the growth-bucket portion of each pot
+    // (so defensive holdings remain intact). When disabled the shock hits the
+    // full pot value, as a proxy for an equity-heavy portfolio with no protection.
+    // Cash savings are never shocked.
+    if (options?.growthShockYear === y && options?.growthShockPercent && options.growthShockPercent > 0) {
+      const shockFrac = options.growthShockPercent / 100;
+      const shockPot = (currentValue: number, potDef: { holdings?: unknown; allocation?: unknown }): number => {
+        if (currentValue <= 0) return currentValue;
+        if (!ladderEnabled) return currentValue * (1 - shockFrac);
+        const split = resolvePotBucketSplit({
+          ...(potDef as object),
+          enabled: true,
+          totalValue: currentValue,
+        } as never);
+        const growthExposure = split.growth;
+        return Math.max(0, currentValue - growthExposure * shockFrac);
+      };
+      p1Isa     = shockPot(p1Isa,     person1.assets.isaInvestments);
+      p1GiaV    = shockPot(p1GiaV,    person1.assets.generalInvestments);
+      p1Dc      = shockPot(p1Dc,      person1.incomeSources.dcPension);
+      p2Isa     = shockPot(p2Isa,     person2.assets.isaInvestments);
+      p2GiaV    = shockPot(p2GiaV,    person2.assets.generalInvestments);
+      p2Dc      = shockPot(p2Dc,      person2.incomeSources.dcPension);
+      jointGiaV = shockPot(jointGiaV, jointGia);
+    }
 
     // ── Asset growth (before drawdown) ────────────────────────────────────
     if (p1Isa            > 0) p1Isa            *= (1 + p1IsaG);
@@ -718,6 +802,64 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
     const clamp = (v: number) => Math.max(0, v);
 
+    // ── Bucket ladder bookkeeping (only when enabled) ─────────────────────
+    // Compute end-of-year bucket balances from each pot's current value and
+    // its allocation/holdings. Then run the rebalance decision function and
+    // record the resulting actions in the YearlyProjection for the UI log.
+    // Rebalance actions in this iteration are advisory only — they are NOT
+    // applied to underlying pot allocations during the simulation. This is a
+    // Stage A simplification documented in the design doc; Stage B / a later
+    // iteration could mutate allocations year-over-year for full fidelity.
+    let bucketValuesOut: YearlyProjection['bucketValues'] | undefined;
+    let rebalanceActionsOut: RebalanceAction[] | undefined;
+    if (ladderEnabled && bucketLadder) {
+      const acc: BucketTriple = { cash: 0, income: 0, growth: 0 };
+      const addPot = (currentValue: number, potDef: { holdings?: unknown; allocation?: unknown; enabled?: boolean }) => {
+        if (!potDef?.enabled || currentValue <= 0) return;
+        const split = resolvePotBucketSplit({
+          ...(potDef as object),
+          enabled: true,
+          totalValue: currentValue,
+        } as never);
+        acc.cash += split.cash; acc.income += split.income; acc.growth += split.growth;
+      };
+      addPot(p1Isa,     person1.assets.isaInvestments);
+      addPot(p1GiaV,    person1.assets.generalInvestments);
+      addPot(p1Dc,      person1.incomeSources.dcPension);
+      if (mode === 'couple') {
+        addPot(p2Isa,   person2.assets.isaInvestments);
+        addPot(p2GiaV,  person2.assets.generalInvestments);
+        addPot(p2Dc,    person2.incomeSources.dcPension);
+      }
+      addPot(jointGiaV, jointGia);
+
+      // Cash savings → Bucket 1 (implicitly 100% cash).
+      if (person1.assets.cashSavings.enabled) acc.cash += p1Cash;
+      if (mode === 'couple' && person2.assets.cashSavings.enabled) acc.cash += p2Cash;
+
+      bucketValuesOut = {
+        cash: Math.max(0, acc.cash),
+        income: Math.max(0, acc.income),
+        growth: Math.max(0, acc.growth),
+        total: Math.max(0, acc.cash + acc.income + acc.growth),
+      };
+
+      const targets = calculateBucketTargets(spending, bucketLadder);
+      const growthChangePctLastYear = y > 0 && prevGrowthBucketValue > 0
+        ? ((bucketValuesOut.growth - prevGrowthBucketValue) / prevGrowthBucketValue) * 100
+        : undefined;
+
+      const actions = calculateRebalancingActions({
+        buckets: { cash: bucketValuesOut.cash, income: bucketValuesOut.income, growth: bucketValuesOut.growth },
+        targets,
+        config: bucketLadder,
+        growthChangePctLastYear,
+        trigger: bucketLadder.rebalanceTrigger,
+      });
+      rebalanceActionsOut = actions.length > 0 ? actions : undefined;
+      prevGrowthBucketValue = bucketValuesOut.growth;
+    }
+
     projections.push({
       yearIndex: y,
       p1Age, p2Age,
@@ -769,10 +911,73 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       p2JointBedIsaTransfer: Math.round(p2JointBedIsaTransfer),
       p2BedIsaTransfer:      Math.round(p2IndivBedIsaTransfer) + Math.round(p2JointBedIsaTransfer),
       plannedEventSpend:     Math.round(eventSpend),
+
+      bucketValues:     bucketValuesOut,
+      rebalanceActions: rebalanceActionsOut,
     });
   }
 
   return projections;
+}
+
+// ─── SORR stress test ─────────────────────────────────────────────────────────
+
+/** Result of the SORR (sequence-of-returns risk) stress comparison. */
+export interface SorrComparison {
+  standardDepletionAge: number | null;
+  ladderDepletionAge: number | null;
+  /** Positive = ladder lasts longer than the standard waterfall under the same shock. */
+  yearsSaved: number;
+  /** Difference in total portfolio value at age 85 (£) — ladder − standard. */
+  portfolioAtAge85Delta: number;
+  /** The shock parameters used for both passes. */
+  shockYear: number;
+  shockPercent: number;
+}
+
+/**
+ * Run two projection passes with an identical shock to compare:
+ *   Pass A: standard waterfall, no ladder — shock applied to whole pot values.
+ *   Pass B: bucket ladder enabled — shock applied only to growth-bucket portion.
+ *
+ * Both passes use the user's actual allocations (if set) so the comparison is
+ * grounded in their real portfolio shape. Returns depletion ages and a £ delta
+ * at age 85 (clamped to plan horizon).
+ */
+export function runSorrStressTest(
+  state: PlannerState,
+  shockYear: number,
+  shockPercent: number,
+): SorrComparison {
+  const baseConfig = state.bucketLadderConfig;
+  const standardState: PlannerState = {
+    ...state,
+    bucketLadderConfig: { ...baseConfig, enabled: false },
+  };
+  const ladderState: PlannerState = {
+    ...state,
+    bucketLadderConfig: { ...baseConfig, enabled: true },
+  };
+
+  const standardProj = calculateProjections(standardState, { growthShockYear: shockYear, growthShockPercent: shockPercent });
+  const ladderProj   = calculateProjections(ladderState,   { growthShockYear: shockYear, growthShockPercent: shockPercent });
+
+  const standardDepletion = getAssetDepletionAge(standardProj);
+  const ladderDepletion   = getAssetDepletionAge(ladderProj);
+
+  const at85Standard = standardProj.find(p => p.p1Age === 85)?.totalAssets ?? 0;
+  const at85Ladder   = ladderProj.find(p => p.p1Age === 85)?.totalAssets ?? 0;
+
+  return {
+    standardDepletionAge: standardDepletion,
+    ladderDepletionAge:   ladderDepletion,
+    yearsSaved:
+      (ladderDepletion ?? state.assumptions.lifeExpectancy)
+      - (standardDepletion ?? state.assumptions.lifeExpectancy),
+    portfolioAtAge85Delta: at85Ladder - at85Standard,
+    shockYear,
+    shockPercent,
+  };
 }
 
 // ─── Derived helpers ──────────────────────────────────────────────────────────
