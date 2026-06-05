@@ -309,13 +309,64 @@ export interface RebalanceArgs {
 export function calculateRebalancingActions(args: RebalanceArgs): RebalanceAction[] {
   if (args.trigger === 'off' || !args.config.enabled) return [];
 
-  const ctx = buildRebalanceContext(args);
-  return [
-    ...fillCashShortfall(ctx),
-    ...fillIncomeShortfall(ctx),
-    ...spillCashSurplus(ctx),
-    ...spillIncomeSurplus(ctx),
-  ];
+  const driftLimit = args.config.rebalanceThresholdPercent / 100;
+  const growthCrashed = typeof args.growthChangePctLastYear === 'number'
+    && args.growthChangePctLastYear < -args.config.pauseRebalanceAfterEquityDropPercent;
+
+  const b: BucketTriple = { ...args.buckets };
+  const actions: RebalanceAction[] = [];
+
+  // Cash shortfall → income first, then growth (unless paused after crash)
+  const cashDrift = driftFraction(b.cash, args.targets.cash);
+  if (shortfallEligible(cashDrift, args.trigger, driftLimit)) {
+    const shortfall = Math.max(0, args.targets.cash - b.cash);
+    const fromIncome = Math.min(shortfall, Math.max(0, b.income));
+    if (fromIncome > 0) {
+      actions.push({ fromBucket: 'income', toBucket: 'cash', amount: fromIncome, reason: cashDriftReason(args.trigger, cashDrift), trigger: args.trigger });
+      b.income -= fromIncome; b.cash += fromIncome;
+    }
+    const stillNeeded = shortfall - fromIncome;
+    if (stillNeeded > 0) {
+      if (growthCrashed) actions.push(pauseAfterDropAction('cash', args.growthChangePctLastYear));
+      else {
+        const fromGrowth = Math.min(stillNeeded, Math.max(0, b.growth));
+        if (fromGrowth > 0) {
+          actions.push({ fromBucket: 'growth', toBucket: 'cash', amount: fromGrowth, reason: 'Cash refill — income bucket insufficient', trigger: args.trigger });
+          b.growth -= fromGrowth; b.cash += fromGrowth;
+        }
+      }
+    }
+  }
+
+  // Income shortfall → growth (unless paused after crash)
+  const incomeDrift = driftFraction(b.income, args.targets.income);
+  if (shortfallEligible(incomeDrift, args.trigger, driftLimit)) {
+    const shortfall = Math.max(0, args.targets.income - b.income);
+    if (shortfall > 0) {
+      if (growthCrashed) actions.push(pauseAfterDropAction('income', args.growthChangePctLastYear));
+      else {
+        const fromGrowth = Math.min(shortfall, Math.max(0, b.growth));
+        if (fromGrowth > 0) {
+          actions.push({ fromBucket: 'growth', toBucket: 'income', amount: fromGrowth, reason: incomeDriftReason(args.trigger, incomeDrift), trigger: args.trigger });
+          b.growth -= fromGrowth; b.income += fromGrowth;
+        }
+      }
+    }
+  }
+
+  // Spill surpluses after refills so we don’t overfill a bucket.
+  const cashDriftAfter = driftFraction(b.cash, args.targets.cash);
+  if (cashDriftAfter > driftLimit && args.targets.cash > 0) {
+    const surplus = b.cash - args.targets.cash;
+    if (surplus > 0) actions.push({ fromBucket: 'cash', toBucket: 'income', amount: surplus, reason: `Cash bucket ${(cashDriftAfter * 100).toFixed(1)}% over target — surplus moved to income`, trigger: args.trigger });
+  }
+  const incomeDriftAfter = driftFraction(b.income, args.targets.income);
+  if (incomeDriftAfter > driftLimit && args.targets.income > 0) {
+    const surplus = b.income - args.targets.income;
+    if (surplus > 0) actions.push({ fromBucket: 'income', toBucket: 'growth', amount: surplus, reason: `Income bucket ${(incomeDriftAfter * 100).toFixed(1)}% over target — surplus moved to growth`, trigger: args.trigger });
+  }
+
+  return actions;
 }
 
 interface RebalanceContext extends RebalanceArgs {
