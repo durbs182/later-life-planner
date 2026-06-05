@@ -480,7 +480,6 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
       p1IndivBedIsaTransfer, p1JointBedIsaTransfer, p1BedIsaCg,
       p2IndivBedIsaTransfer, p2JointBedIsaTransfer, p2IndivBedIsaCg, p2BedIsaCg,
     } = bedIsaTransfers;
-    const p1BedIsaTransfer = p1IndivBedIsaTransfer + p1JointBedIsaTransfer;
     const p2BedIsaTransfer = p2IndivBedIsaTransfer + p2JointBedIsaTransfer;
 
     // ── Save asset state after growth (and after PCLS/B&I), before drawdown ──
