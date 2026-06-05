@@ -119,7 +119,17 @@ export function resolvePotBucketSplit(pot: PotLike | null | undefined): BucketTr
     return zeroTriple();
   }
   if (pot.holdings && pot.holdings.length > 0) {
-    return resolveFromHoldings(pot.holdings);
+    const raw = resolveFromHoldings(pot.holdings);
+    const rawTotal = raw.cash + raw.income + raw.growth;
+    if (rawTotal > 0 && Number.isFinite(rawTotal)) {
+      const scale = pot.totalValue / rawTotal;
+      return {
+        cash: raw.cash * scale,
+        income: raw.income * scale,
+        growth: raw.growth * scale,
+      };
+    }
+    return zeroTriple();
   }
   if (pot.allocation) {
     return resolveFromAllocation(pot.totalValue, pot.allocation);
