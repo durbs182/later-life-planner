@@ -369,22 +369,6 @@ export function calculateRebalancingActions(args: RebalanceArgs): RebalanceActio
   return actions;
 }
 
-interface RebalanceContext extends RebalanceArgs {
-  cashDrift: number;
-  incomeDrift: number;
-  driftLimit: number;
-  growthCrashed: boolean;
-}
-
-function buildRebalanceContext(args: RebalanceArgs): RebalanceContext {
-  const cashDrift = driftFraction(args.buckets.cash, args.targets.cash);
-  const incomeDrift = driftFraction(args.buckets.income, args.targets.income);
-  const driftLimit = args.config.rebalanceThresholdPercent / 100;
-  const growthCrashed = typeof args.growthChangePctLastYear === 'number'
-    && args.growthChangePctLastYear < -args.config.pauseRebalanceAfterEquityDropPercent;
-  return { ...args, cashDrift, incomeDrift, driftLimit, growthCrashed };
-}
-
 /** True when the shortfall side should fire under the current trigger. */
 function shortfallEligible(drift: number, trigger: RebalanceTrigger, driftLimit: number): boolean {
   return drift < 0 && (trigger !== 'threshold' || Math.abs(drift) >= driftLimit);
