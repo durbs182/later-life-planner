@@ -1,0 +1,91 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: baseline — output snapshot 1`] = `
+{
+  "depletionAge": null,
+  "totalAssetsAt85": 321860,
+  "totalAssetsAtHorizonEnd": 232377,
+  "totalRebalances": 0,
+  "totalTaxPaid": 47261,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: extended-cash-buffer — output snapshot 1`] = `
+{
+  "depletionAge": null,
+  "totalAssetsAt85": 407117,
+  "totalAssetsAtHorizonEnd": 363773,
+  "totalRebalances": 83,
+  "totalTaxPaid": 44718,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-annual — output snapshot 1`] = `
+{
+  "depletionAge": null,
+  "totalAssetsAt85": 407117,
+  "totalAssetsAtHorizonEnd": 363773,
+  "totalRebalances": 68,
+  "totalTaxPaid": 44718,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-default — output snapshot 1`] = `
+{
+  "depletionAge": null,
+  "totalAssetsAt85": 407117,
+  "totalAssetsAtHorizonEnd": 363773,
+  "totalRebalances": 68,
+  "totalTaxPaid": 44718,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-no-rebalance — output snapshot 1`] = `
+{
+  "depletionAge": null,
+  "totalAssetsAt85": 407117,
+  "totalAssetsAtHorizonEnd": 363773,
+  "totalRebalances": 0,
+  "totalTaxPaid": 44718,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-threshold — output snapshot 1`] = `
+{
+  "depletionAge": null,
+  "totalAssetsAt85": 407117,
+  "totalAssetsAtHorizonEnd": 363773,
+  "totalRebalances": 66,
+  "totalTaxPaid": 44718,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-year2 — output snapshot 1`] = `
+{
+  "depletionAge": 87,
+  "totalAssetsAt85": 34970,
+  "totalAssetsAtHorizonEnd": 0,
+  "totalRebalances": 69,
+  "totalTaxPaid": 47880,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-year2-baseline — output snapshot 1`] = `
+{
+  "depletionAge": 78,
+  "totalAssetsAt85": 0,
+  "totalAssetsAtHorizonEnd": 0,
+  "totalRebalances": 0,
+  "totalTaxPaid": 32417,
+}
+`;
+
+exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-year5 — output snapshot 1`] = `
+{
+  "depletionAge": 90,
+  "totalAssetsAt85": 112835,
+  "totalAssetsAtHorizonEnd": 0,
+  "totalRebalances": 76,
+  "totalTaxPaid": 52888,
+}
+`;

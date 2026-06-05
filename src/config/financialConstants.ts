@@ -326,6 +326,65 @@ export function getRNRBTaperThresholdForYear(calendarYear: number): number {
   return Math.round(IHT.RNRB_TAPER_THRESHOLD * Math.pow(1 + IHT_ESCALATION_RATE, yearsPost));
 }
 
+// ─── Bucket Ladder (Cash Flow Ladder) ────────────────────────────────────────
+// Defaults for the optional bucket-strategy overlay on top of the standard
+// drawdown waterfall. Disabled by default — users opt in.
+// See docs/cash-flow-ladder-design.md for the full design.
+
+export const BUCKET_LADDER = {
+  /** Default annual growth rate (%) for the cash bucket (money market / cash ISA). */
+  DEFAULT_CASH_GROWTH: 4,
+  /** Default blended annual growth rate (%) for the income bucket (bonds, metals, alternatives). */
+  DEFAULT_INCOME_GROWTH: 4.5,
+  /** Default annual growth rate (%) for the growth bucket (global equities). */
+  DEFAULT_GROWTH_GROWTH: 6,
+  /** Default years of annual spending held in Bucket 1. */
+  DEFAULT_CASH_BUFFER_YEARS: 2,
+  /** Default years of annual spending held in Bucket 2. */
+  DEFAULT_INCOME_BUFFER_YEARS: 5,
+  /** Equity shock used in the SORR stress test (% drop in growth bucket in year 2). */
+  SORR_EQUITY_SHOCK_PERCENT: 30,
+  /** Default rebalance trigger mode. */
+  DEFAULT_REBALANCE_TRIGGER: 'onWithdrawal',
+  /** Drift % that fires a threshold rebalance (also bounds onWithdrawal rebalances). */
+  DEFAULT_REBALANCE_THRESHOLD_PERCENT: 10,
+  /** Pause refill from growth bucket if it fell by more than this % last year. */
+  DEFAULT_PAUSE_REBALANCE_AFTER_DROP_PERCENT: 15,
+  /** Threshold (months of spending) below which Bucket 1 triggers a refill. */
+  CASH_REFILL_TRIGGER_MONTHS: 6,
+} as const;
+
+/**
+ * Per-asset-type default annual growth rates (%). Used to blend a pot's growth
+ * rate from its holdings or quick-mode allocation when the ladder is enabled.
+ * Mixed funds inherit a weighted average of these via their MixedAllocation.
+ */
+export const ASSET_TYPE_GROWTH = {
+  cash: 4,
+  bonds: 4.5,
+  preciousMetals: 3.5,
+  alternatives: 5,
+  equities: 6,
+} as const;
+
+/**
+ * Factory for the default BucketLadderConfig. Used by createDefaultState and
+ * the scenario harness so defaults stay in one place.
+ */
+export function createDefaultBucketLadderConfig(): import('@/models/types').BucketLadderConfig {
+  return {
+    enabled: false,
+    cashBufferYears: BUCKET_LADDER.DEFAULT_CASH_BUFFER_YEARS,
+    incomeBufferYears: BUCKET_LADDER.DEFAULT_INCOME_BUFFER_YEARS,
+    cashGrowthRate: 0,
+    incomeGrowthRate: 0,
+    growthGrowthRate: 0,
+    rebalanceTrigger: BUCKET_LADDER.DEFAULT_REBALANCE_TRIGGER,
+    rebalanceThresholdPercent: BUCKET_LADDER.DEFAULT_REBALANCE_THRESHOLD_PERCENT,
+    pauseRebalanceAfterEquityDropPercent: BUCKET_LADDER.DEFAULT_PAUSE_REBALANCE_AFTER_DROP_PERCENT,
+  };
+}
+
 // ─── Withdrawal order ─────────────────────────────────────────────────────────
 // The app follows this UK tax-efficient ordering.
 // Source: Standard UK financial planning practice.
