@@ -430,17 +430,6 @@ function fillIncomeShortfall(ctx: RebalanceContext): RebalanceAction[] {
   }];
 }
 
-function spillCashSurplus(ctx: RebalanceContext): RebalanceAction[] {
-  if (ctx.cashDrift <= ctx.driftLimit || ctx.targets.cash <= 0) return [];
-  const surplus = ctx.buckets.cash - ctx.targets.cash;
-  if (surplus <= 0) return [];
-  return [{
-    fromBucket: 'cash', toBucket: 'income', amount: surplus,
-    reason: `Cash bucket ${(ctx.cashDrift * 100).toFixed(1)}% over target — surplus moved to income`,
-    trigger: ctx.trigger,
-  }];
-}
-
 function spillIncomeSurplus(ctx: RebalanceContext): RebalanceAction[] {
   if (ctx.incomeDrift <= ctx.driftLimit || ctx.targets.income <= 0) return [];
   const surplus = ctx.buckets.income - ctx.targets.income;
