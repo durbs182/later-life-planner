@@ -511,7 +511,7 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
     const {
       p1IsaD, p1GiaD, p1GiaCG, p1CashD, p1DcD, p1DcTaxFree,
       p2IsaD, p2GiaD, p2GiaCG, p2CashD, p2DcD, p2DcTaxFree,
-      jointGiaD, jointGiaCG,
+      jointGiaD,
     } = drawResult.draws;
     const {
       totalIncome, totalTaxPaid, incomeTaxPaid, totalCgtPaid,
