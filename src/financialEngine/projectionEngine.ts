@@ -537,8 +537,7 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
             { currentValue: jointGiaV, def: jointGia, enabled: jointGia.enabled },
           ],
           cashSavings:
-            (person1.assets.cashSavings.enabled ? p1Cash : 0)
-            + (mode === 'couple' && person2.assets.cashSavings.enabled ? p2Cash : 0),
+            p1Cash + (mode === 'couple' ? p2Cash : 0),
         })
       : null;
     const bucketValuesOut = bucketSnapshot?.bucketValues;
