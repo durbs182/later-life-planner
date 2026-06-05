@@ -306,6 +306,12 @@ export interface RebalanceArgs {
  *  - 'threshold':    fire only when drift exceeds rebalanceThresholdPercent
  *  - 'off':          return []
  */
+  // existing logic
+  const ctx = buildRebalanceContext(args);
+  const actions: RebalanceAction[] = [];
+  actions.push(...fillCashShortfall(ctx));
+  // existing logic
+  return actions;
 export function calculateRebalancingActions(args: RebalanceArgs): RebalanceAction[] {
   if (args.trigger === 'off' || !args.config.enabled) return [];
 
