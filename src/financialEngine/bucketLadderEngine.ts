@@ -184,8 +184,8 @@ export function calculateBucketValues(state: PlannerState): BucketValues {
     state.person1.incomeSources.dcPension,
     state.person1.assets.isaInvestments,
     state.person1.assets.generalInvestments,
-    state.jointGia,
     ...(state.mode === 'couple' ? [
+      state.jointGia,
       state.person2.incomeSources.dcPension,
       state.person2.assets.isaInvestments,
       state.person2.assets.generalInvestments,
