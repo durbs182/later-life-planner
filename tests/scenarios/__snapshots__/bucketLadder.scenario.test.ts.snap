@@ -15,7 +15,7 @@ exports[`bucket ladder scenarios — sample portfolio > scenario: extended-cash-
   "depletionAge": null,
   "totalAssetsAt85": 407117,
   "totalAssetsAtHorizonEnd": 363773,
-  "totalRebalances": 85,
+  "totalRebalances": 83,
   "totalTaxPaid": 44718,
 }
 `;
@@ -25,7 +25,7 @@ exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-annual 
   "depletionAge": null,
   "totalAssetsAt85": 407117,
   "totalAssetsAtHorizonEnd": 363773,
-  "totalRebalances": 79,
+  "totalRebalances": 68,
   "totalTaxPaid": 44718,
 }
 `;
@@ -35,7 +35,7 @@ exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-default
   "depletionAge": null,
   "totalAssetsAt85": 407117,
   "totalAssetsAtHorizonEnd": 363773,
-  "totalRebalances": 79,
+  "totalRebalances": 68,
   "totalTaxPaid": 44718,
 }
 `;
@@ -55,18 +55,18 @@ exports[`bucket ladder scenarios — sample portfolio > scenario: ladder-thresho
   "depletionAge": null,
   "totalAssetsAt85": 407117,
   "totalAssetsAtHorizonEnd": 363773,
-  "totalRebalances": 74,
+  "totalRebalances": 66,
   "totalTaxPaid": 44718,
 }
 `;
 
 exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-year2 — output snapshot 1`] = `
 {
-  "depletionAge": 86,
-  "totalAssetsAt85": 22043,
+  "depletionAge": 87,
+  "totalAssetsAt85": 34970,
   "totalAssetsAtHorizonEnd": 0,
-  "totalRebalances": 64,
-  "totalTaxPaid": 48065,
+  "totalRebalances": 69,
+  "totalTaxPaid": 47880,
 }
 `;
 
@@ -82,10 +82,10 @@ exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-yea
 
 exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-year5 — output snapshot 1`] = `
 {
-  "depletionAge": 89,
-  "totalAssetsAt85": 82805,
+  "depletionAge": 90,
+  "totalAssetsAt85": 112835,
   "totalAssetsAtHorizonEnd": 0,
-  "totalRebalances": 73,
-  "totalTaxPaid": 51073,
+  "totalRebalances": 77,
+  "totalTaxPaid": 52888,
 }
 `;
