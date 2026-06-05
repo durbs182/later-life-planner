@@ -141,9 +141,13 @@ function resolveFromHoldings(holdings: PotHolding[]): BucketTriple {
   const split = zeroTriple();
   for (const h of holdings) {
     if (!h || !Number.isFinite(h.value) || h.value <= 0) continue;
-    if (h.assetType === 'mixed' && h.mixedAllocation) {
-      const m = bucketSplitForMixed(h.value, h.mixedAllocation);
-      addInto(split, m);
+    if (h.assetType === 'mixed') {
+      if (h.mixedAllocation) {
+        const m = bucketSplitForMixed(h.value, h.mixedAllocation);
+        addInto(split, m);
+        continue;
+      }
+      split.growth += h.value;
       continue;
     }
     const bucket = ASSET_TYPE_TO_BUCKET[h.assetType as Exclude<AssetType, 'mixed'>];

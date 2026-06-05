@@ -1288,6 +1288,37 @@ describe('calculateProjections — bucket ladder (Stage A)', () => {
     const anyActions = projections.some(p => p.rebalanceActions && p.rebalanceActions.length > 0);
     expect(anyActions).toBe(false);
   });
+
+  test('rebalance trigger "onWithdrawal" records no actions in years without drawdown', () => {
+    const state = createDefaultState(60);
+    state.bucketLadderConfig = {
+      ...state.bucketLadderConfig,
+      enabled: true,
+      rebalanceTrigger: 'onWithdrawal',
+    };
+    state.fiAge = 60;
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 62 };
+    state.spendingCategories = state.spendingCategories.map(cat => ({
+      ...cat,
+      amounts: Object.fromEntries(Object.keys(cat.amounts).map(stageId => [stageId, 0])),
+    }));
+    state.person1.incomeSources.statePension = {
+      ...state.person1.incomeSources.statePension,
+      enabled: true,
+      startAge: 60,
+      weeklyAmount: 350,
+    };
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 1_000 };
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 800_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 0, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 100 },
+    };
+
+    const projections = calculateProjections(state);
+    const anyActions = projections.some(p => p.rebalanceActions && p.rebalanceActions.length > 0);
+    expect(anyActions).toBe(false);
+  });
 });
 
 describe('calculateProjections — growth shock injection', () => {

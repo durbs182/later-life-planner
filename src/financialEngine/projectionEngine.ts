@@ -125,6 +125,7 @@ interface BucketSnapshotInputs {
   spending: number;
   yearIndex: number;
   prevGrowthBucketValue: number;
+  withdrawalsOccurred: boolean;
   pots: Array<{ currentValue: number; def: PotLike; enabled: boolean }>;
   /** Combined cash savings to add to Bucket 1 (already filtered for enabled+mode). */
   cashSavings: number;
@@ -143,7 +144,7 @@ interface BucketSnapshotResult {
  * they don't mutate underlying pot allocations during the simulation.
  */
 function computeBucketSnapshot(inputs: BucketSnapshotInputs): BucketSnapshotResult {
-  const { bucketLadder, spending, yearIndex, prevGrowthBucketValue, pots, cashSavings } = inputs;
+  const { bucketLadder, spending, yearIndex, prevGrowthBucketValue, withdrawalsOccurred, pots, cashSavings } = inputs;
 
   const acc: BucketTriple = { cash: cashSavings, income: 0, growth: 0 };
   for (const pot of pots) {
@@ -175,7 +176,9 @@ function computeBucketSnapshot(inputs: BucketSnapshotInputs): BucketSnapshotResu
     targets,
     config: bucketLadder,
     growthChangePctLastYear,
-    trigger: bucketLadder.rebalanceTrigger,
+    trigger: bucketLadder.rebalanceTrigger === 'onWithdrawal' && !withdrawalsOccurred
+      ? 'off'
+      : bucketLadder.rebalanceTrigger,
   });
 
   return {
@@ -526,6 +529,8 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
       ? computeBucketSnapshot({
           bucketLadder, mode, spending, yearIndex: y,
           prevGrowthBucketValue,
+          withdrawalsOccurred:
+            p1IsaD + p1GiaD + p1CashD + p1DcD + p2IsaD + p2GiaD + p2CashD + p2DcD + jointGiaD > 0,
           pots: [
             { currentValue: p1Isa,  def: person1.assets.isaInvestments,     enabled: person1.assets.isaInvestments.enabled },
             { currentValue: p1GiaV, def: person1.assets.generalInvestments, enabled: person1.assets.generalInvestments.enabled },

@@ -98,7 +98,7 @@ describe('resolvePotBucketSplit', () => {
     expect(split.growth).toBe(60_000);
   });
 
-  test('mixed holding without mixedAllocation contributes zero (defensive)', () => {
+  test('mixed holding without mixedAllocation falls back to growth bucket', () => {
     const pot = {
       enabled: true,
       totalValue: 50_000,
@@ -106,7 +106,7 @@ describe('resolvePotBucketSplit', () => {
         { id: 'h1', name: 'Bad mixed', value: 50_000, assetType: 'mixed' },
       ] as PotHolding[],
     } as any;
-    expect(resolvePotBucketSplit(pot)).toEqual({ cash: 0, income: 0, growth: 0 });
+    expect(resolvePotBucketSplit(pot)).toEqual({ cash: 0, income: 0, growth: 50_000 });
   });
 
   test('holdings take precedence over allocation', () => {
