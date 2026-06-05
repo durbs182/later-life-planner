@@ -480,7 +480,6 @@ export function calculateProjections(state: PlannerState, options?: ProjectionOp
       p1IndivBedIsaTransfer, p1JointBedIsaTransfer, p1BedIsaCg,
       p2IndivBedIsaTransfer, p2JointBedIsaTransfer, p2IndivBedIsaCg, p2BedIsaCg,
     } = bedIsaTransfers;
-    const p2BedIsaTransfer = p2IndivBedIsaTransfer + p2JointBedIsaTransfer;
 
     // ── Save asset state after growth (and after PCLS/B&I), before drawdown ──
     // Needed to restore between gross-up iterations.
@@ -1013,13 +1012,17 @@ function stepGiaWithinCgtBudget(b: DrawBalances, d: DrawAmounts, ctx: WaterfallC
   return remaining;
 }
 
+/** Map a GIA owner to the corresponding DrawBalances / DrawAmounts field names. */
+const GIA_KEYS = {
+  p1:    { v: 'p1GiaV',    bc: 'p1GiaBC',    d: 'p1GiaD',    cg: 'p1GiaCG'    },
+  p2:    { v: 'p2GiaV',    bc: 'p2GiaBC',    d: 'p2GiaD',    cg: 'p2GiaCG'    },
+  joint: { v: 'jointGiaV', bc: 'jointGiaBC', d: 'jointGiaD', cg: 'jointGiaCG' },
+} as const;
+
 function drawGiaBoundedByBudget(
   b: DrawBalances, d: DrawAmounts, who: 'p1' | 'p2' | 'joint', remaining: number, cgBudget: number,
 ): { drawn: number; gain: number } {
-  const giaKey = `${who === 'joint' ? 'jointGia' : `${who}Gia`}V` as 'p1GiaV' | 'p2GiaV' | 'jointGiaV';
-  const bcKey  = `${who === 'joint' ? 'jointGia' : `${who}Gia`}BC` as 'p1GiaBC' | 'p2GiaBC' | 'jointGiaBC';
-  const drawnKey = `${who === 'joint' ? 'jointGia' : `${who}Gia`}D` as 'p1GiaD' | 'p2GiaD' | 'jointGiaD';
-  const cgKey    = `${who === 'joint' ? 'jointGia' : `${who}Gia`}CG` as 'p1GiaCG' | 'p2GiaCG' | 'jointGiaCG';
+  const { v: giaKey, bc: bcKey, d: drawnKey, cg: cgKey } = GIA_KEYS[who];
 
   const value = b[giaKey];
   const baseCost = b[bcKey];
