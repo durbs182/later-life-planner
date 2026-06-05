@@ -306,12 +306,6 @@ export interface RebalanceArgs {
  *  - 'threshold':    fire only when drift exceeds rebalanceThresholdPercent
  *  - 'off':          return []
  */
-  // existing logic
-  const ctx = buildRebalanceContext(args);
-  const actions: RebalanceAction[] = [];
-  actions.push(...fillCashShortfall(ctx));
-  // existing logic
-  return actions;
 export function calculateRebalancingActions(args: RebalanceArgs): RebalanceAction[] {
   if (args.trigger === 'off' || !args.config.enabled) return [];
 
@@ -379,50 +373,6 @@ export function calculateRebalancingActions(args: RebalanceArgs): RebalanceActio
 function shortfallEligible(drift: number, trigger: RebalanceTrigger, driftLimit: number): boolean {
   return drift < 0 && (trigger !== 'threshold' || Math.abs(drift) >= driftLimit);
 }
-
-function fillCashShortfall(ctx: RebalanceContext): RebalanceAction[] {
-  if (!shortfallEligible(ctx.cashDrift, ctx.trigger, ctx.driftLimit)) return [];
-  const shortfall = Math.max(0, ctx.targets.cash - ctx.buckets.cash);
-  if (shortfall <= 0) return [];
-
-  const actions: RebalanceAction[] = [];
-  const fromIncome = Math.min(shortfall, Math.max(0, ctx.buckets.income));
-  if (fromIncome > 0) {
-    actions.push({
-      fromBucket: 'income', toBucket: 'cash', amount: fromIncome,
-      reason: cashDriftReason(ctx.trigger, ctx.cashDrift),
-      trigger: ctx.trigger,
-    });
-  }
-
-  const stillNeeded = shortfall - fromIncome;
-  if (stillNeeded <= 0) return actions;
-
-  if (ctx.growthCrashed) {
-    actions.push(pauseAfterDropAction('cash', ctx.growthChangePctLastYear));
-    return actions;
-  }
-  const fromGrowth = Math.min(stillNeeded, Math.max(0, ctx.buckets.growth));
-  if (fromGrowth > 0) {
-    actions.push({
-      fromBucket: 'growth', toBucket: 'cash', amount: fromGrowth,
-      reason: 'Cash refill — income bucket insufficient',
-      trigger: ctx.trigger,
-    });
-  }
-  return actions;
-}
-
-function fillIncomeShortfall(ctx: RebalanceContext): RebalanceAction[] {
-  if (!shortfallEligible(ctx.incomeDrift, ctx.trigger, ctx.driftLimit)) return [];
-  const shortfall = Math.max(0, ctx.targets.income - ctx.buckets.income);
-  if (shortfall <= 0) return [];
-
-  if (ctx.growthCrashed) {
-    return [pauseAfterDropAction('income', ctx.growthChangePctLastYear)];
-  }
-  const fromGrowth = Math.min(shortfall, Math.max(0, ctx.buckets.growth));
-  if (fromGrowth <= 0) return [];
 
 function pauseAfterDropAction(toBucket: BucketKey, growthChangePct: number | undefined): RebalanceAction {
   return {

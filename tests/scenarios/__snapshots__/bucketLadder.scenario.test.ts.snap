@@ -85,7 +85,7 @@ exports[`bucket ladder scenarios — sample portfolio > scenario: sorr-shock-yea
   "depletionAge": 90,
   "totalAssetsAt85": 112835,
   "totalAssetsAtHorizonEnd": 0,
-  "totalRebalances": 77,
+  "totalRebalances": 76,
   "totalTaxPaid": 52888,
 }
 `;
