@@ -423,23 +423,6 @@ function fillIncomeShortfall(ctx: RebalanceContext): RebalanceAction[] {
   }
   const fromGrowth = Math.min(shortfall, Math.max(0, ctx.buckets.growth));
   if (fromGrowth <= 0) return [];
-  return [{
-    fromBucket: 'growth', toBucket: 'income', amount: fromGrowth,
-    reason: incomeDriftReason(ctx.trigger, ctx.incomeDrift),
-    trigger: ctx.trigger,
-  }];
-}
-
-function spillIncomeSurplus(ctx: RebalanceContext): RebalanceAction[] {
-  if (ctx.incomeDrift <= ctx.driftLimit || ctx.targets.income <= 0) return [];
-  const surplus = ctx.buckets.income - ctx.targets.income;
-  if (surplus <= 0) return [];
-  return [{
-    fromBucket: 'income', toBucket: 'growth', amount: surplus,
-    reason: `Income bucket ${(ctx.incomeDrift * 100).toFixed(1)}% over target — surplus moved to growth`,
-    trigger: ctx.trigger,
-  }];
-}
 
 function pauseAfterDropAction(toBucket: BucketKey, growthChangePct: number | undefined): RebalanceAction {
   return {
