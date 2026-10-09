@@ -5,7 +5,7 @@ import { persist } from 'zustand/middleware';
 import type {
   PlannerState, PlanningMode, LifeStage, GIAAsset, CareReserve, PrimaryResidenceAsset,
   PersonIncomeSources, PersonAssets, Assumptions, AspirationTag, RlssStandard, PersistedPlannerState,
-  GoalRegistry, DrawdownStrategy, PlannedEvent,
+  GoalRegistry, DrawdownStrategy, PlannedEvent, BucketLadderConfig,
 } from '@/models/types';
 import {
   createDefaultState, createMockDemoState, buildDefaultLifeStages,
@@ -48,6 +48,9 @@ type Actions = {
   addPlannedEvent: (event: PlannedEvent) => void;
   updatePlannedEvent: (id: string, updates: Partial<PlannedEvent>) => void;
   removePlannedEvent: (id: string) => void;
+
+  setBucketLadderEnabled: (enabled: boolean) => void;
+  setBucketLadderConfig: (updates: Partial<BucketLadderConfig>) => void;
 
   setLifeVision: (vision: string) => void;
   toggleAspiration: (tag: AspirationTag) => void;
@@ -326,6 +329,11 @@ export const usePlannerStore = create<PlannerState & Actions>()(
         })),
       removePlannedEvent: (id) =>
         set((s) => ({ plannedEvents: s.plannedEvents.filter((e) => e.id !== id) })),
+
+      setBucketLadderEnabled: (enabled) =>
+        set((s) => ({ bucketLadderConfig: { ...s.bucketLadderConfig, enabled } })),
+      setBucketLadderConfig: (updates) =>
+        set((s) => ({ bucketLadderConfig: { ...s.bucketLadderConfig, ...updates } })),
 
       setLifeVision: (lifeVision) => set({ lifeVision }),
       toggleAspiration: (tag) =>

@@ -22,6 +22,9 @@ docs/exploratory-testing/sessions/*/
 # UI reference screenshots (local working files)
 docs/ui-reference-images/
 
+# Personal bucket-ladder portfolio fixtures (never commit real data)
+scripts/bucket-scenarios/fixtures/
+
 # dependencies
 /node_modules
 /.pnp

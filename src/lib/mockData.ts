@@ -4,6 +4,7 @@ import type {
 } from '@/models/types';
 import {
   RLSS, DEFAULT_ASSUMPTIONS, STATE_PENSION, PENSION_RULES, CARE_RESERVE,
+  createDefaultBucketLadderConfig,
 } from '@/config/financialConstants';
 import {
   clampCurrentAge,
@@ -235,6 +236,7 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
     primaryResidence: { ...defaultPrimaryResidence },
     drawdownStrategy: 'standard-ufpls',
     plannedEvents: [],
+    bucketLadderConfig: createDefaultBucketLadderConfig(),
     // p2FiAge is undefined by default — engine falls back to fiAge
   };
 }
@@ -318,6 +320,8 @@ export function normalizePlannerState(state: PlannerState): PlannerState {
     // gapSpending is optional — undefined means "use stage spending" in the engine
     gapSpending: state.gapSpending,
     plannedEvents: state.plannedEvents ?? [],
+    // Older persisted plans pre-date the bucket ladder — fall back to default (disabled).
+    bucketLadderConfig: state.bucketLadderConfig ?? createDefaultBucketLadderConfig(),
   };
 }
 

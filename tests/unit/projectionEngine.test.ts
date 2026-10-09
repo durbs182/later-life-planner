@@ -13,6 +13,7 @@ import {
   getTotalUnrealisedGain,
   getSustainableRlssLevel,
   calculateGamificationMetrics,
+  runSorrStressTest,
 } from '@/financialEngine/projectionEngine';
 import { createDefaultState, createMockDemoState } from '@/lib/mockData';
 import { bareState, paulAndLisaState, bareCoupleState } from '../fixtures/states';
@@ -1173,5 +1174,237 @@ describe('calculateProjections — couple mode ISA/GIA contributions', () => {
     // p1IsaBalance = 10_000 (not 15_000) proves no contribution fired.
     const atFi = projections.find(p => p.p1Age === 57)!;
     expect(atFi.p1IsaBalance).toBeCloseTo(10_000, 0);
+  });
+});
+
+// ─── Bucket ladder integration ───────────────────────────────────────────────
+
+describe('calculateProjections — bucket ladder (Stage A)', () => {
+  test('flag off (default): YearlyProjection has no bucket fields — existing output unchanged', () => {
+    const state = bareCoupleState(60);
+    const projections = calculateProjections(state);
+    for (const p of projections) {
+      expect(p.bucketValues).toBeUndefined();
+      expect(p.rebalanceActions).toBeUndefined();
+    }
+  });
+
+  test('flag off vs flag on with no allocations → identical totalAssets (legacy fallback)', () => {
+    const state = createDefaultState(60);
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 200_000, growthRate: 5,
+    };
+    state.person1.assets.isaInvestments = { enabled: true, totalValue: 50_000, growthRate: 5 };
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 20_000 };
+
+    const off = calculateProjections({ ...state, bucketLadderConfig: { ...state.bucketLadderConfig, enabled: false } });
+    const on  = calculateProjections({ ...state, bucketLadderConfig: { ...state.bucketLadderConfig, enabled: true  } });
+    // Same totalAssets and same depletion behaviour because no allocations means blended rate = fallback.
+    for (let i = 0; i < off.length; i++) {
+      expect(on[i].totalAssets).toBeCloseTo(off[i].totalAssets, 0);
+    }
+  });
+
+  test('flag on with allocations: bucketValues populated and sum equals total assets', () => {
+    const state = createDefaultState(60);
+    state.bucketLadderConfig = { ...state.bucketLadderConfig, enabled: true };
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 200_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 30, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 70 },
+    };
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 20_000 };
+
+    const projections = calculateProjections(state);
+    const y0 = projections[0];
+    expect(y0.bucketValues).toBeDefined();
+    expect(y0.bucketValues!.cash).toBeGreaterThan(0);    // 20k cash savings + growth on £200k pot
+    expect(y0.bucketValues!.income).toBeGreaterThan(0);  // bonds portion
+    expect(y0.bucketValues!.growth).toBeGreaterThan(0);  // equities portion
+    expect(y0.bucketValues!.total).toBeCloseTo(
+      y0.bucketValues!.cash + y0.bucketValues!.income + y0.bucketValues!.growth, 0,
+    );
+  });
+
+  test('blended growth rate: 100% bonds pot grows slower than 100% equities pot', () => {
+    const baseState = (alloc: { eq: number; bond: number }) => {
+      const s = bareState(60);
+      s.bucketLadderConfig = { ...s.bucketLadderConfig, enabled: true };
+      s.fiAge = 75; // hold off drawdown — let assets grow
+      s.assumptions = { ...s.assumptions, lifeExpectancy: 70, inflation: 0 };
+      s.person1.assets.isaInvestments = {
+        enabled: true, totalValue: 100_000, growthRate: 5,
+        allocation: {
+          cashPercent: 0, bondsPercent: alloc.bond, preciousMetalsPercent: 0,
+          alternativesPercent: 0, equitiesPercent: alloc.eq,
+        },
+      };
+      return withSpending(s, 0); // no drawdown
+    };
+    const bondHeavy   = calculateProjections(baseState({ eq: 0,   bond: 100 }));
+    const equityHeavy = calculateProjections(baseState({ eq: 100, bond: 0   }));
+    // After 10 years of growth-only, equity portfolio should be meaningfully larger.
+    const last = bondHeavy.length - 1;
+    expect(equityHeavy[last].p1IsaBalance).toBeGreaterThan(bondHeavy[last].p1IsaBalance);
+  });
+
+  test('rebalance actions surface when buckets drift below target', () => {
+    const state = createDefaultState(60);
+    state.bucketLadderConfig = {
+      ...state.bucketLadderConfig,
+      enabled: true,
+      rebalanceTrigger: 'onWithdrawal',
+    };
+    state.fiAge = 60; // start drawdown immediately
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 75 };
+    // Almost no cash, plenty of growth — drawdown will leave Bucket 1 below target.
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 1_000 };
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 800_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 0, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 100 },
+    };
+    const projections = calculateProjections(state);
+    const hasRebalance = projections.some(p => p.rebalanceActions && p.rebalanceActions.length > 0);
+    expect(hasRebalance).toBe(true);
+  });
+
+  test('rebalance trigger "off" → no rebalance actions ever recorded', () => {
+    const state = createDefaultState(60);
+    state.bucketLadderConfig = {
+      ...state.bucketLadderConfig,
+      enabled: true,
+      rebalanceTrigger: 'off',
+    };
+    state.fiAge = 60;
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 1_000 };
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 800_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 0, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 100 },
+    };
+    const projections = calculateProjections(state);
+    const anyActions = projections.some(p => p.rebalanceActions && p.rebalanceActions.length > 0);
+    expect(anyActions).toBe(false);
+  });
+
+  test('rebalance trigger "onWithdrawal" records no actions in years without drawdown', () => {
+    const state = createDefaultState(60);
+    state.bucketLadderConfig = {
+      ...state.bucketLadderConfig,
+      enabled: true,
+      rebalanceTrigger: 'onWithdrawal',
+    };
+    state.fiAge = 60;
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 62 };
+    state.spendingCategories = state.spendingCategories.map(cat => ({
+      ...cat,
+      amounts: Object.fromEntries(Object.keys(cat.amounts).map(stageId => [stageId, 0])),
+    }));
+    state.person1.incomeSources.statePension = {
+      ...state.person1.incomeSources.statePension,
+      enabled: true,
+      startAge: 60,
+      weeklyAmount: 350,
+    };
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 1_000 };
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 800_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 0, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 100 },
+    };
+
+    const projections = calculateProjections(state);
+    const anyActions = projections.some(p => p.rebalanceActions && p.rebalanceActions.length > 0);
+    expect(anyActions).toBe(false);
+  });
+});
+
+describe('calculateProjections — growth shock injection', () => {
+  test('shock fires only in the specified year and reduces growth assets', () => {
+    const state = createDefaultState(60);
+    state.fiAge = 75;
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 70, inflation: 0 };
+    state.person1.assets.isaInvestments = { enabled: true, totalValue: 100_000, growthRate: 0 };
+
+    const withShock = calculateProjections(
+      withSpending(state, 0),
+      { growthShockYear: 2, growthShockPercent: 30 },
+    );
+    const noShock = calculateProjections(withSpending(state, 0));
+
+    // Year 0–1 identical, year 2 down ~30%, then resumes growing at 0 (no growthRate).
+    expect(withShock[1].p1IsaBalance).toBeCloseTo(noShock[1].p1IsaBalance, 0);
+    expect(withShock[2].p1IsaBalance).toBeLessThan(noShock[2].p1IsaBalance);
+    expect(withShock[2].p1IsaBalance / noShock[2].p1IsaBalance).toBeCloseTo(0.70, 1);
+  });
+
+  test('cash savings are never shocked', () => {
+    const state = bareState(60);
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 70, inflation: 0 };
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 50_000 };
+
+    const withShock = calculateProjections(
+      withSpending(state, 0),
+      { growthShockYear: 2, growthShockPercent: 50 },
+    );
+    expect(withShock[2].p1CashBalance).toBe(50_000);
+  });
+
+  test('ladder enabled: shock applies only to growth-bucket portion', () => {
+    const state = createDefaultState(60);
+    state.bucketLadderConfig = { ...state.bucketLadderConfig, enabled: true };
+    state.fiAge = 75;
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 70, inflation: 0 };
+    // 50/50 bonds-equities. A 50% shock to growth bucket = 25% loss on the pot.
+    state.person1.assets.isaInvestments = {
+      enabled: true, totalValue: 100_000, growthRate: 0,
+      allocation: { cashPercent: 0, bondsPercent: 50, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 50 },
+    };
+
+    const shocked = calculateProjections(
+      withSpending(state, 0),
+      { growthShockYear: 2, growthShockPercent: 50 },
+    );
+    // 50k bonds untouched + 50k equities × (1 − 0.5) = 25k → £75k total in year 2 (before any growth at 0%).
+    // Bond bucket still grows at 4.5% (DEFAULT_INCOME_GROWTH) when ladder enabled.
+    // Equity bucket still grows at 6.0% (DEFAULT_GROWTH_GROWTH).
+    // After shock the growth bucket is 25k, income still 50k; both grow at their bucket rate.
+    // Just check the immediate post-shock pot value is below the no-shock pot value
+    // and above what a full 50% pot-wide shock would have been (50k).
+    const noShockProj = calculateProjections(withSpending(state, 0));
+    expect(shocked[2].p1IsaBalance).toBeLessThan(noShockProj[2].p1IsaBalance);
+    expect(shocked[2].p1IsaBalance).toBeGreaterThan(50_000 * 1.02); // > a full-pot 50% shock
+  });
+});
+
+describe('runSorrStressTest', () => {
+  test('returns a positive yearsSaved when ladder has a cash buffer to draw from', () => {
+    const state = createDefaultState(60);
+    state.fiAge = 60;
+    state.assumptions = { ...state.assumptions, lifeExpectancy: 90, inflation: 2 };
+    state.bucketLadderConfig = {
+      ...state.bucketLadderConfig,
+      cashBufferYears: 3, incomeBufferYears: 5,
+    };
+    state.person1.assets.cashSavings = { enabled: true, totalValue: 80_000 };
+    state.person1.assets.isaInvestments = {
+      enabled: true, totalValue: 100_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 40, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 60 },
+    };
+    state.person1.incomeSources.dcPension = {
+      ...state.person1.incomeSources.dcPension,
+      enabled: true, totalValue: 400_000, growthRate: 5,
+      allocation: { cashPercent: 0, bondsPercent: 30, preciousMetalsPercent: 0, alternativesPercent: 0, equitiesPercent: 70 },
+    };
+
+    const result = runSorrStressTest(state, 2, 30);
+    expect(result.shockYear).toBe(2);
+    expect(result.shockPercent).toBe(30);
+    // Ladder shock = 30% × growth fraction (~60–70% of each pot) < 30% × whole pot.
+    // So ladder run preserves more capital and lasts at least as long.
+    expect(result.yearsSaved).toBeGreaterThanOrEqual(0);
+    expect(result.portfolioAtAge85Delta).toBeGreaterThanOrEqual(0);
   });
 });

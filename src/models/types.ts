@@ -147,6 +147,10 @@ export interface DCPensionSource {
   workplaceContributionPercent?: number;  // % of salary added each year until FI age
   workplaceSalary?: number;               // Current salary in today's money
   sippContributionAnnualGross?: number;   // Gross annual contribution in today's money
+  /** Itemised holdings inside this pot, used by the bucket ladder. Sum must equal totalValue. */
+  holdings?: PotHolding[];
+  /** Quick-mode percentage split of the pot across asset types (sum 100). Used only when holdings is empty. */
+  allocation?: PotAllocation;
 }
 
 export interface DBPensionSource {
@@ -197,6 +201,10 @@ export interface ISAAsset {
   growthRate: number;
   /** Yearly lump sum deposited in today's £ before reaching FI age. Optional — 0 / undefined = no contributions. */
   annualContribution?: number;
+  /** Itemised holdings inside this pot, used by the bucket ladder. Sum must equal totalValue. */
+  holdings?: PotHolding[];
+  /** Quick-mode percentage split of the pot across asset types (sum 100). Used only when holdings is empty. */
+  allocation?: PotAllocation;
 }
 
 export interface GIAAsset {
@@ -206,6 +214,10 @@ export interface GIAAsset {
   growthRate: number;
   /** Yearly lump sum deposited in today's £ before reaching FI age. Optional — 0 / undefined = no contributions. */
   annualContribution?: number;
+  /** Itemised holdings inside this pot, used by the bucket ladder. Sum must equal totalValue. */
+  holdings?: PotHolding[];
+  /** Quick-mode percentage split of the pot across asset types (sum 100). Used only when holdings is empty. */
+  allocation?: PotAllocation;
 }
 
 export interface PropertyAsset {
@@ -253,6 +265,109 @@ export interface Assumptions {
    * will not pay income tax. Togglable because policy may change.
    */
   statePensionSoleIncomeExempt: boolean;
+}
+
+// ─── Bucket Ladder (Cash Flow Ladder) ────────────────────────────────────────
+//
+// Sequence-of-returns risk (SORR) protection: hold defensive buckets so a market
+// crash in early retirement doesn't force selling growth assets at depressed prices.
+//
+// Bucket 1 — Cash      (1-2 yrs of spending): cash, money market, ultra-short gilts
+// Bucket 2 — Income    (3-7 yrs of spending): bonds, gilts, precious metals, REITs, alternatives
+// Bucket 3 — Growth    (8+ yrs):              equities, equity funds, growth alternatives
+//
+// Asset-type allocation is captured *within each pot*, not by pot type, so a SIPP
+// can hold cash + bonds + equities and a GIA can be 100% gold if the user wants.
+// See docs/cash-flow-ladder-design.md for the full design.
+
+/** The five concrete asset types + 'mixed' for blended funds (e.g. 60/40). */
+export type AssetType =
+  | 'cash'
+  | 'bonds'
+  | 'preciousMetals'
+  | 'alternatives'
+  | 'equities'
+  | 'mixed';
+
+/** The three buckets the ladder aggregates into. */
+export type BucketKey = 'cash' | 'income' | 'growth';
+
+/**
+ * Sub-allocation for a holding tagged as 'mixed' (e.g. a 60/40 LifeStrategy fund).
+ * Percentages must sum to 100.
+ */
+export interface MixedAllocation {
+  cashPercent: number;
+  bondsPercent: number;
+  preciousMetalsPercent: number;
+  alternativesPercent: number;
+  equitiesPercent: number;
+}
+
+/**
+ * One specific fund/asset inside a pot (e.g. "Vanguard FTSE Global All Cap, £45k, equities").
+ * Sum of `value` across all holdings in a pot must equal the pot's totalValue.
+ */
+export interface PotHolding {
+  id: string;
+  name: string;
+  value: number;
+  assetType: AssetType;
+  /** Required when assetType === 'mixed'; ignored otherwise. */
+  mixedAllocation?: MixedAllocation;
+}
+
+/**
+ * Quick-mode percentage split for a whole pot, used when the user doesn't want
+ * to itemise individual holdings. Percentages must sum to 100.
+ */
+export interface PotAllocation {
+  cashPercent: number;
+  bondsPercent: number;
+  preciousMetalsPercent: number;
+  alternativesPercent: number;
+  equitiesPercent: number;
+}
+
+/** When the rebalance step fires during the projection loop. */
+export type RebalanceTrigger = 'onWithdrawal' | 'annual' | 'threshold' | 'off';
+
+/**
+ * A single rebalance move between buckets, recorded per simulation year for the UI log.
+ * Modelled as a cash-flow-neutral fund switch (no CGT impact in the simulation).
+ */
+export interface RebalanceAction {
+  fromBucket: BucketKey;
+  toBucket: BucketKey;
+  amount: number;
+  reason: string;
+  trigger: RebalanceTrigger | 'pauseAfterDrop';
+}
+
+/**
+ * Household-level bucket strategy configuration. Sits on PlannerState.
+ *
+ * `enabled` defaults to false — existing plans must opt in.
+ * Growth rate fields are overrides; 0 means "use the per-bucket default from financialConstants".
+ */
+export interface BucketLadderConfig {
+  enabled: boolean;
+  /** Target years of annual spending held in Bucket 1 (default 2). */
+  cashBufferYears: number;
+  /** Target years of annual spending held in Bucket 2 (default 5). */
+  incomeBufferYears: number;
+  /** Per-bucket growth rate override; 0 = use BUCKET_LADDER default. */
+  cashGrowthRate: number;
+  /** Per-bucket growth rate override; 0 = use BUCKET_LADDER default. */
+  incomeGrowthRate: number;
+  /** Per-bucket growth rate override; 0 = use BUCKET_LADDER default. */
+  growthGrowthRate: number;
+  /** When to fire the rebalance step. */
+  rebalanceTrigger: RebalanceTrigger;
+  /** Drift % that triggers a threshold rebalance and bounds onWithdrawal rebalances. */
+  rebalanceThresholdPercent: number;
+  /** Skip refill from growth bucket if it dropped by more than this % last year. */
+  pauseRebalanceAfterEquityDropPercent: number;
 }
 
 // ─── Top-level planner state ──────────────────────────────────────────────────
@@ -326,6 +441,12 @@ export interface PlannerState {
    * spending target in the year it falls.
    */
   plannedEvents: PlannedEvent[];
+  /**
+   * Bucket-ladder (cash flow ladder) configuration. Defaults to `{ enabled: false, ... }`
+   * so the existing waterfall behaviour is preserved until the user opts in.
+   * See docs/cash-flow-ladder-design.md.
+   */
+  bucketLadderConfig: BucketLadderConfig;
 }
 
 export type PlannerUiState = Pick<PlannerState, 'currentStep' | 'maxVisitedStep'>;
@@ -431,6 +552,12 @@ export interface YearlyProjection {
   p2JointBedIsaTransfer: number;
   /** Sum of all PlannedEvent amounts (inflation-adjusted) falling in this year. Zero when no events. */
   plannedEventSpend: number;
+
+  // ── Bucket ladder (optional — populated only when bucketLadderConfig.enabled) ─
+  /** End-of-year bucket balances (£). Undefined when the ladder is disabled. */
+  bucketValues?: { cash: number; income: number; growth: number; total: number };
+  /** Rebalance moves recorded for this year. Undefined / empty when ladder disabled or no moves. */
+  rebalanceActions?: RebalanceAction[];
 }
 
 // ─── Simulation result (dashboard summary) ───────────────────────────────────
