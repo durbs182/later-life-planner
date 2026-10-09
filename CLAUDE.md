@@ -162,6 +162,29 @@ git worktree remove ../llp-llp-myname
 - **Never rebase/amend pushed commits** — create a new commit instead
 - **Always `git pull` before editing** a branch that has been pushed
 
+### Shared-File Ownership
+
+Most features touch these files, so parallel agents editing them is the main source of merge conflicts:
+
+- `src/models/types.ts`
+- `src/config/financialConstants.ts`
+- `src/store/plannerStore.ts`
+- `src/lib/mockData.ts`
+
+Only the lead (the orchestrating session) edits them. When a task needs changes there, the lead commits those first as their own "types/constants" commit. Specialist agents then branch from that commit and build on it. A specialist that needs a further change to a shared file must ask the lead instead of editing the file itself.
+
+Hand-off order for specialist agents (definitions in `.claude/agents/`):
+
+| Task | Flow |
+|------|------|
+| Engine feature | lead (shared files) → `financial-engine` → `test-specialist` → `pre-pr-gate` |
+| UI feature | `ui-frontend` → `test-specialist` → `pre-pr-gate` |
+| Full-stack feature | lead (shared files) → `financial-engine` + `ui-frontend` in parallel worktrees → `test-specialist` → `pre-pr-gate` |
+| Sync, crypto, auth, API | `sync-security` → `test-specialist` → `pre-pr-gate` |
+| CI or E2E breakage | `infrastructure` or `test-specialist`, fixed in one PR |
+
+`pre-pr-gate` runs before every push. Run no more than 3–4 agents at once.
+
 ### Pre-Work Checklist
 
 - [ ] `git status` and `git fetch origin`
