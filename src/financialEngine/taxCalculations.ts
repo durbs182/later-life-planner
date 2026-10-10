@@ -128,3 +128,25 @@ export function drawFromGIA(
     newBaseCost: Math.max(0, baseCost - capitalReturn),
   };
 }
+
+/**
+ * Largest DC withdrawal whose taxable portion fits within `headroom`.
+ *
+ * Each withdrawal is `taxFreeFraction` tax-free until the remaining Lump Sum
+ * Allowance runs out; after that every extra pound is taxable. Dividing the
+ * headroom by the taxable fraction alone would overdraw once the LSA is
+ * exhausted (e.g. after a full PCLS), pushing income above the allowance.
+ *
+ * @param headroom        - Unused personal allowance (£)
+ * @param remainingLsa    - Lump Sum Allowance still available (£)
+ * @param taxFreeFraction - UFPLS tax-free fraction (0.25)
+ */
+export function maxUfplsWithinHeadroom(
+  headroom: number,
+  remainingLsa: number,
+  taxFreeFraction: number,
+): number {
+  if (headroom <= 0) return 0;
+  const lsa = Math.max(0, remainingLsa);
+  return Math.min(headroom / (1 - taxFreeFraction), headroom + lsa);
+}

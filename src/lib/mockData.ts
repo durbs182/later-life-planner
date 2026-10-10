@@ -233,7 +233,6 @@ export function createDefaultState(primaryAge: number = DEFAULT_ASSUMPTIONS.DEFA
     jointGia: { enabled: false, totalValue: 0, baseCost: 0, growthRate: DEFAULT_ASSUMPTIONS.INVESTMENT_GROWTH },
     careReserve: { enabled: false, amount: CARE_RESERVE.DEFAULT_AMOUNT },
     primaryResidence: { ...defaultPrimaryResidence },
-    drawdownStrategy: 'standard-ufpls',
     plannedEvents: [],
     // p2FiAge is undefined by default — engine falls back to fiAge
   };
@@ -310,9 +309,6 @@ export function normalizePlannerState(state: PlannerState): PlannerState {
     },
     goalRegistry: normalizeGoalRegistry(state.goalRegistry),
     primaryResidence: normalizePrimaryResidence(state.primaryResidence),
-    drawdownStrategy: state.drawdownStrategy ?? 'standard-ufpls',
-    // pclsAge is optional — undefined means "default to fiAge" in the engine
-    pclsAge: state.pclsAge,
     // p2FiAge is optional — undefined means "default to fiAge" in the engine
     p2FiAge: normalized.p2FiAge,
     // gapSpending is optional — undefined means "use stage spending" in the engine

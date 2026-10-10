@@ -539,15 +539,16 @@ function pclsBedIsaState(overrides: {
   return {
     ...base,
     fiAge: fiAgeVal,
-    drawdownStrategy: 'pcls-bed-isa',
-    pclsAge: overrides.pclsAge,
     assumptions: { ...base.assumptions, investmentGrowth: 0, inflation: 0, lifeExpectancy: lifeExp },
     person1: {
       ...base.person1,
       currentAge: age,
       incomeSources: {
         ...base.person1.incomeSources,
-        dcPension: { enabled: true, totalValue: dcValue, growthRate: 0 },
+        dcPension: {
+          enabled: true, totalValue: dcValue, growthRate: 0,
+          fullLumpSum: { enabled: true, age: overrides.pclsAge },
+        },
       },
       assets: {
         ...base.person1.assets,
@@ -584,10 +585,12 @@ describe('calculateProjections — pcls-bed-isa: PCLS timing', () => {
     expect(eventRows[0].p1Age).toBe(55);
   });
 
-  test('no PCLS events in standard-ufpls mode', () => {
+  test('no PCLS events when the lump sum is switched off', () => {
+    const base = pclsBedIsaState({ age: 55, fiAge: 55 });
+    const dcPension = { ...base.person1.incomeSources.dcPension, fullLumpSum: { enabled: false } };
     const state: PlannerState = {
-      ...pclsBedIsaState({ age: 55, fiAge: 55 }),
-      drawdownStrategy: 'standard-ufpls',
+      ...base,
+      person1: { ...base.person1, incomeSources: { ...base.person1.incomeSources, dcPension } },
     };
     const projections = calculateProjections(state);
     projections.forEach(p => expect(p.p1PclsEvent).toBe(0));
@@ -684,7 +687,6 @@ describe('calculateProjections — pcls-bed-isa: CGT on Bed & ISA gains', () => 
     const state: PlannerState = {
       ...base,
       fiAge: 55,
-      drawdownStrategy: 'pcls-bed-isa',
       assumptions: { ...base.assumptions, investmentGrowth: 0, inflation: 0, lifeExpectancy: 85 },
       jointGia: { enabled: true, totalValue: 60_000, baseCost: 20_000, growthRate: 0 },
       person1: {
@@ -697,7 +699,7 @@ describe('calculateProjections — pcls-bed-isa: CGT on Bed & ISA gains', () => 
         },
         incomeSources: {
           ...base.person1.incomeSources,
-          dcPension: { enabled: true, totalValue: 300_000, growthRate: 0 },
+          dcPension: { enabled: true, totalValue: 300_000, growthRate: 0, fullLumpSum: { enabled: true } },
         },
       },
     };
@@ -719,13 +721,12 @@ describe('calculateProjections — pcls-bed-isa: couple-mode crystallisation rei
     return withSpending({
       ...base,
       fiAge: 55,
-      drawdownStrategy: 'pcls-bed-isa',
       assumptions: { ...base.assumptions, investmentGrowth: 0, inflation: 0, lifeExpectancy: 85 },
       person1: {
         ...base.person1,
         incomeSources: {
           ...base.person1.incomeSources,
-          dcPension: { enabled: true, totalValue: p1DcValue, growthRate: 0 },
+          dcPension: { enabled: true, totalValue: p1DcValue, growthRate: 0, fullLumpSum: { enabled: true } },
         },
       },
     }, 0);

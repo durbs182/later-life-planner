@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { bareCoupleState, dcOnlyState, paulAndLisaState } from '../fixtures/states';
-import { withSpending } from '../fixtures/helpers';
+import { withFullLumpSum, withSpending } from '../fixtures/helpers';
 import {
   BASELINE_STRATEGY,
   optimizeWithdrawals,
@@ -385,19 +385,12 @@ describe('optimizeWithdrawals', () => {
     expect(baseline?.feasible).toBe(true);
   });
 
-  test('pcls-bed-isa: pre-FI crystallisation seeds LSA exhaustion so all FI-year DC draws are 100% taxable', () => {
+  test('full lump sum: pre-FI crystallisation seeds LSA exhaustion so all FI-year DC draws are 100% taxable', () => {
     // pclsAge (57) is before fiAge (60): the projection engine fires the PCLS in
     // the pre-FI phase and the optimizer must seed p1LifetimePcls = LSA so that
     // every post-FI DC withdrawal is treated as fully taxable.
     const base = dcOnlyState(55, 300_000, 60);
-    const state = withSpending(
-      {
-        ...base,
-        drawdownStrategy: 'pcls-bed-isa',
-        pclsAge: 57,
-      },
-      20_000,
-    );
+    const state = withSpending(withFullLumpSum(base, { p1: { age: 57 } }), 20_000);
 
     const result = optimizeWithdrawals(state);
 
@@ -412,19 +405,13 @@ describe('optimizeWithdrawals', () => {
     }
   });
 
-  test('pcls-bed-isa: at-FI crystallisation exhausts LSA in-loop so all subsequent DC draws are 100% taxable', () => {
+  test('full lump sum: at-FI crystallisation exhausts LSA in-loop so all subsequent DC draws are 100% taxable', () => {
     // pclsAge defaults to fiAge (60): the PCLS fires inside the optimizer loop at
     // age 60 (after growth, before drawdown). From that point on, p1LifetimePcls
     // equals the LSA so all DC draws must have zero tax-free fraction.
     const base = dcOnlyState(60, 300_000);
-    const state = withSpending(
-      {
-        ...base,
-        drawdownStrategy: 'pcls-bed-isa',
-        // pclsAge intentionally omitted — defaults to fiAge inside the engine.
-      },
-      20_000,
-    );
+    // No age given: the lump sum defaults to fiAge inside the engine.
+    const state = withSpending(withFullLumpSum(base, { p1: true }), 20_000);
 
     const result = optimizeWithdrawals(state);
 

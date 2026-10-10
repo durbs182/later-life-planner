@@ -11,13 +11,12 @@ import {
   getStageTotalSpending,
 } from '@/lib/calculations';
 import ProInterestModal from '@/components/ProInterestModal';
-import DashboardMain from '@/components/DashboardMain';
-// DashboardSidebar is no longer rendered — kept as a file reference to avoid breaking any test imports
-// import DashboardSidebar from '@/components/DashboardSidebar';
+import DashboardMain, { type LumpSumControl } from '@/components/DashboardMain';
 import IHTOutlookPanel from '@/components/IHTOutlookPanel';
 import ProFeatureBanner from '@/components/ProFeatureBanner';
-import { CARE_RESERVE, CURRENT_TAX_YEAR_START, GOAL_PANEL, PENSION_RULES, CGT, INCOME_TAX } from '@/config/financialConstants';
+import { CARE_RESERVE, GOAL_PANEL, PENSION_RULES, CGT, INCOME_TAX } from '@/config/financialConstants';
 import { optimizeWithdrawals } from '@/financialEngine/withdrawalOptimizer';
+import { resolveCrystallisationAge, resolveP2FiAge } from '@/financialEngine/pclsCrystallisation';
 import {
   buildGoalOrchestrateRequest,
   DEFAULT_GOAL_ORCHESTRATION_SCHEMA_VERSION,
@@ -27,7 +26,7 @@ import {
 } from '@/lib/goalOrchestration';
 import type { YearlyProjection } from '@/lib/types';
 import type { OptimizationResult, OptimizerPolicyOverride } from '@/financialEngine/types';
-import type { CareReserve, DrawdownStrategy, GoalConfig, GoalId } from '@/models/types';
+import type { CareReserve, GoalConfig, GoalId, PlannerState } from '@/models/types';
 import InfoIcon from '@/components/ui/InfoIcon';
 import { GLOSSARY } from '@/lib/glossary';
 import { STEP4_IDS } from '@/lib/testIds';
@@ -388,15 +387,6 @@ function GoalPriorityPanel({
   );
 }
 
-/** Resolves a PCLS age candidate against NMPA rules and the person's current age. */
-function resolvePclsAge(candidate: number, currentAge: number): number {
-  const calYear = CURRENT_TAX_YEAR_START + (candidate - currentAge);
-  const nmpaForAge = calYear >= PENSION_RULES.NMPA_RISE_YEAR
-    ? PENSION_RULES.MIN_ACCESS_AGE_POST_2028
-    : PENSION_RULES.MIN_ACCESS_AGE;
-  return Math.max(candidate, nmpaForAge, currentAge);
-}
-
 export function buildOptimizerViewProjections(
   displayRows: YearlyProjection[],
   optimizerResult: NonNullable<ReturnType<typeof optimizeWithdrawals> | null>,
@@ -455,6 +445,18 @@ export function buildOptimizerViewProjections(
   });
 }
 
+/** Full lump sums are Pro-only: strip them so non-Pro projections use UFPLS draws. */
+function withoutLumpSums<T extends PlannerState>(s: T): T {
+  const strip = (p: PlannerState['person1']) => ({
+    ...p,
+    incomeSources: {
+      ...p.incomeSources,
+      dcPension: { ...p.incomeSources.dcPension, fullLumpSum: undefined },
+    },
+  });
+  return { ...s, person1: strip(s.person1), person2: strip(s.person2) };
+}
+
 export default function Step4Dashboard({ onBack }: Props) {
   const getToken = useOptionalGetToken();
   const getTokenRef = useRef(getToken);
@@ -476,10 +478,8 @@ export default function Step4Dashboard({ onBack }: Props) {
     setGoalRegistry,
     careReserve,
     setCareReserve,
-    drawdownStrategy,
-    setDrawdownStrategy,
-    pclsAge,
-    setPclsAge,
+    setP1Income,
+    setP2Income,
   } = state;
 
   const [policyOverride, setPolicyOverride] = useState<OptimizerPolicyOverride | null>(null);
@@ -490,8 +490,6 @@ export default function Step4Dashboard({ onBack }: Props) {
     () => !localStorage.getItem(DASHBOARD_WELCOMED_KEY)
   );
 
-  const rawAge = pclsAge ?? fiAge;
-  const effectivePclsAge = resolvePclsAge(rawAge, person1.currentAge);
 
   // Goal registry sync effect
   useEffect(() => {
@@ -559,9 +557,7 @@ export default function Step4Dashboard({ onBack }: Props) {
 
   // Calculate projections
   const { projections, optimizerResult } = useMemo(() => {
-    const effectiveState = !proEnabled && deferredState.drawdownStrategy === 'pcls-bed-isa'
-      ? { ...deferredState, drawdownStrategy: 'standard-ufpls' as const }
-      : deferredState;
+    const effectiveState = proEnabled ? deferredState : withoutLumpSums(deferredState);
 
     if (!optimizerEnabled) {
       return {
@@ -640,21 +636,34 @@ export default function Step4Dashboard({ onBack }: Props) {
     });
   }
 
-  // ─── Withdrawal strategy options ─────────────────────────────────────────────
-  const strategies = [
-    {
-      id: 'standard-ufpls' as DrawdownStrategy,
-      label: 'Flexible pension drawdown',
-      icon: '💧',
-      description: 'Draw flexibly from your pension — each withdrawal is 25% tax-free and 75% taxable, using your tax-free entitlement gradually over time.',
-    },
-    {
-      id: 'pcls-bed-isa' as DrawdownStrategy,
-      label: 'Tax-free lump sum + ISA transfer',
-      icon: '🚀',
-      description: 'Once your pension pot is large enough that any further growth would be fully taxable on withdrawal, it could make sense to take your entire tax-free entitlement now and move it into an ISA — where future growth is sheltered from tax.',
-    },
-  ] as const;
+  // ─── Full lump sum controls (Pro only) — one per person with a DC pension ──────
+  const lumpSumControls: LumpSumControl[] = [];
+  const addLumpSumControl = (
+    person: 'p1' | 'p2',
+    personName: string,
+    currentAge: number,
+    dc: typeof person1.incomeSources.dcPension,
+    defaultAge: number,
+    setIncome: typeof setP1Income,
+  ) => {
+    if (!dc.enabled) return;
+    const plan = dc.fullLumpSum;
+    lumpSumControls.push({
+      person,
+      personName,
+      currentAge,
+      enabled: plan?.enabled ?? false,
+      effectiveAge: resolveCrystallisationAge(plan?.age ?? defaultAge, currentAge),
+      onToggle: (enabled) => setIncome('dcPension', { fullLumpSum: { ...plan, enabled } }),
+      onAgeChange: (age) => setIncome('dcPension', { fullLumpSum: { enabled: true, age } }),
+    });
+  };
+  const p1DisplayName = person1.name || (mode === 'couple' ? 'Partner 1' : 'You');
+  const p2DisplayName = person2?.name || 'Partner 2';
+  addLumpSumControl('p1', p1DisplayName, person1.currentAge, person1.incomeSources.dcPension, fiAge, setP1Income);
+  if (mode === 'couple') {
+    addLumpSumControl('p2', p2DisplayName, person2.currentAge, person2.incomeSources.dcPension, resolveP2FiAge(state), setP2Income);
+  }
 
   // ─── Tab definitions ──────────────────────────────────────────────────────────
   const tabs: { id: ActiveTab; label: string; badge?: string }[] = [
@@ -664,13 +673,6 @@ export default function Step4Dashboard({ onBack }: Props) {
     { id: 'iht', label: 'IHT & Estate' },
     { id: 'care', label: 'Care Reserve', badge: 'Coming soon' },
   ];
-
-  // Sanitise the persisted drawdown strategy: if Pro is disabled, fall back to the
-  // default strategy so the Pro-only UI never appears active in the calculations or UI.
-  const effectiveDrawdownStrategy: DrawdownStrategy =
-    !proEnabled && drawdownStrategy === 'pcls-bed-isa'
-      ? 'standard-ufpls'
-      : (drawdownStrategy ?? 'standard-ufpls');
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -758,24 +760,15 @@ export default function Step4Dashboard({ onBack }: Props) {
             lastPositive={lastPositive}
             lifeStages={lifeStages}
             mode={mode}
-            p1Name={person1.name || (mode === 'couple' ? 'Partner 1' : 'You')}
-            p2Name={person2?.name || 'Partner 2'}
+            p1Name={p1DisplayName}
+            p2Name={p2DisplayName}
             rlssStandard={rlssStandard ?? undefined}
             optimizerEnabled={optimizerEnabled}
             proEnabled={proEnabled}
             optimizerResult={optimizerResult ?? null}
             plannerState={deferredState}
             onProCta={() => setProModalSource('optimizer-explain')}
-            {...(proEnabled && {
-              drawdownStrategy,
-              setDrawdownStrategy,
-              pclsAge,
-              setPclsAge,
-              strategies,
-              effectiveDrawdownStrategy,
-              effectivePclsAge,
-              person1CurrentAge: person1.currentAge,
-            })}
+            {...(proEnabled && { lumpSumControls })}
           />
         )}
 

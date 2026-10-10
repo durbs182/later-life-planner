@@ -30,20 +30,22 @@ export type GoalId =
 export type AssetOwner = 'p1' | 'p2' | 'joint';
 
 /**
- * Drawdown strategy for DC pensions.
+ * Take a person's full tax-free lump sum (PCLS, up to the £268,275 LSA) in one go
+ * and reinvest it in ISAs then GIA. Every later draw from that person's DC pot is
+ * 100% taxable. Each person's plan is independent of their partner's.
  *
- * - `standard-ufpls`: Each DC withdrawal is 25% tax-free / 75% taxable (UFPLS).
- *   The full pot stays invested for longer; the LSA is consumed gradually.
- *
- * - `pcls-bed-isa`: At plan start, person1 takes the maximum Pension Commencement
- *   Lump Sum (up to the £268,275 LSA). The cash is reinvested into their ISA
- *   (up to the annual allowance) and GIA. All subsequent DC draws for person1
- *   are 100% taxable (LSA exhausted). Each year, up to the ISA annual allowance
- *   is transferred from person1's GIA to their ISA (pre- and post-FI), and from
- *   the joint GIA to person2's ISA (post-FI only). This Bed & ISA step builds a
- *   large tax-free ISA pot that can cover spending with minimal income tax.
+ * Without it, each DC draw is 25% tax-free / 75% taxable (UFPLS) until the LSA
+ * is used up.
  */
-export type DrawdownStrategy = 'standard-ufpls' | 'pcls-bed-isa';
+export interface FullLumpSumPlan {
+  enabled: boolean;
+  /**
+   * Age at which the lump sum is taken. Defaults to the person's FI age
+   * (`fiAge` for person 1, `p2FiAge` for person 2). Moved later if below
+   * minimum pension age (55, or 57 from calendar year 2028).
+   */
+  age?: number;
+}
 
 export interface GoalConfig {
   id: GoalId;
@@ -147,6 +149,7 @@ export interface DCPensionSource {
   workplaceContributionPercent?: number;  // % of salary added each year until FI age
   workplaceSalary?: number;               // Current salary in today's money
   sippContributionAnnualGross?: number;   // Gross annual contribution in today's money
+  fullLumpSum?: FullLumpSumPlan;          // Pro only; absent or disabled = UFPLS draws
 }
 
 export interface DBPensionSource {
@@ -294,19 +297,6 @@ export interface PlannerState {
    */
   primaryResidence: PrimaryResidenceAsset;
   /**
-   * DC pension drawdown strategy.
-   * - `standard-ufpls` (default): each DC draw is 25% tax-free via UFPLS.
-   * - `pcls-bed-isa`: take full PCLS at a chosen age (≥ NMPA), reinvest into ISA + GIA,
-   *   then Bed & ISA each year to build the ISA wrapper further.
-   */
-  drawdownStrategy: DrawdownStrategy;
-  /**
-   * Age at which person 1 crystallises their PCLS under the `pcls-bed-isa` strategy.
-   * Must be ≥ 55 (or 57 if that calendar year is 2028 or later).
-   * Defaults to `fiAge` when not set.
-   */
-  pclsAge?: number;
-  /**
    * Financial independence age for person 2 — the age at which person 2's DC pension
    * contributions stop. This value is also used as the drawdown label anchor in Step 3.
    * Only used in couple mode; ignored in single mode.
@@ -414,9 +404,11 @@ export interface YearlyProjection {
   jointGiaBaseCost: number;
   totalAssets: number;
 
-  // PCLS + Bed & ISA strategy tracking (zero when strategy = 'standard-ufpls')
-  /** PCLS lump sum taken at plan start (person1 only, year 0 event). */
+  // Full lump sum + Bed & ISA tracking
+  /** PCLS lump sum taken by person1 this year (non-zero only in their crystallisation year). */
   p1PclsEvent: number;
+  /** PCLS lump sum taken by person2 this year (non-zero only in their crystallisation year). */
+  p2PclsEvent: number;
   /** Total transferred into person1 ISA via Bed & ISA this year (individual + joint GIA). */
   p1BedIsaTransfer: number;
   /** Amount from person1's own individual GIA → person1 ISA (subset of p1BedIsaTransfer). */
