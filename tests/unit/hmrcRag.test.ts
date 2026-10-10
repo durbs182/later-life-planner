@@ -11,7 +11,7 @@ const {
   const itemsQueryMock = vi.fn(() => ({ fetchAll: queryFetchAllMock }));
   const containerMock = { items: { query: itemsQueryMock } };
   const databaseMock = vi.fn(() => ({ container: vi.fn(() => containerMock) }));
-  const cosmosClientMock = vi.fn(() => ({ database: databaseMock }));
+  const cosmosClientMock = vi.fn(function () { return { database: databaseMock }; });
   const getTokenMock = vi.fn(async () => ({ token: 'aad-token' }));
 
   return {
@@ -28,7 +28,7 @@ vi.mock('@azure/cosmos', () => ({
 }));
 
 vi.mock('@azure/identity', () => ({
-  DefaultAzureCredential: vi.fn(() => ({ getToken: getTokenMock })),
+  DefaultAzureCredential: vi.fn(function () { return { getToken: getTokenMock }; }),
 }));
 
 import { retrieveHmrcChunks } from '@/lib/hmrcRag';

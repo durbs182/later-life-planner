@@ -50,7 +50,7 @@ describe('usePlanSync — 8-second degradation timeout', () => {
     usePlannerStore.getState().resetPlan();
     usePlannerStore.persist.clearStorage();
     // fetch hangs indefinitely — simulates a slow/unreachable backend
-    globalThis.fetch = vi.fn(() => new Promise(() => {}));
+    globalThis.fetch = vi.fn(() => new Promise<Response>(() => {}));
   });
 
   afterEach(() => {

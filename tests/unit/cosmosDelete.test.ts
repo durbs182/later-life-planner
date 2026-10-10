@@ -7,7 +7,7 @@ const mockDatabase = { container: vi.fn(() => mockContainer) };
 const mockClient = { database: vi.fn(() => mockDatabase) };
 
 vi.mock('@azure/cosmos', () => ({
-  CosmosClient: vi.fn(() => mockClient),
+  CosmosClient: vi.fn(function () { return mockClient; }),
 }));
 
 vi.mock('@azure/identity', () => ({
