@@ -40,9 +40,10 @@ import type {
   PersonIncomeSources, PersonAssets, SimulationResult,
   GamificationMetrics,
 } from '@/models/types';
-import { CGT, PENSION_RULES, RLSS, CURRENT_TAX_YEAR_START, GAP_PERIOD_NET_SALARY_FACTOR } from '@/config/financialConstants';
+import { CGT, RLSS, CURRENT_TAX_YEAR_START, GAP_PERIOD_NET_SALARY_FACTOR } from '@/config/financialConstants';
 import { getSnapshotForYear } from '@/config/taxRuleSnapshot';
-import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer } from './taxCalculations';
+import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer, maxUfplsWithinHeadroom } from './taxCalculations';
+import { resolvePclsAges } from './pclsCrystallisation';
 
 // ─── Per-person income aggregator ────────────────────────────────────────────
 
@@ -134,15 +135,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
   const p2FiAge = state.p2FiAge ??
     (mode === 'couple' ? person2.currentAge + (fiAge - person1.currentAge) : fiAge);
 
-  // Resolve the PCLS crystallisation age: user-specified (≥ current age and NMPA), else fiAge.
-  // NMPA is 55 before calendar year 2028, rising to 57 from 2028 onwards.
-  const rawPclsAge = state.pclsAge ?? fiAge;
-  const pclsCalendarYear = CURRENT_TAX_YEAR_START + (rawPclsAge - person1.currentAge);
-  const nmpa = pclsCalendarYear >= PENSION_RULES.NMPA_RISE_YEAR
-    ? PENSION_RULES.MIN_ACCESS_AGE_POST_2028
-    : PENSION_RULES.MIN_ACCESS_AGE;
-  // Prevent the crystallisation event from being scheduled in the past.
-  const resolvedPclsAge = Math.max(rawPclsAge, nmpa, person1.currentAge);
+  const pclsAges = resolvePclsAges(state);
 
   // ── Initialise asset balances ──────────────────────────────────────────────
   let p1Isa   = person1.assets.isaInvestments.enabled     ? person1.assets.isaInvestments.totalValue     : 0;
@@ -302,9 +295,10 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     // are permanent for the year and not repeated on each gross-up iteration.
     //
     // PCLS crystallisation (pcls-bed-isa strategy only):
-    //   At resolvedPclsAge, take person1's maximum tax-free lump sum (up to LSA),
-    //   reinvest into ISA wrappers then GIA. Mark p1LifetimePcls = LSA so all
-    //   subsequent DC draws are 100% taxable.
+    //   At each person's PCLS age, take their maximum tax-free lump sum (up to LSA),
+    //   reinvest into ISA wrappers then GIA. Mark that person's LSA as fully used:
+    //   the whole pot is crystallised, so the 75% left in drawdown is 100% taxable
+    //   even when 25% of the pot was below the LSA.
     //
     // Annual Bed & ISA (all strategies, FI years only):
     //   Sell GIA assets (individual then joint) up to each person's remaining ISA
@@ -316,6 +310,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     //   Allowance order: p1 individual GIA → p1 ISA, p2 individual GIA → p2 ISA,
     //   joint GIA → p1 ISA (remaining allowance), joint GIA → p2 ISA (remaining).
     let p1PclsEvent = 0;
+    let p2PclsEvent = 0;
     // p1BedIsaTransfer / p1BedIsaCg: transfers into p1 ISA and their capital gains (individual p1 GIA).
     // p2BedIsaTransfer / p2IndivBedIsaCg: transfers into p2 ISA and individual p2 GIA gains (100% p2).
     // p2BedIsaCg: total joint GIA Bed & ISA gains (split 50/50 between persons for CGT).
@@ -333,16 +328,13 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       let p1IsaCapacity = yearSnapshot.isaAnnualAllowance;
       let p2IsaCapacity = yearSnapshot.isaAnnualAllowance;
 
-      // ── PCLS crystallisation at resolvedPclsAge ───────────────────────
-      if (p1Age === resolvedPclsAge && p1Dc > 0 && dc1.enabled) {
+      // ── Person 1 PCLS crystallisation ─────────────────────────────────
+      if (p1Age === pclsAges.p1 && p1Dc > 0 && dc1.enabled) {
         const remainingPensionLsa = Math.max(0, yearPensionLsa - p1LifetimePcls);
         const pclsAmount = Math.min(p1Dc * yearUfplsFrac, remainingPensionLsa);
         if (pclsAmount > 0) {
           p1Dc -= pclsAmount;
-          // Advance the lifetime PCLS usage by the amount actually crystallised,
-          // clamping at the year's LSA so future p1 DC draws become fully taxable
-          // once the allowance has been exhausted.
-          p1LifetimePcls = Math.min(yearPensionLsa, p1LifetimePcls + pclsAmount);
+          p1LifetimePcls = yearPensionLsa;
           // Reinvest: up to the annual ISA allowance per person into ISA wrappers,
           // remainder into GIA (joint for couple, p1 for single).
           // Base cost = reinvested amount; no embedded gain at acquisition.
@@ -357,13 +349,34 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
           p1IsaCapacity -= p1ToIsa;
           p2IsaCapacity -= p2ToIsa;
           p1Isa += p1ToIsa;
-          p1IsaAllowanceUsed = p1ToIsa;
-          if (p2ToIsa > 0) { p2Isa += p2ToIsa; p2IsaAllowanceUsed = p2ToIsa; }
+          p1IsaAllowanceUsed += p1ToIsa;
+          if (p2ToIsa > 0) { p2Isa += p2ToIsa; p2IsaAllowanceUsed += p2ToIsa; }
           if (toGia > 0) {
             if (mode === 'couple') { jointGiaV += toGia; jointGiaBC += toGia; }
             else                   { p1GiaV    += toGia; p1GiaBC    += toGia; }
           }
           p1PclsEvent = pclsAmount;
+        }
+      }
+
+      // ── Person 2 PCLS crystallisation (couple only) ───────────────────
+      // Reinvest into p2's ISA first, then any p1 ISA capacity left this year,
+      // then the joint GIA.
+      if (mode === 'couple' && p2Age === pclsAges.p2 && p2Dc > 0 && dc2.enabled) {
+        const remainingPensionLsa = Math.max(0, yearPensionLsa - p2LifetimePcls);
+        const pclsAmount = Math.min(p2Dc * yearUfplsFrac, remainingPensionLsa);
+        if (pclsAmount > 0) {
+          p2Dc -= pclsAmount;
+          p2LifetimePcls = yearPensionLsa;
+          const p2ToIsa = Math.min(pclsAmount, p2IsaCapacity);
+          const p1ToIsa = Math.min(pclsAmount - p2ToIsa, p1IsaCapacity);
+          const toGia = pclsAmount - p2ToIsa - p1ToIsa;
+          p2Isa += p2ToIsa;
+          p2IsaAllowanceUsed += p2ToIsa;
+          p1Isa += p1ToIsa;
+          p1IsaAllowanceUsed += p1ToIsa;
+          if (toGia > 0) { jointGiaV += toGia; jointGiaBC += toGia; }
+          p2PclsEvent = pclsAmount;
         }
       }
     }
@@ -504,22 +517,22 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
         // Only draws what is actually needed to cover spending (remaining).
         if (p1Dc > 0 && dc1.enabled && householdFiStarted) {
           const p1Headroom = Math.max(0, yearSnapshot.incomeTaxBands.personalAllowance - p1TaxableFixed);
-          const maxWithinAllowance = p1Headroom / (1 - yearUfplsFrac);
+          const p1RemainingLsa = Math.max(0, yearPensionLsa - p1LifetimePcls);
+          const maxWithinAllowance = maxUfplsWithinHeadroom(p1Headroom, p1RemainingLsa, yearUfplsFrac);
           const d = Math.min(maxWithinAllowance, p1Dc, remaining);
           if (d > 0) {
             p1DcD += d; p1Dc -= d; remaining -= d;
-            const p1RemainingLsa = Math.max(0, yearPensionLsa - p1LifetimePcls);
             const tf = Math.min(d * yearUfplsFrac, p1RemainingLsa);
             p1DcTaxFree += tf; p1LifetimePcls += tf;
           }
         }
         if (mode === 'couple' && remaining > 0 && p2Age !== null && p2Dc > 0 && dc2.enabled && householdFiStarted) {
           const p2Headroom = Math.max(0, yearSnapshot.incomeTaxBands.personalAllowance - p2TaxableFixed);
-          const maxWithinAllowance = p2Headroom / (1 - yearUfplsFrac);
+          const p2RemainingLsa = Math.max(0, yearPensionLsa - p2LifetimePcls);
+          const maxWithinAllowance = maxUfplsWithinHeadroom(p2Headroom, p2RemainingLsa, yearUfplsFrac);
           const d = Math.min(maxWithinAllowance, p2Dc, remaining);
           if (d > 0) {
             p2DcD += d; p2Dc -= d; remaining -= d;
-            const p2RemainingLsa = Math.max(0, yearPensionLsa - p2LifetimePcls);
             const tf = Math.min(d * yearUfplsFrac, p2RemainingLsa);
             p2DcTaxFree += tf; p2LifetimePcls += tf;
           }
@@ -762,6 +775,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
 
       // PCLS + Bed & ISA strategy tracking (zero in standard-ufpls mode)
       p1PclsEvent: Math.round(p1PclsEvent),
+      p2PclsEvent: Math.round(p2PclsEvent),
       p1IndivBedIsaTransfer: Math.round(p1IndivBedIsaTransfer),
       p1JointBedIsaTransfer: Math.round(p1JointBedIsaTransfer),
       p1BedIsaTransfer:      Math.round(p1IndivBedIsaTransfer) + Math.round(p1JointBedIsaTransfer),

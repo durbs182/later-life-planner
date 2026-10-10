@@ -1,9 +1,10 @@
-import { CURRENT_TAX_YEAR_START, PENSION_RULES } from '@/config/financialConstants';
+import { CURRENT_TAX_YEAR_START } from '@/config/financialConstants';
 import { getSnapshotForYear } from '@/config/taxRuleSnapshot';
 import { getStrategyDisplayLabel } from '@/lib/strategyDefinitions';
 import type { PlannerState, YearlyProjection } from '@/models/types';
 import { calculateProjections } from './projectionEngine';
-import { calcCGT, calcIncomeTax, drawFromGIA, isHigherRateTaxpayer } from './taxCalculations';
+import { calcCGT, calcIncomeTax, drawFromGIA, isHigherRateTaxpayer, maxUfplsWithinHeadroom } from './taxCalculations';
+import { resolvePclsAges } from './pclsCrystallisation';
 import type {
   DCOrder,
   DrawdownBreakdown,
@@ -681,8 +682,16 @@ function simulateCandidatePass(
   const p2TaxableFixedIncome = fixed.p2OtherTaxable + fixed.p2StatePension;
   const p1Headroom = Math.max(0, snapshot.incomeTaxBands.personalAllowance - p1TaxableFixedIncome);
   const p2Headroom = Math.max(0, snapshot.incomeTaxBands.personalAllowance - p2TaxableFixedIncome);
-  const p1WithinAllowance = p1Headroom / snapshot.pension.ufplsTaxableFraction;
-  const p2WithinAllowance = p2Headroom / snapshot.pension.ufplsTaxableFraction;
+  const p1WithinAllowance = maxUfplsWithinHeadroom(
+    p1Headroom,
+    snapshot.pension.lsa - working.p1LifetimePcls,
+    snapshot.pension.ufplsTaxFreeFraction,
+  );
+  const p2WithinAllowance = maxUfplsWithinHeadroom(
+    p2Headroom,
+    snapshot.pension.lsa - working.p2LifetimePcls,
+    snapshot.pension.ufplsTaxFreeFraction,
+  );
 
   const withinPa = allocateDcWithinAllowance(
     strategy.dcOrder,
@@ -1127,24 +1136,25 @@ function simulateStrategies(
   // Resolve PCLS + Bed & ISA strategy parameters once.
   const isPclsBedIsa = (state.drawdownStrategy ?? 'standard-ufpls') === 'pcls-bed-isa';
   const dc1Enabled = state.person1.incomeSources.dcPension.enabled;
-  let resolvedPclsAge = 0;
+  const dc2Enabled = state.mode === 'couple' && state.person2.incomeSources.dcPension.enabled;
+  const pclsAges = resolvePclsAges(state);
   if (isPclsBedIsa) {
-    const rawPclsAge = state.pclsAge ?? state.fiAge;
-    const pclsCalendarYear = CURRENT_TAX_YEAR_START + (rawPclsAge - state.person1.currentAge);
-    const nmpa = pclsCalendarYear >= PENSION_RULES.NMPA_RISE_YEAR
-      ? PENSION_RULES.MIN_ACCESS_AGE_POST_2028
-      : PENSION_RULES.MIN_ACCESS_AGE;
-    resolvedPclsAge = Math.max(rawPclsAge, nmpa);
-
     // If PCLS fired before FI age (pre-FI period), the projection engine already
-    // reduced p1Dc and boosted ISA/GIA in the pre-FI rows that seed our balances.
+    // reduced the DC pot and boosted ISA/GIA in the pre-FI rows that seed our balances.
     // We must mark the LSA as fully exhausted so that subsequent DC draws are
     // treated as 100% taxable — not 25% tax-free.
-    if (resolvedPclsAge < state.fiAge) {
+    if (pclsAges.p1 < state.fiAge) {
       const pclsSnapshot = getSnapshotForYear(
-        CURRENT_TAX_YEAR_START + (resolvedPclsAge - state.person1.currentAge),
+        CURRENT_TAX_YEAR_START + (pclsAges.p1 - state.person1.currentAge),
       );
       balances = { ...balances, p1LifetimePcls: pclsSnapshot.pension.lsa };
+    }
+    if (pclsAges.p2 !== null) {
+      const p2PclsYearIndex = pclsAges.p2 - state.person2.currentAge;
+      if (state.person1.currentAge + p2PclsYearIndex < state.fiAge) {
+        const pclsSnapshot = getSnapshotForYear(CURRENT_TAX_YEAR_START + p2PclsYearIndex);
+        balances = { ...balances, p2LifetimePcls: pclsSnapshot.pension.lsa };
+      }
     }
   }
 
@@ -1158,12 +1168,12 @@ function simulateStrategies(
     let p1IsaAllowanceUsed = 0;
     let p2IsaAllowanceUsed = 0;
 
-    // PCLS + Bed & ISA: fire the crystallisation event at resolvedPclsAge.
+    // PCLS + Bed & ISA: fire each person's crystallisation event at their PCLS age.
     // Mirrors projectionEngine logic: happens after growth, before drawdown.
     // Moves the tax-free lump sum from DC into ISA (up to annual allowance)
     // and GIA (remainder), then exhausts the LSA so all future DC draws are
     // 100% taxable.
-    if (isPclsBedIsa && dc1Enabled && row.p1Age === resolvedPclsAge && balances.p1Dc > 0) {
+    if (isPclsBedIsa && dc1Enabled && row.p1Age === pclsAges.p1 && balances.p1Dc > 0) {
       const pclsSnapshot = getSnapshotForYear(calendarYear);
       const pclsAmount = Math.min(
         balances.p1Dc * pclsSnapshot.pension.ufplsTaxFreeFraction,
@@ -1189,6 +1199,32 @@ function simulateStrategies(
           ...(state.mode === 'couple'
             ? { jointGiaValue: balances.jointGiaValue + toGia, jointGiaBaseCost: balances.jointGiaBaseCost + toGia }
             : { p1GiaValue: balances.p1GiaValue + toGia, p1GiaBaseCost: balances.p1GiaBaseCost + toGia }),
+        };
+      }
+    }
+
+    // Person 2: reinvest into p2's ISA first, then any p1 ISA allowance left
+    // this year, then the joint GIA.
+    if (isPclsBedIsa && dc2Enabled && row.p2Age === pclsAges.p2 && balances.p2Dc > 0) {
+      const pclsSnapshot = getSnapshotForYear(calendarYear);
+      const pclsAmount = Math.min(
+        balances.p2Dc * pclsSnapshot.pension.ufplsTaxFreeFraction,
+        Math.max(0, pclsSnapshot.pension.lsa - balances.p2LifetimePcls),
+      );
+      if (pclsAmount > 0) {
+        const p2ToIsa = Math.min(pclsAmount, pclsSnapshot.isaAnnualAllowance - p2IsaAllowanceUsed);
+        const p1ToIsa = Math.min(pclsAmount - p2ToIsa, pclsSnapshot.isaAnnualAllowance - p1IsaAllowanceUsed);
+        const toGia = pclsAmount - p2ToIsa - p1ToIsa;
+        p2IsaAllowanceUsed += p2ToIsa;
+        p1IsaAllowanceUsed += p1ToIsa;
+        balances = {
+          ...balances,
+          p2Dc: balances.p2Dc - pclsAmount,
+          p2LifetimePcls: pclsSnapshot.pension.lsa,
+          p1Isa: balances.p1Isa + p1ToIsa,
+          p2Isa: balances.p2Isa + p2ToIsa,
+          jointGiaValue: balances.jointGiaValue + toGia,
+          jointGiaBaseCost: balances.jointGiaBaseCost + toGia,
         };
       }
     }

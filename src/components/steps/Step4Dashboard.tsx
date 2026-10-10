@@ -16,8 +16,9 @@ import DashboardMain from '@/components/DashboardMain';
 // import DashboardSidebar from '@/components/DashboardSidebar';
 import IHTOutlookPanel from '@/components/IHTOutlookPanel';
 import ProFeatureBanner from '@/components/ProFeatureBanner';
-import { CARE_RESERVE, CURRENT_TAX_YEAR_START, GOAL_PANEL, PENSION_RULES, CGT, INCOME_TAX } from '@/config/financialConstants';
+import { CARE_RESERVE, GOAL_PANEL, PENSION_RULES, CGT, INCOME_TAX } from '@/config/financialConstants';
 import { optimizeWithdrawals } from '@/financialEngine/withdrawalOptimizer';
+import { resolveCrystallisationAge } from '@/financialEngine/pclsCrystallisation';
 import {
   buildGoalOrchestrateRequest,
   DEFAULT_GOAL_ORCHESTRATION_SCHEMA_VERSION,
@@ -388,15 +389,6 @@ function GoalPriorityPanel({
   );
 }
 
-/** Resolves a PCLS age candidate against NMPA rules and the person's current age. */
-function resolvePclsAge(candidate: number, currentAge: number): number {
-  const calYear = CURRENT_TAX_YEAR_START + (candidate - currentAge);
-  const nmpaForAge = calYear >= PENSION_RULES.NMPA_RISE_YEAR
-    ? PENSION_RULES.MIN_ACCESS_AGE_POST_2028
-    : PENSION_RULES.MIN_ACCESS_AGE;
-  return Math.max(candidate, nmpaForAge, currentAge);
-}
-
 export function buildOptimizerViewProjections(
   displayRows: YearlyProjection[],
   optimizerResult: NonNullable<ReturnType<typeof optimizeWithdrawals> | null>,
@@ -491,7 +483,7 @@ export default function Step4Dashboard({ onBack }: Props) {
   );
 
   const rawAge = pclsAge ?? fiAge;
-  const effectivePclsAge = resolvePclsAge(rawAge, person1.currentAge);
+  const effectivePclsAge = resolveCrystallisationAge(rawAge, person1.currentAge);
 
   // Goal registry sync effect
   useEffect(() => {

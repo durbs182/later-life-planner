@@ -6,6 +6,7 @@ import OptimizerPanel from '@/components/OptimizerPanel';
 import { optimizeWithdrawals } from '@/financialEngine/withdrawalOptimizer';
 import { formatCurrency } from '@/financialEngine/projectionEngine';
 import { dcOnlyState, paulAndLisaState } from '../fixtures/states';
+import { withSpending } from '../fixtures/helpers';
 
 afterEach(() => {
   window.localStorage.clear();
@@ -808,10 +809,14 @@ describe('OptimizerPanel — Your action plan (Option B)', () => {
 });
 
 describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
+  // Higher spending than the base fixture so ISA withdrawals exceed the Bed & ISA
+  // transfer (p1ShowBed / p2ShowBed = false) in the years these tests inspect.
+  const fundingBreakdownState = () =>
+    withSpending({ ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const }, 70_000);
+
   test('shows ISA-funded spending label and Bed & ISA split when ISA withdrawal covers transfer (person 1)', async () => {
-    // With pcls-bed-isa, year 5 has p1ShowBed=false (p1Isa=39,413 >= p1Bed=27,371)
-    // so the full breakdown renders inside "ISA withdrawal"
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // Year 5 has p1ShowBed=false (p1Isa >= p1Bed), so the full breakdown renders inside "ISA withdrawal"
+    const plannerState = fundingBreakdownState();
     const result = optimizeWithdrawals(plannerState);
 
     // Precondition: year 5 must have p1 ISA withdrawal > p1 Bed transfer
@@ -832,14 +837,14 @@ describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
     }
     expect(within(section).getByText(record5.taxYear)).toBeInTheDocument();
 
-    // The funding breakdown card should be visible
-    expect(within(section).getByText("ISA withdrawal")).toBeInTheDocument();
+    // The funding breakdown card should be visible (person 2 may show the same card this year)
+    expect(within(section).getAllByText("ISA withdrawal").length).toBeGreaterThanOrEqual(1);
     // Accurate label for the ISA withdrawal amount
-    expect(within(section).getByText('ISA-funded spending:')).toBeInTheDocument();
+    expect(within(section).getAllByText('ISA-funded spending:').length).toBeGreaterThanOrEqual(1);
     // Breakdown lines - should now only show tax-free ISA portion (not "From GIA" anymore)
-    expect(within(section).getByText('Tax-free from ISA:')).toBeInTheDocument();
+    expect(within(section).getAllByText('Tax-free from ISA:').length).toBeGreaterThanOrEqual(1);
     // GIA breakdown should be in the GIA panel with spending amount
-    expect(within(section).getByText('💷 GIA withdrawal')).toBeInTheDocument();
+    expect(within(section).getAllByText('💷 GIA withdrawal').length).toBeGreaterThanOrEqual(1);
     expect(within(section).getAllByText('To spending:').length).toBeGreaterThanOrEqual(1);
 
     // Validate computed overlap values for ISA > BED scenario:
@@ -854,8 +859,8 @@ describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
   });
 
   test('shows CGT line in ISA/GIA breakdown when CGT is due', async () => {
-    // Year 5 (pcls-bed-isa) has p1CgtPaid=778 and p1ShowBed=false
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // Year 5 has p1CgtPaid > 0 and p1ShowBed=false
+    const plannerState = fundingBreakdownState();
     const result = optimizeWithdrawals(plannerState);
 
     const record5 = result.yearRecords[5]!;
@@ -876,8 +881,8 @@ describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
   });
 
   test('shows ISA/GIA breakdown for person 2 in couple mode', async () => {
-    // Year 7 (pcls-bed-isa) has p2ShowBed=false (p2Isa=23,865 >= p2Bed=12,478)
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // Year 7 has p2ShowBed=false (p2Isa >= p2Bed)
+    const plannerState = fundingBreakdownState();
     const result = optimizeWithdrawals(plannerState);
 
     const record7 = result.yearRecords[7]!;

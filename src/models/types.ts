@@ -35,10 +35,11 @@ export type AssetOwner = 'p1' | 'p2' | 'joint';
  * - `standard-ufpls`: Each DC withdrawal is 25% tax-free / 75% taxable (UFPLS).
  *   The full pot stays invested for longer; the LSA is consumed gradually.
  *
- * - `pcls-bed-isa`: At plan start, person1 takes the maximum Pension Commencement
- *   Lump Sum (up to the £268,275 LSA). The cash is reinvested into their ISA
- *   (up to the annual allowance) and GIA. All subsequent DC draws for person1
- *   are 100% taxable (LSA exhausted). Each year, up to the ISA annual allowance
+ * - `pcls-bed-isa`: At `pclsAge`, person1 takes the maximum Pension Commencement
+ *   Lump Sum (up to the £268,275 LSA); in couple mode person2 does the same in
+ *   that tax year (or once they reach minimum pension age). The cash is
+ *   reinvested into ISAs (up to the annual allowance) and GIA. All subsequent DC
+ *   draws for each person are 100% taxable (LSA exhausted). Each year, up to the ISA annual allowance
  *   is transferred from person1's GIA to their ISA (pre- and post-FI), and from
  *   the joint GIA to person2's ISA (post-FI only). This Bed & ISA step builds a
  *   large tax-free ISA pot that can cover spending with minimal income tax.
@@ -302,6 +303,7 @@ export interface PlannerState {
   drawdownStrategy: DrawdownStrategy;
   /**
    * Age at which person 1 crystallises their PCLS under the `pcls-bed-isa` strategy.
+   * Person 2 crystallises in the same tax year, or later if below minimum pension age.
    * Must be ≥ 55 (or 57 if that calendar year is 2028 or later).
    * Defaults to `fiAge` when not set.
    */
@@ -415,8 +417,10 @@ export interface YearlyProjection {
   totalAssets: number;
 
   // PCLS + Bed & ISA strategy tracking (zero when strategy = 'standard-ufpls')
-  /** PCLS lump sum taken at plan start (person1 only, year 0 event). */
+  /** PCLS lump sum taken by person1 this year (non-zero only in their crystallisation year). */
   p1PclsEvent: number;
+  /** PCLS lump sum taken by person2 this year (non-zero only in their crystallisation year). */
+  p2PclsEvent: number;
   /** Total transferred into person1 ISA via Bed & ISA this year (individual + joint GIA). */
   p1BedIsaTransfer: number;
   /** Amount from person1's own individual GIA → person1 ISA (subset of p1BedIsaTransfer). */

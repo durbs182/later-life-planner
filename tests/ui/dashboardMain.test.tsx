@@ -45,7 +45,7 @@ function makeProjection(overrides: Partial<YearlyProjection> = {}): YearlyProjec
     p1IsaBalance: 0, p1GiaValue: 0, p1GiaBaseCost: 0, p1CashBalance: 0, p1DcBalance: 0,
     p2IsaBalance: 0, p2GiaValue: 0, p2GiaBaseCost: 0, p2CashBalance: 0, p2DcBalance: 0,
     jointGiaValue: 0, jointGiaBaseCost: 0, totalAssets: 200_000,
-    p1PclsEvent: 0, p1BedIsaTransfer: 0, p1IndivBedIsaTransfer: 0, p1JointBedIsaTransfer: 0,
+    p1PclsEvent: 0, p2PclsEvent: 0, p1BedIsaTransfer: 0, p1IndivBedIsaTransfer: 0, p1JointBedIsaTransfer: 0,
     p2BedIsaTransfer: 0, p2IndivBedIsaTransfer: 0, p2JointBedIsaTransfer: 0,
     plannedEventSpend: 0,
     ...overrides,
