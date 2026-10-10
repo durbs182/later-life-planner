@@ -5,7 +5,8 @@
 import React from 'react';
 import { describe, test, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import DashboardMain from '@/components/DashboardMain';
+import DashboardMain, { type LumpSumControl } from '@/components/DashboardMain';
+import { STEP4_IDS } from '@/lib/testIds';
 import { bareState } from '../fixtures/states';
 import type { YearlyProjection } from '@/models/types';
 
@@ -56,15 +57,24 @@ const defaultState = bareState(65);
 const defaultLifeStages = [{ id: 'active', label: 'Go-Go', color: '#f97316', startAge: 65, endAge: 95 }];
 const projections = [makeProjection()];
 
-const testStrategies = [
-  { id: 'standard-ufpls' as const, label: 'Flexible pension drawdown',        icon: '💧', description: 'Draw flexibly from your pension.' },
-  { id: 'pcls-bed-isa'    as const, label: 'Tax-free lump sum + ISA transfer', icon: '🚀', description: 'Take your tax-free entitlement now.' },
-] as const;
+function lumpSumControl(overrides: Partial<LumpSumControl> = {}): LumpSumControl {
+  return {
+    person: 'p1',
+    personName: 'You',
+    currentAge: 65,
+    enabled: false,
+    effectiveAge: 65,
+    onToggle: vi.fn(),
+    onAgeChange: vi.fn(),
+    ...overrides,
+  };
+}
 
 function renderDashboardMain(
   overrides: {
     proEnabled?: boolean;
     optimizerEnabled?: boolean;
+    lumpSumControls?: LumpSumControl[];
   } = {},
 ) {
   return render(
@@ -80,15 +90,7 @@ function renderDashboardMain(
       p2Name="Partner 2"
       optimizerEnabled={overrides.optimizerEnabled ?? false}
       proEnabled={overrides.proEnabled ?? false}
-      // Strategy-related props for Pro mode
-      drawdownStrategy={overrides.proEnabled ? 'standard-ufpls' : undefined}
-      setDrawdownStrategy={overrides.proEnabled ? vi.fn() : undefined}
-      pclsAge={overrides.proEnabled ? 65 : undefined}
-      setPclsAge={overrides.proEnabled ? vi.fn() : undefined}
-      strategies={overrides.proEnabled ? testStrategies : undefined}
-      effectiveDrawdownStrategy={overrides.proEnabled ? 'standard-ufpls' : undefined}
-      effectivePclsAge={overrides.proEnabled ? 65 : undefined}
-      person1CurrentAge={overrides.proEnabled ? 65 : undefined}
+      lumpSumControls={overrides.lumpSumControls ?? [lumpSumControl()]}
     />,
   );
 }
@@ -134,23 +136,58 @@ describe('DashboardMain chart toggle', () => {
   });
 });
 
-describe('DashboardMain Withdrawal Strategy (Pro mode)', () => {
-  test('shows Withdrawal Strategy heading and strategy buttons when Pro enabled', () => {
-    renderDashboardMain({ proEnabled: true });
-    expect(screen.getByText('Withdrawal Strategy')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Flexible pension drawdown/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Tax-free lump sum \+ ISA transfer/ })).toBeInTheDocument();
+describe('DashboardMain tax-free lump sum (Pro mode)', () => {
+  test('shows one toggle per person when Pro enabled', () => {
+    renderDashboardMain({
+      proEnabled: true,
+      lumpSumControls: [
+        lumpSumControl({ person: 'p1', personName: 'Alex' }),
+        lumpSumControl({ person: 'p2', personName: 'Sam' }),
+      ],
+    });
+    expect(screen.getByText('Tax-free lump sum')).toBeInTheDocument();
+    expect(screen.getByTestId(STEP4_IDS.LUMP_SUM_TOGGLE('p1'))).not.toBeChecked();
+    expect(screen.getByTestId(STEP4_IDS.LUMP_SUM_TOGGLE('p2'))).not.toBeChecked();
+    expect(screen.getByText('Alex: take full tax-free lump sum')).toBeInTheDocument();
+    expect(screen.getByText('Sam: take full tax-free lump sum')).toBeInTheDocument();
   });
 
-  test('active strategy button has aria-pressed=true', () => {
-    renderDashboardMain({ proEnabled: true });
-    const activeBtn = screen.getByRole('button', { name: /Flexible pension drawdown/ });
-    expect(activeBtn).toHaveAttribute('aria-pressed', 'true');
+  test('age input only appears for the person who has opted in', () => {
+    renderDashboardMain({
+      proEnabled: true,
+      lumpSumControls: [
+        lumpSumControl({ person: 'p1', enabled: true, effectiveAge: 67 }),
+        lumpSumControl({ person: 'p2', enabled: false }),
+      ],
+    });
+    expect(screen.getByTestId(STEP4_IDS.LUMP_SUM_AGE('p1'))).toHaveValue(67);
+    expect(screen.queryByTestId(STEP4_IDS.LUMP_SUM_AGE('p2'))).not.toBeInTheDocument();
   });
 
-  test('does not show Withdrawal Strategy selector in non-Pro mode', () => {
+  test('toggling and changing age call back for that person only', () => {
+    const p1 = lumpSumControl({ person: 'p1', enabled: true, effectiveAge: 66 });
+    const p2 = lumpSumControl({ person: 'p2' });
+    renderDashboardMain({ proEnabled: true, lumpSumControls: [p1, p2] });
+
+    fireEvent.click(screen.getByTestId(STEP4_IDS.LUMP_SUM_TOGGLE('p2')));
+    expect(p2.onToggle).toHaveBeenCalledWith(true);
+    expect(p1.onToggle).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId(STEP4_IDS.LUMP_SUM_AGE('p1')), { target: { value: '70' } });
+    expect(p1.onAgeChange).toHaveBeenCalledWith(70);
+    expect(p2.onAgeChange).not.toHaveBeenCalled();
+  });
+
+  test('age below current age is clamped to current age', () => {
+    const p1 = lumpSumControl({ enabled: true, currentAge: 65 });
+    renderDashboardMain({ proEnabled: true, lumpSumControls: [p1] });
+    fireEvent.change(screen.getByTestId(STEP4_IDS.LUMP_SUM_AGE('p1')), { target: { value: '50' } });
+    expect(p1.onAgeChange).toHaveBeenCalledWith(65);
+  });
+
+  test('does not show lump sum controls in non-Pro mode', () => {
     renderDashboardMain({ proEnabled: false });
-    expect(screen.queryByText('Withdrawal Strategy')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tax-free lump sum')).not.toBeInTheDocument();
   });
 });
 

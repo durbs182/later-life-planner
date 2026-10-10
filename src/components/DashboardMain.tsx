@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import type { YearlyProjection, DrawdownStrategy, LifeStage } from '@/lib/types';
+import type { YearlyProjection, LifeStage } from '@/lib/types';
 import type { PlannerState, RlssStandard } from '@/models/types';
 import type { OptimizationResult } from '@/financialEngine/types';
 import { formatCurrency } from '@/lib/calculations';
@@ -88,14 +88,19 @@ interface DashboardMainProps {
   optimizerResult?: OptimizationResult | null;
   plannerState?: PlannerState;
   onProCta?: () => void;
-  drawdownStrategy?: DrawdownStrategy;
-  setDrawdownStrategy?: (v: DrawdownStrategy) => void;
-  pclsAge?: number | undefined;
-  setPclsAge?: (v: number | undefined) => void;
-  strategies?: ReadonlyArray<{ id: DrawdownStrategy; label: string; icon: string; description: string }>;
-  effectiveDrawdownStrategy?: DrawdownStrategy;
-  effectivePclsAge?: number;
-  person1CurrentAge?: number;
+  lumpSumControls?: LumpSumControl[];
+}
+
+/** One person's full tax-free lump sum setting (Pro only). */
+export interface LumpSumControl {
+  person: 'p1' | 'p2';
+  personName: string;
+  currentAge: number;
+  enabled: boolean;
+  /** Age the engine will use, after defaulting and minimum pension age rules. */
+  effectiveAge: number;
+  onToggle: (enabled: boolean) => void;
+  onAgeChange: (age: number) => void;
 }
 
 interface StatCardProps {
@@ -137,14 +142,7 @@ export default function DashboardMain({
   optimizerResult,
   plannerState,
   onProCta,
-  drawdownStrategy,
-  setDrawdownStrategy,
-  pclsAge,
-  setPclsAge,
-  strategies,
-  effectiveDrawdownStrategy,
-  effectivePclsAge,
-  person1CurrentAge,
+  lumpSumControls,
 }: DashboardMainProps) {
   const firstStageId = lifeStages[0]?.id ?? 'active';
   const annualSpend = getStageTotalSpending(state, firstStageId);
@@ -226,57 +224,61 @@ export default function DashboardMain({
         </div>
       )}
 
-      {/* Withdrawal Strategy selector — Pro mode only */}
-      {proEnabled && strategies && strategies.length > 0 && setDrawdownStrategy && (
+      {/* Full tax-free lump sum, set per person — Pro mode only */}
+      {proEnabled && lumpSumControls && lumpSumControls.length > 0 && (
         <div className="game-card mb-6">
-          <h3 className="section-heading mb-1">Withdrawal Strategy</h3>
-          <p className="text-xs text-slate-500 mb-3">Choose how you draw down your pension and investment accounts each year.</p>
+          <h3 className="section-heading mb-1">Tax-free lump sum</h3>
+          <p className="text-xs text-slate-500 mb-3">
+            Each person can take their whole tax-free entitlement in one go and move it into an ISA, where future growth is sheltered from tax.
+            After that, every withdrawal from their pension is fully taxable. Otherwise each withdrawal is 25% tax-free.
+          </p>
           <div className="space-y-3">
-            {strategies.map(option => (
-              <button
-                key={option.id}
-                data-testid={STEP4_IDS.STRATEGY_BUTTON(option.id)}
-                onClick={() => setDrawdownStrategy(option.id)}
+            {lumpSumControls.map(control => (
+              <div
+                key={control.person}
                 className={clsx(
-                  'w-full text-left rounded-xl border-2 p-4 transition-all hover:shadow-md',
-                  effectiveDrawdownStrategy === option.id
-                    ? 'border-orange-400 bg-orange-50'
-                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50',
+                  'rounded-xl border-2 p-4 transition-all',
+                  control.enabled ? 'border-orange-400 bg-orange-50' : 'border-slate-200 bg-white',
                 )}
-                aria-pressed={effectiveDrawdownStrategy === option.id}
-                aria-label={`${option.label}. ${option.description}${effectiveDrawdownStrategy === option.id ? ' (Active)' : ''}`}
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="text-xl" aria-hidden="true">{option.icon}</span>
-                  <span className={clsx('font-bold text-sm', effectiveDrawdownStrategy === option.id ? 'text-orange-800' : 'text-slate-800')} aria-hidden="true">
-                    {option.label}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={control.enabled}
+                    onChange={(e) => control.onToggle(e.target.checked)}
+                    data-testid={STEP4_IDS.LUMP_SUM_TOGGLE(control.person)}
+                    className="h-4 w-4 accent-orange-500"
+                  />
+                  <span className="font-bold text-sm text-slate-800">
+                    {control.personName}: take full tax-free lump sum
                   </span>
-                  {effectiveDrawdownStrategy === option.id && (
-                    <span className="ml-auto text-xs font-bold bg-orange-200 text-orange-700 px-2 py-0.5 rounded-full" aria-hidden="true">Active</span>
-                  )}
-                </div>
-                <p className={clsx('text-sm leading-relaxed', effectiveDrawdownStrategy === option.id ? 'text-orange-700' : 'text-slate-500')}>
-                  {option.description}
-                </p>
-              </button>
+                </label>
+                {control.enabled && (
+                  <div className="mt-3">
+                    <label
+                      htmlFor={`lump-sum-age-${control.person}`}
+                      className="text-sm font-semibold text-slate-700 block mb-2"
+                    >
+                      Lump sum age
+                    </label>
+                    <input
+                      id={`lump-sum-age-${control.person}`}
+                      type="number"
+                      value={control.effectiveAge}
+                      onChange={(e) => control.onAgeChange(
+                        Math.max(control.currentAge, parseInt(e.target.value) || control.effectiveAge),
+                      )}
+                      min={control.currentAge}
+                      max={120}
+                      data-testid={STEP4_IDS.LUMP_SUM_AGE(control.person)}
+                      className="w-32 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                    <p className="text-xs text-blue-600 mt-1">Taken at age {control.effectiveAge}</p>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-          {effectiveDrawdownStrategy === 'pcls-bed-isa' && setPclsAge && person1CurrentAge !== undefined && (
-            <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-              <label className="text-sm font-semibold text-slate-700 block mb-2">
-                Lump sum age
-              </label>
-              <input
-                type="number"
-                value={effectivePclsAge ?? state.fiAge}
-                onChange={(e) => setPclsAge(Math.max(person1CurrentAge, parseInt(e.target.value) || state.fiAge))}
-                min={person1CurrentAge}
-                max={120}
-                className="w-32 px-3 py-2 text-sm border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-              <p className="text-xs text-blue-600 mt-1">Strategy applies from age {effectivePclsAge ?? state.fiAge}</p>
-            </div>
-          )}
         </div>
       )}
 

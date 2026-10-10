@@ -42,7 +42,8 @@ export const STEP3_IDS = {
 
 export const STEP4_IDS = {
   TAB_BUTTON:        (tabId: string) => `step4-tab-${tabId}`,
-  STRATEGY_BUTTON:   (strategyId: string) => `step4-strategy-${strategyId}`,
+  LUMP_SUM_TOGGLE:   (person: 'p1' | 'p2') => `step4-lump-sum-toggle-${person}`,
+  LUMP_SUM_AGE:      (person: 'p1' | 'p2') => `step4-lump-sum-age-${person}`,
   KPI_CARDS:         'step4-kpi-cards',
 } as const;
 

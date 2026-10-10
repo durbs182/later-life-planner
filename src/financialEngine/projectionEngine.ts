@@ -11,9 +11,9 @@
  * - Exported helpers (formatCurrency, etc.) are used by UI components
  *
  * DC Pension drawdown model — UFPLS (Uncrystallised Funds Pension Lump Sum):
- *   The engine uses a pure UFPLS strategy. No upfront PCLS lump sum is taken
- *   at crystallisation. Instead, each DC pension withdrawal is 25% tax-free
- *   and 75% taxable, spread naturally over the drawdown period.
+ *   By default no upfront PCLS lump sum is taken. Each DC pension withdrawal
+ *   is 25% tax-free and 75% taxable, spread naturally over the drawdown period.
+ *   Each person can instead opt in to a full lump sum (dcPension.fullLumpSum).
  *
  *   Rationale:
  *   - Leaves the full pension pot invested (tax-free growth environment) for longer.
@@ -43,7 +43,7 @@ import type {
 import { CGT, RLSS, CURRENT_TAX_YEAR_START, GAP_PERIOD_NET_SALARY_FACTOR } from '@/config/financialConstants';
 import { getSnapshotForYear } from '@/config/taxRuleSnapshot';
 import { calcIncomeTax, calcCGT, drawFromGIA, isHigherRateTaxpayer, maxUfplsWithinHeadroom } from './taxCalculations';
-import { resolvePclsAges } from './pclsCrystallisation';
+import { allocateLumpSums, resolveP2FiAge, resolvePclsAges } from './pclsCrystallisation';
 
 // ─── Per-person income aggregator ────────────────────────────────────────────
 
@@ -125,15 +125,7 @@ function getAnnualDcContribution(
 export function calculateProjections(state: PlannerState): YearlyProjection[] {
   const { person1, person2, lifeStages, spendingCategories, assumptions, mode, fiAge, jointGia } = state;
   const { lifeExpectancy, inflation, investmentGrowth } = assumptions;
-  const drawdownStrategy = state.drawdownStrategy ?? 'standard-ufpls';
-  const isPclsBedIsa = drawdownStrategy === 'pcls-bed-isa';
-
-  // Resolve person2's FI age: user-specified, else preserve original household behaviour
-  // by computing the age person2 would be when person1 reaches fiAge. This ensures
-  // existing couple plans (where p2FiAge was never stored) continue to produce identical
-  // projections to before this field was introduced.
-  const p2FiAge = state.p2FiAge ??
-    (mode === 'couple' ? person2.currentAge + (fiAge - person1.currentAge) : fiAge);
+  const p2FiAge = resolveP2FiAge(state);
 
   const pclsAges = resolvePclsAges(state);
 
@@ -290,17 +282,17 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     const p2TaxableFixed = p2Inc.sp + p2Inc.db + p2Inc.ptw + p2Inc.other + p2RentEffective;
     const spExempt = assumptions.statePensionSoleIncomeExempt ?? true;
 
-    // ── PCLS + Bed & ISA strategy — pre-waterfall adjustments ─────────────
+    // ── Full lump sum + Bed & ISA — pre-waterfall adjustments ─────────────
     // These modify asset balances BEFORE the gross-up snapshot so the changes
     // are permanent for the year and not repeated on each gross-up iteration.
     //
-    // PCLS crystallisation (pcls-bed-isa strategy only):
-    //   At each person's PCLS age, take their maximum tax-free lump sum (up to LSA),
-    //   reinvest into ISA wrappers then GIA. Mark that person's LSA as fully used:
-    //   the whole pot is crystallised, so the 75% left in drawdown is 100% taxable
-    //   even when 25% of the pot was below the LSA.
+    // Full lump sum (per person, when opted in):
+    //   At that person's lump-sum age, take their maximum tax-free lump sum (up to
+    //   LSA) and reinvest into ISA wrappers then GIA. Mark that person's LSA as fully
+    //   used: the whole pot is crystallised, so the 75% left in drawdown is 100%
+    //   taxable even when 25% of the pot was below the LSA.
     //
-    // Annual Bed & ISA (all strategies, FI years only):
+    // Annual Bed & ISA (FI years only):
     //   Sell GIA assets (individual then joint) up to each person's remaining ISA
     //   annual allowance and repurchase inside the ISA wrapper. Triggers CGT on
     //   any embedded gains crystallised. Holding GIA when ISA allowance is unused
@@ -318,72 +310,39 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
     let p2BedIsaTransfer = 0, p2IndivBedIsaTransfer = 0, p2JointBedIsaTransfer = 0, p2IndivBedIsaCg = 0, p2BedIsaCg = 0;
 
     // Track how much of each person's ISA annual allowance has already been used
-    // in this year (PCLS reinvestment counts toward the same subscription limit).
+    // in this year (lump-sum reinvestment counts toward the same subscription limit).
     let p1IsaAllowanceUsed = 0;
     let p2IsaAllowanceUsed = 0;
 
-    if (isPclsBedIsa) {
-      // Track remaining ISA capacity per person to prevent over-subscription
-      // when PCLS reinvestment and Bed & ISA both fire in the same tax year.
-      let p1IsaCapacity = yearSnapshot.isaAnnualAllowance;
-      let p2IsaCapacity = yearSnapshot.isaAnnualAllowance;
-
-      // ── Person 1 PCLS crystallisation ─────────────────────────────────
-      if (p1Age === pclsAges.p1 && p1Dc > 0 && dc1.enabled) {
-        const remainingPensionLsa = Math.max(0, yearPensionLsa - p1LifetimePcls);
-        const pclsAmount = Math.min(p1Dc * yearUfplsFrac, remainingPensionLsa);
-        if (pclsAmount > 0) {
-          p1Dc -= pclsAmount;
-          p1LifetimePcls = yearPensionLsa;
-          // Reinvest: up to the annual ISA allowance per person into ISA wrappers,
-          // remainder into GIA (joint for couple, p1 for single).
-          // Base cost = reinvested amount; no embedded gain at acquisition.
-          const p1ToIsa = Math.min(pclsAmount, p1IsaCapacity);
-          const afterP1Isa = pclsAmount - p1ToIsa;
-          const p2ToIsa = (mode === 'couple' && afterP1Isa > 0)
-            ? Math.min(afterP1Isa, p2IsaCapacity)
-            : 0;
-          const toGia = afterP1Isa - p2ToIsa;
-          // Reduce remaining capacity so Bed & ISA later in the same year
-          // cannot cause total ISA subscriptions to exceed the annual cap.
-          p1IsaCapacity -= p1ToIsa;
-          p2IsaCapacity -= p2ToIsa;
-          p1Isa += p1ToIsa;
-          p1IsaAllowanceUsed += p1ToIsa;
-          if (p2ToIsa > 0) { p2Isa += p2ToIsa; p2IsaAllowanceUsed += p2ToIsa; }
-          if (toGia > 0) {
-            if (mode === 'couple') { jointGiaV += toGia; jointGiaBC += toGia; }
-            else                   { p1GiaV    += toGia; p1GiaBC    += toGia; }
-          }
-          p1PclsEvent = pclsAmount;
-        }
-      }
-
-      // ── Person 2 PCLS crystallisation (couple only) ───────────────────
-      // Reinvest into p2's ISA first, then any p1 ISA capacity left this year,
-      // then the joint GIA.
-      if (mode === 'couple' && p2Age === pclsAges.p2 && p2Dc > 0 && dc2.enabled) {
-        const remainingPensionLsa = Math.max(0, yearPensionLsa - p2LifetimePcls);
-        const pclsAmount = Math.min(p2Dc * yearUfplsFrac, remainingPensionLsa);
-        if (pclsAmount > 0) {
-          p2Dc -= pclsAmount;
-          p2LifetimePcls = yearPensionLsa;
-          const p2ToIsa = Math.min(pclsAmount, p2IsaCapacity);
-          const p1ToIsa = Math.min(pclsAmount - p2ToIsa, p1IsaCapacity);
-          const toGia = pclsAmount - p2ToIsa - p1ToIsa;
-          p2Isa += p2ToIsa;
-          p2IsaAllowanceUsed += p2ToIsa;
-          p1Isa += p1ToIsa;
-          p1IsaAllowanceUsed += p1ToIsa;
-          if (toGia > 0) { jointGiaV += toGia; jointGiaBC += toGia; }
-          p2PclsEvent = pclsAmount;
-        }
-      }
+    if (p1Age === pclsAges.p1 && p1Dc > 0) {
+      p1PclsEvent = Math.min(p1Dc * yearUfplsFrac, Math.max(0, yearPensionLsa - p1LifetimePcls));
+      p1Dc -= p1PclsEvent;
+      p1LifetimePcls = yearPensionLsa;
+    }
+    if (p2Age !== null && p2Age === pclsAges.p2 && p2Dc > 0) {
+      p2PclsEvent = Math.min(p2Dc * yearUfplsFrac, Math.max(0, yearPensionLsa - p2LifetimePcls));
+      p2Dc -= p2PclsEvent;
+      p2LifetimePcls = yearPensionLsa;
+    }
+    if (p1PclsEvent > 0 || p2PclsEvent > 0) {
+      // Base cost = reinvested amount; no embedded gain at acquisition.
+      const alloc = allocateLumpSums(
+        p1PclsEvent,
+        p2PclsEvent,
+        yearSnapshot.isaAnnualAllowance,
+        mode === 'couple' ? yearSnapshot.isaAnnualAllowance : 0,
+      );
+      p1Isa += alloc.p1Isa;
+      p2Isa += alloc.p2Isa;
+      p1IsaAllowanceUsed = alloc.p1Isa;
+      p2IsaAllowanceUsed = alloc.p2Isa;
+      if (mode === 'couple') { jointGiaV += alloc.gia; jointGiaBC += alloc.gia; }
+      else                   { p1GiaV    += alloc.gia; p1GiaBC    += alloc.gia; }
     }
 
-    // ── Annual Bed & ISA — all strategies, FI years ─────────────────────
+    // ── Annual Bed & ISA — FI years ─────────────────────────────────────
     // Shelter GIA assets into ISA wrappers up to each person's remaining annual
-    // ISA allowance (reduced by any PCLS reinvestment above).
+    // ISA allowance (reduced by any lump-sum reinvestment above).
     if (householdFiStarted) {
       // p1 individual GIA → p1 ISA
       const p1Allowance = yearSnapshot.isaAnnualAllowance - p1IsaAllowanceUsed;
@@ -773,7 +732,7 @@ export function calculateProjections(state: PlannerState): YearlyProjection[] {
       // Care reserve tracked separately — earmarked, never drawn for spending.
       careReserveBalance: Math.round(careReserveBalance),
 
-      // PCLS + Bed & ISA strategy tracking (zero in standard-ufpls mode)
+      // Full lump sum + Bed & ISA tracking
       p1PclsEvent: Math.round(p1PclsEvent),
       p2PclsEvent: Math.round(p2PclsEvent),
       p1IndivBedIsaTransfer: Math.round(p1IndivBedIsaTransfer),

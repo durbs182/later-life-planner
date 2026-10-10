@@ -63,3 +63,26 @@ export function withSpending(state: PlannerState, annualSpend: number): PlannerS
 export function near(a: number, b: number, tolerance = 1): boolean {
   return Math.abs(a - b) <= tolerance;
 }
+
+/**
+ * Turn on a full tax-free lump sum for one or both people.
+ * Pass `true` to use the default age (the person's FI age) or `{ age }` to set one.
+ */
+export function withFullLumpSum(
+  state: PlannerState,
+  plans: { p1?: true | { age: number }; p2?: true | { age: number } },
+): PlannerState {
+  const apply = (person: PlannerState['person1'], plan?: true | { age: number }) => plan
+    ? {
+        ...person,
+        incomeSources: {
+          ...person.incomeSources,
+          dcPension: {
+            ...person.incomeSources.dcPension,
+            fullLumpSum: plan === true ? { enabled: true } : { enabled: true, age: plan.age },
+          },
+        },
+      }
+    : person;
+  return { ...state, person1: apply(state.person1, plans.p1), person2: apply(state.person2, plans.p2) };
+}

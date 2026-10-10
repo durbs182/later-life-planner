@@ -6,7 +6,7 @@ import OptimizerPanel from '@/components/OptimizerPanel';
 import { optimizeWithdrawals } from '@/financialEngine/withdrawalOptimizer';
 import { formatCurrency } from '@/financialEngine/projectionEngine';
 import { dcOnlyState, paulAndLisaState } from '../fixtures/states';
-import { withSpending } from '../fixtures/helpers';
+import { withFullLumpSum, withSpending } from '../fixtures/helpers';
 
 afterEach(() => {
   window.localStorage.clear();
@@ -556,8 +556,8 @@ describe('OptimizerPanel — Pro gating (proEnabled=false)', () => {
 
 describe('OptimizerPanel — Bed & ISA action columns', () => {
   test('shows "Annual ISA action" column headers when plan has GIA to shelter', async () => {
-    // pcls-bed-isa strategy is required to trigger Bed & ISA transfers
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // a full lump sum puts cash in the GIA, which triggers Bed & ISA transfers
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     const hasAnyBedIsa = result.baselineProjections.some(p => p.p1BedIsaTransfer > 0 || p.p2BedIsaTransfer > 0);
@@ -570,8 +570,8 @@ describe('OptimizerPanel — Bed & ISA action columns', () => {
   });
 
   test('shows ISA transfer footnote when Bed & ISA columns are present', async () => {
-    // pcls-bed-isa strategy is required to trigger Bed & ISA transfers
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // a full lump sum puts cash in the GIA, which triggers Bed & ISA transfers
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     const hasAnyBedIsa = result.baselineProjections.some(p => p.p1BedIsaTransfer > 0 || p.p2BedIsaTransfer > 0);
@@ -585,7 +585,7 @@ describe('OptimizerPanel — Bed & ISA action columns', () => {
   });
 
   test('does not show "Annual ISA action" column when no GIA exists to shelter', async () => {
-    // dcOnlyState has no GIA and uses the default standard-ufpls strategy, so B&I transfers are zero
+    // dcOnlyState has no GIA and takes no lump sum, so B&I transfers are zero
     const plannerState = dcOnlyState(65, 250_000);
     const result = optimizeWithdrawals(plannerState);
 
@@ -598,8 +598,8 @@ describe('OptimizerPanel — Bed & ISA action columns', () => {
   });
 
   test('BedIsaCell shows split breakdown (Into ISA + Covers ISA spending) when ISA withdrawal partially intercepts the transfer', async () => {
-    // Year 1 of pcls-bed-isa has p1Isa < p1Bed, so the table cell enters split mode and shows both sub-rows.
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // Year 1 with a full lump sum has p1Isa < p1Bed, so the table cell enters split mode and shows both sub-rows.
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     const record1 = result.yearRecords[1]!;
@@ -621,8 +621,8 @@ describe('OptimizerPanel — Bed & ISA action columns', () => {
   });
 
   test('Bed & ISA cells show dash when no transfer needed that year', async () => {
-    // pcls-bed-isa strategy is required to trigger Bed & ISA transfers
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // a full lump sum puts cash in the GIA, which triggers Bed & ISA transfers
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     const hasAnyBedIsa = result.baselineProjections.some(p => p.p1BedIsaTransfer > 0 || p.p2BedIsaTransfer > 0);
@@ -703,7 +703,7 @@ describe('OptimizerPanel — Your action plan (Option B)', () => {
   });
 
   test('shows ISA action card when plan has B&I transfers', async () => {
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     // Precondition: at least one year must have a B&I transfer
@@ -765,8 +765,8 @@ describe('OptimizerPanel — Your action plan (Option B)', () => {
   });
 
   test('shows "Bed & ISA strategy active" banner in action plan when ISA spending partially intercepts the transfer', async () => {
-    // Year 1 of pcls-bed-isa: p1Isa=18,351 < p1Bed=23,397 → p1BedIsaToSpend=18,351 > 0 → banner shows
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    // Year 1 with a full lump sum: p1Isa=18,351 < p1Bed=23,397 → p1BedIsaToSpend=18,351 > 0 → banner shows
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     const record1 = result.yearRecords[1]!;
@@ -812,7 +812,7 @@ describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
   // Higher spending than the base fixture so ISA withdrawals exceed the Bed & ISA
   // transfer (p1ShowBed / p2ShowBed = false) in the years these tests inspect.
   const fundingBreakdownState = () =>
-    withSpending({ ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const }, 70_000);
+    withSpending(withFullLumpSum(paulAndLisaState(), { p1: true, p2: true }), 70_000);
 
   test('shows ISA-funded spending label and Bed & ISA split when ISA withdrawal covers transfer (person 1)', async () => {
     // Year 5 has p1ShowBed=false (p1Isa >= p1Bed), so the full breakdown renders inside "ISA withdrawal"
@@ -923,9 +923,9 @@ describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
   });
 
   test('hides ISA withdrawal card and shows BED explanatory text when ISA withdrawal < BED transfer', async () => {
-    // Year 1 (pcls-bed-isa) has p1Isa=18,351 < p1Bed=23,397 and p2Isa=18,351 < p2Bed=23,397
+    // Year 1 (full lump sum) has p1Isa=18,351 < p1Bed=23,397 and p2Isa=18,351 < p2Bed=23,397
     // so p1ShowBed=true and p2ShowBed=true: BED section shown, ISA withdrawal hidden
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     // Preconditions: year 1 must have both persons' ISA withdrawal < BED transfer
@@ -974,7 +974,7 @@ describe('OptimizerPanel — ISA/GIA funding breakdown', () => {
   test('hides ISA withdrawal card and shows BED explanatory text when ISA withdrawal equals BED transfer', async () => {
     // Patch year 1 so that person 1's ISA withdrawal exactly equals the BED transfer amount
     // (the equality case must also suppress the ISA withdrawal card)
-    const plannerState = { ...paulAndLisaState(), drawdownStrategy: 'pcls-bed-isa' as const };
+    const plannerState = withFullLumpSum(paulAndLisaState(), { p1: true });
     const result = optimizeWithdrawals(plannerState);
 
     const record1 = result.yearRecords[1]!;

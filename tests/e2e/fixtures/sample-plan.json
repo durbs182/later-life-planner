@@ -474,6 +474,5 @@
     "mortgageOutstanding": 0,
     "leavesToDescendants": false
   },
-  "drawdownStrategy": "standard-ufpls",
   "plannedEvents": []
 }

@@ -5,7 +5,7 @@ import { persist } from 'zustand/middleware';
 import type {
   PlannerState, PlanningMode, LifeStage, GIAAsset, CareReserve, PrimaryResidenceAsset,
   PersonIncomeSources, PersonAssets, Assumptions, AspirationTag, RlssStandard, PersistedPlannerState,
-  GoalRegistry, DrawdownStrategy, PlannedEvent,
+  GoalRegistry, PlannedEvent,
 } from '@/models/types';
 import {
   createDefaultState, createMockDemoState, buildDefaultLifeStages,
@@ -42,8 +42,6 @@ type Actions = {
   setJointGia: (updates: Partial<GIAAsset>) => void;
   setCareReserve: (updates: Partial<CareReserve>) => void;
   setPrimaryResidence: (updates: Partial<PrimaryResidenceAsset>) => void;
-  setDrawdownStrategy: (strategy: DrawdownStrategy) => void;
-  setPclsAge: (age: number | undefined) => void;
   setGapSpending: (amount: number | undefined) => void;
   addPlannedEvent: (event: PlannedEvent) => void;
   updatePlannedEvent: (id: string, updates: Partial<PlannedEvent>) => void;
@@ -314,8 +312,6 @@ export const usePlannerStore = create<PlannerState & Actions>()(
       setPrimaryResidence: (updates) =>
         set((s) => ({ primaryResidence: { ...s.primaryResidence, ...updates } })),
 
-      setDrawdownStrategy: (strategy) => set({ drawdownStrategy: strategy }),
-      setPclsAge: (age) => set({ pclsAge: age }),
       setGapSpending: (amount) => set({ gapSpending: amount }),
 
       addPlannedEvent: (event) =>

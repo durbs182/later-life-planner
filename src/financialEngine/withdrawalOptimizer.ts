@@ -4,7 +4,7 @@ import { getStrategyDisplayLabel } from '@/lib/strategyDefinitions';
 import type { PlannerState, YearlyProjection } from '@/models/types';
 import { calculateProjections } from './projectionEngine';
 import { calcCGT, calcIncomeTax, drawFromGIA, isHigherRateTaxpayer, maxUfplsWithinHeadroom } from './taxCalculations';
-import { resolvePclsAges } from './pclsCrystallisation';
+import { allocateLumpSums, resolvePclsAges } from './pclsCrystallisation';
 import type {
   DCOrder,
   DrawdownBreakdown,
@@ -1133,29 +1133,22 @@ function simulateStrategies(
     ? getCandidateStrategies(policyOverride)
     : [BASELINE_STRATEGY];
 
-  // Resolve PCLS + Bed & ISA strategy parameters once.
-  const isPclsBedIsa = (state.drawdownStrategy ?? 'standard-ufpls') === 'pcls-bed-isa';
-  const dc1Enabled = state.person1.incomeSources.dcPension.enabled;
-  const dc2Enabled = state.mode === 'couple' && state.person2.incomeSources.dcPension.enabled;
+  // Each person's full lump sum is independent: own switch, own age.
   const pclsAges = resolvePclsAges(state);
-  if (isPclsBedIsa) {
-    // If PCLS fired before FI age (pre-FI period), the projection engine already
-    // reduced the DC pot and boosted ISA/GIA in the pre-FI rows that seed our balances.
-    // We must mark the LSA as fully exhausted so that subsequent DC draws are
-    // treated as 100% taxable — not 25% tax-free.
-    if (pclsAges.p1 < state.fiAge) {
-      const pclsSnapshot = getSnapshotForYear(
-        CURRENT_TAX_YEAR_START + (pclsAges.p1 - state.person1.currentAge),
-      );
-      balances = { ...balances, p1LifetimePcls: pclsSnapshot.pension.lsa };
-    }
-    if (pclsAges.p2 !== null) {
-      const p2PclsYearIndex = pclsAges.p2 - state.person2.currentAge;
-      if (state.person1.currentAge + p2PclsYearIndex < state.fiAge) {
-        const pclsSnapshot = getSnapshotForYear(CURRENT_TAX_YEAR_START + p2PclsYearIndex);
-        balances = { ...balances, p2LifetimePcls: pclsSnapshot.pension.lsa };
-      }
-    }
+
+  // A lump sum taken before FI age happened in the pre-FI projection rows that
+  // seed our balances (DC already reduced, ISA/GIA already boosted). Mark that
+  // person's LSA as used so their later DC draws are 100% taxable.
+  const pclsYearIndex = (age: number | null, currentAge: number) =>
+    age === null ? null : age - currentAge;
+  const p1PclsYear = pclsYearIndex(pclsAges.p1, state.person1.currentAge);
+  const p2PclsYear = pclsYearIndex(pclsAges.p2, state.person2.currentAge);
+  const firstFiYear = state.fiAge - state.person1.currentAge;
+  if (p1PclsYear !== null && p1PclsYear < firstFiYear) {
+    balances = { ...balances, p1LifetimePcls: getSnapshotForYear(CURRENT_TAX_YEAR_START + p1PclsYear).pension.lsa };
+  }
+  if (p2PclsYear !== null && p2PclsYear < firstFiYear) {
+    balances = { ...balances, p2LifetimePcls: getSnapshotForYear(CURRENT_TAX_YEAR_START + p2PclsYear).pension.lsa };
   }
 
   for (const row of postFiRows) {
@@ -1163,70 +1156,42 @@ function simulateStrategies(
     recordRuleProvenance(provenance, calendarYear);
     balances = applyGrowth(balances, growth);
 
-    // Track ISA allowance consumed by PCLS reinvestment in this year, so that
+    // Track ISA allowance consumed by lump-sum reinvestment in this year, so that
     // the subsequent Bed & ISA pass only uses the remaining allowance.
     let p1IsaAllowanceUsed = 0;
     let p2IsaAllowanceUsed = 0;
 
-    // PCLS + Bed & ISA: fire each person's crystallisation event at their PCLS age.
-    // Mirrors projectionEngine logic: happens after growth, before drawdown.
-    // Moves the tax-free lump sum from DC into ISA (up to annual allowance)
-    // and GIA (remainder), then exhausts the LSA so all future DC draws are
-    // 100% taxable.
-    if (isPclsBedIsa && dc1Enabled && row.p1Age === pclsAges.p1 && balances.p1Dc > 0) {
+    // Full lump sums: mirrors projectionEngine (after growth, before drawdown).
+    if (row.yearIndex === p1PclsYear || row.yearIndex === p2PclsYear) {
       const pclsSnapshot = getSnapshotForYear(calendarYear);
-      const pclsAmount = Math.min(
-        balances.p1Dc * pclsSnapshot.pension.ufplsTaxFreeFraction,
-        Math.max(0, pclsSnapshot.pension.lsa - balances.p1LifetimePcls),
+      const lsa = pclsSnapshot.pension.lsa;
+      const taxFreeFrac = pclsSnapshot.pension.ufplsTaxFreeFraction;
+      const p1Lump = row.yearIndex === p1PclsYear && balances.p1Dc > 0
+        ? Math.min(balances.p1Dc * taxFreeFrac, Math.max(0, lsa - balances.p1LifetimePcls))
+        : 0;
+      const p2Lump = row.yearIndex === p2PclsYear && balances.p2Dc > 0
+        ? Math.min(balances.p2Dc * taxFreeFrac, Math.max(0, lsa - balances.p2LifetimePcls))
+        : 0;
+      const alloc = allocateLumpSums(
+        p1Lump,
+        p2Lump,
+        pclsSnapshot.isaAnnualAllowance,
+        state.mode === 'couple' ? pclsSnapshot.isaAnnualAllowance : 0,
       );
-      if (pclsAmount > 0) {
-        // Reinvest into ISA wrappers (£20k per person) then GIA for any remainder.
-        // Joint GIA for couple, p1 GIA for single; base cost = reinvested amount.
-        const p1ToIsa = Math.min(pclsAmount, pclsSnapshot.isaAnnualAllowance);
-        const afterP1Isa = pclsAmount - p1ToIsa;
-        const p2ToIsa = (state.mode === 'couple' && afterP1Isa > 0)
-          ? Math.min(afterP1Isa, pclsSnapshot.isaAnnualAllowance)
-          : 0;
-        const toGia = afterP1Isa - p2ToIsa;
-        p1IsaAllowanceUsed = p1ToIsa;
-        p2IsaAllowanceUsed = p2ToIsa;
-        balances = {
-          ...balances,
-          p1Dc: balances.p1Dc - pclsAmount,
-          p1LifetimePcls: pclsSnapshot.pension.lsa,
-          p1Isa: balances.p1Isa + p1ToIsa,
-          p2Isa: balances.p2Isa + p2ToIsa,
-          ...(state.mode === 'couple'
-            ? { jointGiaValue: balances.jointGiaValue + toGia, jointGiaBaseCost: balances.jointGiaBaseCost + toGia }
-            : { p1GiaValue: balances.p1GiaValue + toGia, p1GiaBaseCost: balances.p1GiaBaseCost + toGia }),
-        };
-      }
-    }
-
-    // Person 2: reinvest into p2's ISA first, then any p1 ISA allowance left
-    // this year, then the joint GIA.
-    if (isPclsBedIsa && dc2Enabled && row.p2Age === pclsAges.p2 && balances.p2Dc > 0) {
-      const pclsSnapshot = getSnapshotForYear(calendarYear);
-      const pclsAmount = Math.min(
-        balances.p2Dc * pclsSnapshot.pension.ufplsTaxFreeFraction,
-        Math.max(0, pclsSnapshot.pension.lsa - balances.p2LifetimePcls),
-      );
-      if (pclsAmount > 0) {
-        const p2ToIsa = Math.min(pclsAmount, pclsSnapshot.isaAnnualAllowance - p2IsaAllowanceUsed);
-        const p1ToIsa = Math.min(pclsAmount - p2ToIsa, pclsSnapshot.isaAnnualAllowance - p1IsaAllowanceUsed);
-        const toGia = pclsAmount - p2ToIsa - p1ToIsa;
-        p2IsaAllowanceUsed += p2ToIsa;
-        p1IsaAllowanceUsed += p1ToIsa;
-        balances = {
-          ...balances,
-          p2Dc: balances.p2Dc - pclsAmount,
-          p2LifetimePcls: pclsSnapshot.pension.lsa,
-          p1Isa: balances.p1Isa + p1ToIsa,
-          p2Isa: balances.p2Isa + p2ToIsa,
-          jointGiaValue: balances.jointGiaValue + toGia,
-          jointGiaBaseCost: balances.jointGiaBaseCost + toGia,
-        };
-      }
+      p1IsaAllowanceUsed = alloc.p1Isa;
+      p2IsaAllowanceUsed = alloc.p2Isa;
+      balances = {
+        ...balances,
+        p1Dc: balances.p1Dc - p1Lump,
+        p2Dc: balances.p2Dc - p2Lump,
+        p1LifetimePcls: row.yearIndex === p1PclsYear ? lsa : balances.p1LifetimePcls,
+        p2LifetimePcls: row.yearIndex === p2PclsYear ? lsa : balances.p2LifetimePcls,
+        p1Isa: balances.p1Isa + alloc.p1Isa,
+        p2Isa: balances.p2Isa + alloc.p2Isa,
+        ...(state.mode === 'couple'
+          ? { jointGiaValue: balances.jointGiaValue + alloc.gia, jointGiaBaseCost: balances.jointGiaBaseCost + alloc.gia }
+          : { p1GiaValue: balances.p1GiaValue + alloc.gia, p1GiaBaseCost: balances.p1GiaBaseCost + alloc.gia }),
+      };
     }
 
     // General Bed & ISA — shelter GIA into ISA wrappers up to each person's
