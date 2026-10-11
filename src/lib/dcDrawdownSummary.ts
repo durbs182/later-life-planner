@@ -25,11 +25,9 @@ export function describeDcDrawdown(
   const couple = state.mode === 'couple';
 
   const startAge = Math.max(p.currentAge, p.currentAge + state.fiAge - state.person1.currentAge);
-  const startNote = state.person1.currentAge >= state.fiAge
-    ? '(now — financial independence age already reached)'
-    : isP1 || !couple
-      ? '(your financial independence age)'
-      : '(when the household reaches financial independence)';
+  let startNote = '(when the household reaches financial independence)';
+  if (state.person1.currentAge >= state.fiAge) startNote = '(now — financial independence age already reached)';
+  else if (isP1 || !couple) startNote = '(your financial independence age)';
 
   const pct = Math.round(PENSION_RULES.UFPLS_TAX_FREE_FRACTION * 100);
   const lsa = `£${PENSION_RULES.PCLS_LUMP_SUM_ALLOWANCE.toLocaleString('en-GB')}`;

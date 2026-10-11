@@ -197,14 +197,14 @@ function PriorityGroup({ number, title, subtitle, badge, badgeClass, children }:
 
 // ─── Income section ───────────────────────────────────────────────────────────
 
-function IncomeSection({ currentAge, dcDrawdown, lifeExpectancy, src, assets, set }: {
+function IncomeSection({ currentAge, dcDrawdown, lifeExpectancy, src, assets, set }: Readonly<{
   currentAge: number;
   dcDrawdown: DcDrawdownSummary;
   lifeExpectancy: number;
   src: PersonIncomeSources;
   assets: PersonAssets;
   set: (key: keyof PersonIncomeSources, u: Record<string, unknown>) => void;
-}) {
+}>) {
   const hasRentalProperty = assets.property.enabled && assets.property.annualRent > 0;
   const annuity = src.annuity ?? { enabled: false, annualIncome: 0, startAge: 65 };
 
