@@ -77,8 +77,16 @@ describe('describeDcDrawdown', () => {
     expect(describeDcDrawdown(noContrib, 'p2', true).text).not.toContain('Contributions');
   });
 
-  test('drawdown never starts before the current age', () => {
-    const { startAge } = describeDcDrawdown(dcOnlyState(62, 400_000, 60), 'p1', true);
+  test('drawdown starts now once the FI age has passed', () => {
+    const { startAge, startNote } = describeDcDrawdown(dcOnlyState(62, 400_000, 60), 'p1', true);
     expect(startAge).toBe(62);
+    expect(startNote).toBe('(now — financial independence age already reached)');
+  });
+
+  test('partner drawdown starts now once the household FI age has passed', () => {
+    const base = withDc({ ...bareCoupleState(62, 59), fiAge: 60 }, 'person2');
+    const { startAge, startNote } = describeDcDrawdown(base, 'p2', true);
+    expect(startAge).toBe(59);
+    expect(startNote).toBe('(now — financial independence age already reached)');
   });
 });
