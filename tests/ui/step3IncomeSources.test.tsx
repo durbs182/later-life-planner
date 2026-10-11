@@ -6,6 +6,36 @@ import { usePlannerStore } from '@/store/plannerStore';
 import { STEP3_IDS } from '@/lib/testIds';
 import Step3IncomeSources from '@/components/steps/Step3IncomeSources';
 
+describe('Step3IncomeSources — DC drawdown start age', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    usePlannerStore.getState().resetPlan();
+    usePlannerStore.persist.clearStorage();
+  });
+
+  test("partner's drawdown age is their own age when the household reaches FI", () => {
+    const s = usePlannerStore.getState();
+    usePlannerStore.setState({
+      mode: 'couple',
+      fiAge: 60,
+      person1: { ...s.person1, currentAge: 58 },
+      person2: {
+        ...s.person2,
+        name: 'Lisa',
+        currentAge: 55,
+        incomeSources: {
+          ...s.person2.incomeSources,
+          dcPension: { ...s.person2.incomeSources.dcPension, enabled: true, totalValue: 200000 },
+        },
+      },
+    });
+    render(<Step3IncomeSources onBack={vi.fn()} onNext={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Lisa/ }));
+    expect(screen.getByText('Age 57')).toBeInTheDocument();
+    expect(screen.getByText('(when the household reaches financial independence)')).toBeInTheDocument();
+  });
+});
+
 describe('Step3IncomeSources — income/assets tab switcher', () => {
   beforeEach(() => {
     localStorage.clear();
