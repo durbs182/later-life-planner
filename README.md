@@ -36,12 +36,12 @@ Choose individual or couple mode. Capture names, current ages, and financial ind
 Set your later-life aspirations and define up to three life stages (Go-Go Years, Slo-Go Years, No-Go Years) with age boundaries and spending multipliers for each stage.
 
 **Step 3 — Spending Goals**
-Set target annual spending in today's £. Choose a starting point from UK Retirement Living Standards (PLSA 2024), then refine by category:
+Set target annual spending in today's £. Choose a starting point from UK Retirement Living Standards (Pensions UK, formerly PLSA, 2026), then refine by category:
 
 | Household | Minimum | Moderate | Comfortable |
 |-----------|---------|----------|-------------|
-| Single    | £13,400 | £31,700  | £43,900     |
-| Couple    | £21,600 | £43,900  | £60,600     |
+| Single    | £13,900 | £32,700  | £45,400     |
+| Couple    | £22,500 | £45,400  | £62,700     |
 
 21 spending categories across four tiers: Essential, Enjoyment, Aspirational, and Life-Stage/Variable.
 

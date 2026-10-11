@@ -53,29 +53,29 @@ describe('Step2 — RLSS total spend display', () => {
     plannerState = makePlannerState({ mode: 'single', rlssStandard: 'moderate' });
   });
 
-  test('moderate single RLSS: Go-Go total displayed matches PLSA target (£31,700)', () => {
+  test('moderate single RLSS: Go-Go total displayed matches PLSA target (£32,700)', () => {
     render(<Step2SpendingGoals onBack={vi.fn()} onNext={vi.fn()} />);
     const display = screen.getByTestId(STEP2_IDS.TOTAL_SPEND_DISPLAY);
-    // formatCurrency(31700, true) = '£31.7k'
-    expect(display).toHaveTextContent('£31.7k');
+    // formatCurrency(32700, true) = '£32.7k'
+    expect(display).toHaveTextContent('£32.7k');
   });
 
-  test('comfortable single RLSS: Go-Go total displayed matches PLSA target (£43,900)', () => {
+  test('comfortable single RLSS: Go-Go total displayed matches PLSA target (£45,400)', () => {
     plannerState = makePlannerState({ mode: 'single', rlssStandard: 'comfortable' });
     render(<Step2SpendingGoals onBack={vi.fn()} onNext={vi.fn()} />);
     const display = screen.getByTestId(STEP2_IDS.TOTAL_SPEND_DISPLAY);
-    // formatCurrency(43900, true) = '£43.9k'
-    expect(display).toHaveTextContent('£43.9k');
+    // formatCurrency(45400, true) = '£45.4k'
+    expect(display).toHaveTextContent('£45.4k');
   });
 
-  test('minimum single RLSS: Go-Go total displayed matches PLSA target (£13,400)', () => {
+  test('minimum single RLSS: Go-Go total displayed matches PLSA target (£13,900)', () => {
     plannerState = makePlannerState({ mode: 'single', rlssStandard: 'minimum' });
     render(<Step2SpendingGoals onBack={vi.fn()} onNext={vi.fn()} />);
     const display = screen.getByTestId(STEP2_IDS.TOTAL_SPEND_DISPLAY);
-    expect(display).toHaveTextContent('£13.4k');
+    expect(display).toHaveTextContent('£13.9k');
   });
 
-  test('moderate couple RLSS total (£43,900) differs from moderate single (£31,700)', () => {
+  test('moderate couple RLSS total (£45,400) differs from moderate single (£32,700)', () => {
     const singleCategories = buildCategoriesForRlss('moderate', 'single');
     const coupleCategories = buildCategoriesForRlss('moderate', 'couple');
 
