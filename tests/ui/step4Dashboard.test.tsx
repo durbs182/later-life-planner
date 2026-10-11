@@ -1,11 +1,13 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { paulAndLisaState } from '../fixtures/states';
 import { calculateProjections, formatCurrency } from '@/lib/calculations';
 import { optimizeWithdrawals } from '@/financialEngine/withdrawalOptimizer';
 import { PENSION_RULES, INCOME_TAX, CGT } from '@/config/financialConstants';
 import { DASHBOARD_WELCOMED_KEY } from '@/lib/browserStorageKeys';
+import { STEP4_IDS } from '@/lib/testIds';
+import { useUiStore } from '@/store/uiStore';
 
 const setGoalRegistryMock = vi.fn();
 const setCareReserveMock = vi.fn();
@@ -147,6 +149,21 @@ describe('Step4Dashboard', () => {
     test('shows the simplified withdrawal strategy heading on the Strategy tab', () => {
       renderAndOpenStrategyTab();
       expect(screen.getByText('Simplified tax-efficient withdrawal strategy')).toBeInTheDocument();
+    });
+
+    test('keeps the selected tab after leaving and returning to the dashboard', () => {
+      renderAndOpenStrategyTab();
+      cleanup();
+      render(<Step4Dashboard onBack={vi.fn()} />);
+      expect(screen.getByText('Simplified tax-efficient withdrawal strategy')).toBeInTheDocument();
+    });
+
+    test('falls back to Overview when the remembered tab is not available', () => {
+      useUiStore.setState({ dashboardTab: 'strategy' });
+      vi.stubEnv('NEXT_PUBLIC_PRO_ENABLED', 'true');
+      render(<Step4Dashboard onBack={vi.fn()} />);
+      expect(screen.queryByText('Simplified tax-efficient withdrawal strategy')).not.toBeInTheDocument();
+      expect(screen.getByTestId(STEP4_IDS.TAB_BUTTON('overview'))).toHaveClass('bg-orange-100');
     });
 
     test('shows all five withdrawal steps matching the drawdown waterfall', () => {

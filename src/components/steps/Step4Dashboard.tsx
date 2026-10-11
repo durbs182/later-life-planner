@@ -2,6 +2,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
+import { useUiStore, type DashboardTab } from '@/store/uiStore';
 import { useOptionalGetToken } from '@/hooks/useOptionalGetToken';
 import { newId } from '@/lib/ids';
 import {
@@ -35,7 +36,7 @@ import clsx from 'clsx';
 
 interface Props { onBack: () => void }
 
-type ActiveTab = 'overview' | 'strategy' | 'goals' | 'iht' | 'care';
+type ActiveTab = DashboardTab;
 
 // ─── Goal priority panel helpers ───────────────────────────────────────────────
 
@@ -485,7 +486,7 @@ export default function Step4Dashboard({ onBack }: Props) {
   const [policyOverride, setPolicyOverride] = useState<OptimizerPolicyOverride | null>(null);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [proModalSource, setProModalSource] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+  const { dashboardTab, setDashboardTab: setActiveTab } = useUiStore();
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(
     () => !localStorage.getItem(DASHBOARD_WELCOMED_KEY)
   );
@@ -673,6 +674,7 @@ export default function Step4Dashboard({ onBack }: Props) {
     { id: 'iht', label: 'IHT & Estate' },
     { id: 'care', label: 'Care Reserve', badge: 'Coming soon' },
   ];
+  const activeTab: ActiveTab = tabs.some(t => t.id === dashboardTab) ? dashboardTab : 'overview';
 
   return (
     <div className="min-h-screen bg-slate-50">

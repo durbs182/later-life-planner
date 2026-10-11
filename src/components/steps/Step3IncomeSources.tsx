@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { usePlannerStore } from '@/store/plannerStore';
+import { useUiStore } from '@/store/uiStore';
 import Toggle from '@/components/ui/Toggle';
 import CurrencyInput from '@/components/ui/CurrencyInput';
 import GuidedSetupWizard from '@/components/GuidedSetupWizard';
@@ -600,8 +601,8 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
     assumptions, updateAssumptions,
   } = usePlannerStore();
 
-  const [activePerson, setActivePerson] = useState<'person1' | 'person2'>('person1');
-  const [activeTab, setActiveTab]       = useState<'income' | 'assets'>('income');
+  const { step3Person: activePerson, setStep3Person: setActivePerson,
+          step3Tab: activeTab, setStep3Tab: setActiveTab } = useUiStore();
   const [showGuided, setShowGuided]     = useState(
     () => !localStorage.getItem(INCOME_WIZARD_DONE_KEY)
   );
