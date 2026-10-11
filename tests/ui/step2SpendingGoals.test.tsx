@@ -41,6 +41,21 @@ describe('Step2SpendingGoals', () => {
     plannerState.gapSpending = 1000;
   });
 
+  test('labels the living standards source and household size for each mode', () => {
+    const { unmount } = render(<Step2SpendingGoals onBack={vi.fn()} onNext={vi.fn()} />);
+    expect(screen.getByText(/Retirement Living Standards \(Pensions UK 2026\)/)).toBeInTheDocument();
+    expect(screen.getByText('Two-person')).toBeInTheDocument();
+    unmount();
+
+    plannerState.mode = 'single';
+    try {
+      render(<Step2SpendingGoals onBack={vi.fn()} onNext={vi.fn()} />);
+      expect(screen.getByText('One-person')).toBeInTheDocument();
+    } finally {
+      plannerState.mode = 'couple';
+    }
+  });
+
   test('syncs the care reserve goal when the reserve amount is updated', () => {
     render(<Step2SpendingGoals onBack={vi.fn()} onNext={vi.fn()} />);
 

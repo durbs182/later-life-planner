@@ -83,20 +83,21 @@ export const STATE_PENSION = {
   RISE_TO_67_BY_YEAR: 2028,
 } as const;
 
-// ─── UK Retirement Living Standards (RLSS) 2024 ──────────────────────────────
-// Source: Pensions and Lifetime Savings Association (PLSA) — https://www.retirementlivingstandards.org.uk
+// ─── UK Retirement Living Standards (RLSS) 2026 ──────────────────────────────
+// Source: Pensions UK (formerly the PLSA) — https://www.retirementlivingstandards.org.uk
+// Annual spending after tax, outside London. Research 2025, modelling completed 2026.
 // User-adjustable: These are starting templates only; users customise category amounts.
 
 export const RLSS = {
   single: {
-    minimum:     { annual: 13_400, label: 'Minimum',     emoji: '🏠', description: 'Covers basic needs with a little flexibility' },
-    moderate:    { annual: 31_700, label: 'Moderate',    emoji: '🌿', description: 'More financial security and comfort' },
-    comfortable: { annual: 43_900, label: 'Comfortable', emoji: '⭐', description: 'More freedom and some luxuries' },
+    minimum:     { annual: 13_900, label: 'Minimum',     emoji: '🏠', description: 'Covers basic needs with a little flexibility' },
+    moderate:    { annual: 32_700, label: 'Moderate',    emoji: '🌿', description: 'More financial security and comfort' },
+    comfortable: { annual: 45_400, label: 'Comfortable', emoji: '⭐', description: 'More freedom and some luxuries' },
   },
   couple: {
-    minimum:     { annual: 21_600, label: 'Minimum',     emoji: '🏠', description: 'Covers basic needs with a little flexibility' },
-    moderate:    { annual: 43_900, label: 'Moderate',    emoji: '🌿', description: 'More financial security and comfort' },
-    comfortable: { annual: 60_600, label: 'Comfortable', emoji: '⭐', description: 'More freedom and some luxuries' },
+    minimum:     { annual: 22_500, label: 'Minimum',     emoji: '🏠', description: 'Covers basic needs with a little flexibility' },
+    moderate:    { annual: 45_400, label: 'Moderate',    emoji: '🌿', description: 'More financial security and comfort' },
+    comfortable: { annual: 62_700, label: 'Comfortable', emoji: '⭐', description: 'More freedom and some luxuries' },
   },
 } as const;
 

@@ -464,7 +464,7 @@ describe('getSustainableRlssLevel', () => {
   });
 
   test('returns null or minimum for bare plan with no assets/income', () => {
-    const state = withSpending(bareState(65), 60_600); // comfortable spend, zero resources
+    const state = withSpending(bareState(65), 62_700); // comfortable spend, zero resources
     const projections = calculateProjections(state);
     const result = getSustainableRlssLevel(projections, 'single');
     // No income → can't sustain even minimum
