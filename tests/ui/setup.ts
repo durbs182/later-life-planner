@@ -3,7 +3,14 @@ import 'fake-indexeddb/auto';
 
 import React from 'react';
 import { webcrypto } from 'node:crypto';
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
+import { useUiStore } from '@/store/uiStore';
+
+// View selections live in a module-level store, so reset them between tests.
+const initialUiState = useUiStore.getState();
+beforeEach(() => {
+  useUiStore.setState(initialUiState, true);
+});
 
 const localStorageShim = (() => {
   const store = new Map<string, string>();

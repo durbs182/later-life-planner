@@ -31,6 +31,19 @@ describe('Step3IncomeSources — income/assets tab switcher', () => {
     fireEvent.click(screen.getByTestId(STEP3_IDS.TAB_INCOME));
     expect(screen.getByText('DC / Personal Pension')).toBeInTheDocument();
   });
+
+  test("keeps the partner's assets tab after leaving and returning to the step", () => {
+    usePlannerStore.setState({ mode: 'couple', person2: { ...usePlannerStore.getState().person2, name: 'Lisa' } });
+    const { unmount } = render(<Step3IncomeSources onBack={vi.fn()} onNext={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /Lisa/ }));
+    fireEvent.click(screen.getByTestId(STEP3_IDS.TAB_ASSETS));
+    unmount();
+
+    render(<Step3IncomeSources onBack={vi.fn()} onNext={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /Lisa/ })).toHaveClass('bg-emerald-500');
+    expect(screen.getByText('ISA')).toBeInTheDocument();
+    expect(screen.queryByText('DC / Personal Pension')).not.toBeInTheDocument();
+  });
 });
 
 describe('Step3IncomeSources — ISA and GIA annual contributions', () => {
