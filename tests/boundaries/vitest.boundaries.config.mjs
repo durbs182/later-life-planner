@@ -11,13 +11,26 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, '../../src') },
   },
   test: {
-    name: 'boundaries',
     globals: true,
-    environmentMatchGlobs: [
-      ['tests/boundaries/ui/**', 'jsdom'],
-      ['tests/boundaries/engine/**', 'node'],
-    ],
     setupFiles: [path.resolve(__dirname, '../ui/setup.ts')],
-    include: ['tests/boundaries/**/*.test.{ts,tsx}'],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'boundaries',
+          environment: 'node',
+          include: ['tests/boundaries/**/*.test.{ts,tsx}'],
+          exclude: ['tests/boundaries/ui/**'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'boundaries-ui',
+          environment: 'jsdom',
+          include: ['tests/boundaries/ui/**/*.test.{ts,tsx}'],
+        },
+      },
+    ],
   },
 });
