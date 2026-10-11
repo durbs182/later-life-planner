@@ -11,6 +11,7 @@ import type { PersonIncomeSources, PersonAssets, AssetOwner } from '@/lib/types'
 import type { PrimaryResidenceAsset } from '@/models/types';
 import { STEP3_IDS } from '@/lib/testIds';
 import { INCOME_WIZARD_DONE_KEY } from '@/lib/browserStorageKeys';
+import { describeDcDrawdown, type DcDrawdownSummary } from '@/lib/dcDrawdownSummary';
 import clsx from 'clsx';
 
 interface Props { onNext: () => void; onBack: () => void }
@@ -196,9 +197,9 @@ function PriorityGroup({ number, title, subtitle, badge, badgeClass, children }:
 
 // ─── Income section ───────────────────────────────────────────────────────────
 
-function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: {
+function IncomeSection({ currentAge, dcDrawdown, lifeExpectancy, src, assets, set }: {
   currentAge: number;
-  fiAge: number;
+  dcDrawdown: DcDrawdownSummary;
   lifeExpectancy: number;
   src: PersonIncomeSources;
   assets: PersonAssets;
@@ -338,10 +339,10 @@ function IncomeSection({ currentAge, fiAge, lifeExpectancy, src, assets, set }: 
             />
           </FieldRow>
           <FieldRow label="Drawdown starts">
-            <span className="text-sm font-bold text-orange-600">Age {fiAge} <span className="font-normal text-slate-400">(your financial independence age)</span></span>
+            <span className="text-sm font-bold text-orange-600">Age {dcDrawdown.startAge} <span className="font-normal text-slate-400">{dcDrawdown.startNote}</span></span>
           </FieldRow>
           <div className="py-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3">
-            Each withdrawal is 25% tax-free and 75% taxable income. The full pot stays invested until needed. Workplace and SIPP contributions are projected only until FI age.
+            {dcDrawdown.text}
           </div>
         </SourceCard>
 
@@ -592,14 +593,15 @@ function AssetsSection({ assets, set, mode, p1Label, p2Label, sharedGia, onShare
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Step3IncomeSources({ onNext, onBack }: Props) {
+  const state = usePlannerStore();
   const {
-    mode, fiAge,
+    mode,
     person1, setP1Income, setP1Asset,
     person2, setP2Income, setP2Asset,
     jointGia, setJointGia,
     primaryResidence, setPrimaryResidence,
     assumptions, updateAssumptions,
-  } = usePlannerStore();
+  } = state;
 
   const { step3Person: activePerson, setStep3Person: setActivePerson,
           step3Tab: activeTab, setStep3Tab: setActiveTab } = useUiStore();
@@ -618,6 +620,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
   const person    = isPerson1 ? person1 : person2;
   const setIncome = isPerson1 ? setP1Income : setP2Income;
   const setAsset  = isPerson1 ? setP1Asset  : setP2Asset;
+  const dcDrawdown = describeDcDrawdown(state, isPerson1 ? 'p1' : 'p2', process.env.NEXT_PUBLIC_PRO_ENABLED === 'true');
 
   return (
     <div className="space-y-5 pb-24">
@@ -759,7 +762,7 @@ export default function Step3IncomeSources({ onNext, onBack }: Props) {
 
       {/* Content */}
       {activeTab === 'income' ? (
-        <IncomeSection currentAge={person.currentAge} fiAge={fiAge} lifeExpectancy={assumptions.lifeExpectancy} src={person.incomeSources} assets={person.assets} set={setIncome} />
+        <IncomeSection currentAge={person.currentAge} dcDrawdown={dcDrawdown} lifeExpectancy={assumptions.lifeExpectancy} src={person.incomeSources} assets={person.assets} set={setIncome} />
       ) : (
         <AssetsSection
           assets={person.assets} set={setAsset} mode={mode}
